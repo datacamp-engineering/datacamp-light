@@ -7,7 +7,9 @@ let exercise = null;
 const loadedPackages = new Set();
 const SHELLWHAT_SOURCES = ${JSON.stringify(SHELLWHAT_PY_SOURCES)};
 
-const PYODIDE_INDEX_URL = "https://cdn.jsdelivr.net/pyodide/v0.27.3/full/";
+const PYODIDE_INDEX_URL = (typeof self !== "undefined" && self.DCL_PYODIDE_URL)
+  ? self.DCL_PYODIDE_URL
+  : "https://cdn.jsdelivr.net/pyodide/v0.27.3/full/";
 
 // Pure-Python packages already prebuilt in Pyodide's own package registry -
 // fast to load via pyodide.loadPackage(), no network round-trip to PyPI.

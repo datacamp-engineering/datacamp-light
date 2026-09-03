@@ -1,33 +1,13 @@
-import { JsonRpcSessionClient } from '../jsonrpc/session';
 import type { IJsonRpcSession } from '../jsonrpc/session';
+import dclConfig from '../config';
 import { PYODIDE_WORKER_SCRIPT } from './pyodideWorkerSource';
+import { createWorkerJsonRpcSession } from './workerSession';
 
 export function createWasmSession(): IJsonRpcSession {
-  // Create an in-memory worker using Blob URL for maximum standalone portability
-  const blob = new Blob([PYODIDE_WORKER_SCRIPT], {
-    type: 'application/javascript',
+  const { client } = createWorkerJsonRpcSession(PYODIDE_WORKER_SCRIPT, {
+    name: 'Pyodide Worker',
+    preamble: `self.DCL_PYODIDE_URL = ${JSON.stringify(dclConfig.pyodideUrl)};`,
   });
-  const workerUrl = URL.createObjectURL(blob);
-  const worker = new Worker(workerUrl);
-
-  const client = new JsonRpcSessionClient((message) => {
-    worker.postMessage(message);
-  });
-
-  worker.onmessage = (event: MessageEvent) => {
-    client.handleMessageFromWorker(event.data);
-  };
-
-  worker.onerror = (error: ErrorEvent) => {
-    console.error('DataCamp Light Worker Error:', error);
-  };
-
-  const originalDestroy = client.destroy.bind(client);
-  client.destroy = () => {
-    originalDestroy();
-    worker.terminate();
-    URL.revokeObjectURL(workerUrl);
-  };
 
   return client;
 }

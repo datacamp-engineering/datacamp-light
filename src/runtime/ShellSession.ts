@@ -1,9 +1,9 @@
-import { JsonRpcSessionClient } from '../jsonrpc/session';
 import type { IRunCommandSession } from '../jsonrpc/session';
 import type { ISubmitCodeParams, ISubmitCodeResult } from '../jsonrpc/types';
 import dclConfig from '../config';
 import { getSharedPyodideSession } from './pyodideEvaluator';
 import { SHELL_WORKER_SCRIPT } from './shellWorkerSource';
+import { createWorkerJsonRpcSession } from './workerSession';
 
 /**
  * Creates a WASM-equivalent shell session.
@@ -13,28 +13,10 @@ import { SHELL_WORKER_SCRIPT } from './shellWorkerSource';
  * routes grading through the shared in-browser Pyodide worker running shellwhat.
  */
 export function createShellSession(): IRunCommandSession {
-  // The worker is created from a Blob, so it has no bundle context: inject the
-  // resolved asset base (dev: '' -> dev-server origin, prod: fixed CDN base)
-  // before the worker script body.
-  const workerSource =
-    `self.DCL_ASSET_BASE_URL = ${JSON.stringify(dclConfig.assetBaseUrl)};\n` + SHELL_WORKER_SCRIPT;
-  const blob = new Blob([workerSource], {
-    type: 'application/javascript',
+  const { client } = createWorkerJsonRpcSession(SHELL_WORKER_SCRIPT, {
+    name: 'Shell Worker',
+    preamble: `self.DCL_ASSET_BASE_URL = ${JSON.stringify(dclConfig.assetBaseUrl)};`,
   });
-  const workerUrl = URL.createObjectURL(blob);
-  const worker = new Worker(workerUrl);
-
-  const client = new JsonRpcSessionClient((message) => {
-    worker.postMessage(message);
-  });
-
-  worker.onmessage = (event: MessageEvent) => {
-    client.handleMessageFromWorker(event.data);
-  };
-
-  worker.onerror = (error: ErrorEvent) => {
-    console.error('DataCamp Light Shell Worker Error:', error);
-  };
 
   const originalSubmitCode = client.submitCode.bind(client);
   client.submitCode = async (params: ISubmitCodeParams): Promise<ISubmitCodeResult> => {
@@ -69,13 +51,6 @@ export function createShellSession(): IRunCommandSession {
     }
 
     return originalSubmitCode(params);
-  };
-
-  const originalDestroy = client.destroy.bind(client);
-  client.destroy = () => {
-    originalDestroy();
-    worker.terminate();
-    URL.revokeObjectURL(workerUrl);
   };
 
   return client;
