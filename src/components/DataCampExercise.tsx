@@ -64,20 +64,31 @@ const ShellExercise: React.FC<{
   utmCampaign?: string;
   onSubmit?: (code: string) => void;
   onFeedback?: (correct: boolean, message: string) => void;
-}> = ({ hint, preExerciseCode, sct, height, utmSource, utmCampaign, onSubmit, onFeedback }) => {
+}> = ({
+  hint,
+  preExerciseCode,
+  sct,
+  height,
+  utmSource,
+  utmCampaign,
+  onSubmit,
+  onFeedback,
+}) => {
   const [showingHint, setShowingHint] = useState(false);
   const [feedback, setFeedback] = useState<{ correct: boolean; message: string } | null>(null);
   const [typedHistory, setTypedHistory] = useState<string[]>([]);
-  const [submitting, setSubmitting] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const initialHeight = typeof height === 'number' ? height : 300;
   const [terminalHeight, setTerminalHeight] = useState<number>(initialHeight);
 
   const session = useMemo(() => createSessionForLanguage('shell'), []);
 
   useEffect(() => {
-    session.initialize({ pec: preExerciseCode, sct, language: 'shell' }).catch((err) => {
-      console.warn('DataCamp Light shell initialisation warning:', err);
-    });
+    session
+      .initialize({ pec: preExerciseCode, sct, language: 'shell' })
+      .catch((initializationError) => {
+        console.warn('DataCamp Light shell initialization warning:', initializationError);
+      });
 
     return () => {
       session.destroy();
@@ -100,14 +111,14 @@ const ShellExercise: React.FC<{
       const result = await session.runCommand({ command });
       onSubmit?.(nextHistory.join('\n'));
       return result;
-    } catch (err: any) {
-      return { error: err.message || 'Execution error' };
+    } catch (executionError: any) {
+      return { error: executionError.message || 'Execution error' };
     }
   };
 
   // SCT grading only on explicit submit, against the full typed history.
   const handleSubmit = async () => {
-    setSubmitting(true);
+    setIsSubmitting(true);
     setFeedback(null);
     try {
       const result = await session.submitCode({
@@ -117,10 +128,13 @@ const ShellExercise: React.FC<{
       });
       setFeedback({ correct: result.correct, message: result.message });
       onFeedback?.(result.correct, result.message);
-    } catch (err: any) {
-      setFeedback({ correct: false, message: err.message || 'Evaluation error' });
+    } catch (evaluationError: any) {
+      setFeedback({
+        correct: false,
+        message: evaluationError.message || 'Evaluation error',
+      });
     } finally {
-      setSubmitting(false);
+      setIsSubmitting(false);
     }
   };
 
@@ -144,7 +158,7 @@ const ShellExercise: React.FC<{
       >
         {hint && (
           <Button
-            onClick={() => setShowingHint((prev) => !prev)}
+            onClick={() => setShowingHint((previous) => !previous)}
             size="small"
             variant="plain"
           >
@@ -152,8 +166,8 @@ const ShellExercise: React.FC<{
           </Button>
         )}
         <Button
-          disabled={submitting}
-          isLoading={submitting}
+          disabled={isSubmitting}
+          isLoading={isSubmitting}
           onClick={handleSubmit}
           size="small"
           variant="regularOutline"
@@ -184,7 +198,7 @@ const ShellExercise: React.FC<{
       <ResizeHandle
         ariaLabel="Resize terminal"
         onResize={(deltaY) =>
-          setTerminalHeight((prev) => Math.max(120, Math.min(800, prev + deltaY)))
+          setTerminalHeight((previous) => Math.max(120, Math.min(800, previous + deltaY)))
         }
       />
 
@@ -228,17 +242,23 @@ const CodeExercise: React.FC<DataCampExerciseProps> = ({
   const prompt = language === 'r' ? '> ' : '>>> ';
 
   useEffect(() => {
-    const unsubStatus = session.onStatusChange((newStatus) => {
+    const unsubscribeStatus = session.onStatusChange((newStatus) => {
       setStatus(newStatus);
     });
 
-    const unsubOutput = session.onOutput((notif) => {
-      if (notif.type === 'output' && typeof notif.payload === 'string') {
-        setConsoleEntries((prev) => [...prev, { type: 'output', text: notif.payload as string }]);
-      } else if (notif.type === 'graph' && typeof notif.payload === 'string') {
-        setPlots((prev) => [...prev, notif.payload as string]);
-      } else if (notif.type === 'error' && typeof notif.payload === 'string') {
-        setConsoleEntries((prev) => [...prev, { type: 'error', text: notif.payload as string }]);
+    const unsubscribeOutput = session.onOutput((notification) => {
+      if (notification.type === 'output' && typeof notification.payload === 'string') {
+        setConsoleEntries((previous) => [
+          ...previous,
+          { type: 'output', text: notification.payload as string },
+        ]);
+      } else if (notification.type === 'graph' && typeof notification.payload === 'string') {
+        setPlots((previous) => [...previous, notification.payload as string]);
+      } else if (notification.type === 'error' && typeof notification.payload === 'string') {
+        setConsoleEntries((previous) => [
+          ...previous,
+          { type: 'error', text: notification.payload as string },
+        ]);
       }
     });
 
@@ -250,13 +270,13 @@ const CodeExercise: React.FC<DataCampExerciseProps> = ({
         packages,
         language,
       })
-      .catch((err) => {
-        console.warn('DataCamp Light initialisation warning:', err);
+      .catch((initializationError) => {
+        console.warn('DataCamp Light initialization warning:', initializationError);
       });
 
     return () => {
-      unsubStatus();
-      unsubOutput();
+      unsubscribeStatus();
+      unsubscribeOutput();
       session.destroy();
     };
   }, [session, preExerciseCode, solution, sct, language]);
@@ -268,10 +288,10 @@ const CodeExercise: React.FC<DataCampExerciseProps> = ({
 
     try {
       await session.runCode({ code });
-    } catch (err: any) {
-      setConsoleEntries((prev) => [
-        ...prev,
-        { type: 'error', text: err.message || 'Execution error' },
+    } catch (executionError: any) {
+      setConsoleEntries((previous) => [
+        ...previous,
+        { type: 'error', text: executionError.message || 'Execution error' },
       ]);
     } finally {
       setExecutingAction(null);
@@ -296,10 +316,10 @@ const CodeExercise: React.FC<DataCampExerciseProps> = ({
         message: result.message,
       });
       onFeedback?.(result.correct, result.message);
-    } catch (err: any) {
+    } catch (evaluationError: any) {
       setFeedback({
         correct: false,
-        message: err.message || 'Evaluation error',
+        message: evaluationError.message || 'Evaluation error',
       });
     } finally {
       setExecutingAction(null);
@@ -307,15 +327,15 @@ const CodeExercise: React.FC<DataCampExerciseProps> = ({
   };
 
   const handleExecuteConsoleCommand = async (command: string) => {
-    setConsoleEntries((prev) => [...prev, { type: 'input', text: command }]);
+    setConsoleEntries((previous) => [...previous, { type: 'input', text: command }]);
     setExecutingAction('run');
 
     try {
       await session.runCode({ code: command });
-    } catch (err: any) {
-      setConsoleEntries((prev) => [
-        ...prev,
-        { type: 'error', text: err.message || 'Execution error' },
+    } catch (executionError: any) {
+      setConsoleEntries((previous) => [
+        ...previous,
+        { type: 'error', text: executionError.message || 'Execution error' },
       ]);
     } finally {
       setExecutingAction(null);
@@ -342,7 +362,7 @@ const CodeExercise: React.FC<DataCampExerciseProps> = ({
   };
 
   const handleToggleHint = () => {
-    setShowingHint((prev) => !prev);
+    setShowingHint((previous) => !previous);
   };
 
   return (
@@ -357,7 +377,7 @@ const CodeExercise: React.FC<DataCampExerciseProps> = ({
       <ResizeHandle
         ariaLabel="Resize code editor"
         onResize={(deltaY) =>
-          setEditorHeight((prev) => Math.max(100, Math.min(800, prev + deltaY)))
+          setEditorHeight((previous) => Math.max(100, Math.min(800, previous + deltaY)))
         }
       />
 
@@ -398,7 +418,7 @@ const CodeExercise: React.FC<DataCampExerciseProps> = ({
       <ResizeHandle
         ariaLabel="Resize output console"
         onResize={(deltaY) =>
-          setOutputHeight((prev) => Math.max(80, Math.min(600, prev + deltaY)))
+          setOutputHeight((previous) => Math.max(80, Math.min(600, previous + deltaY)))
         }
       />
 
@@ -408,7 +428,7 @@ const CodeExercise: React.FC<DataCampExerciseProps> = ({
           <ResizeHandle
             ariaLabel="Resize plot section"
             onResize={(deltaY) =>
-              setPlotHeight((prev) => Math.max(150, Math.min(800, prev + deltaY)))
+              setPlotHeight((previous) => Math.max(150, Math.min(800, previous + deltaY)))
             }
           />
         </>
