@@ -1,183 +1,124 @@
-import { ExerciseType, Language } from "@datacamp/multiplexer-client";
-import * as React from "react";
-import { Provider } from "react-redux";
-import { render } from "react-dom";
-import { AppContainer } from "react-hot-loader";
-import { applyMiddleware } from "redux";
-import { composeWithDevTools } from "redux-devtools-extension";
-import { createEpicMiddleware } from "redux-observable";
-import LazyLoad from "react-lazyload";
-const outdent = require("strip-indent");
+import './i18n';
+import { createRoot } from 'react-dom/client';
+import { DataCampExercise } from './components/DataCampExercise';
+import type { DataCampExerciseProps } from './components/DataCampExercise';
 
-import createApp from "./containers/App";
-import Placeholder from "./components/Placeholder";
-import rootEpic from "./helpers/epics";
-import Hub from "./helpers/hub";
-import uuid from "./helpers/uuid";
-import getPackages from "./helpers/packages";
-import { setExercise, updateCode, setId, setListener } from "./redux/exercise";
-import createStore from "./redux/store";
-
-type Settings = {
-  id: string;
-  height: number;
-  hint?: string;
-  language: Language;
-  lang_version?: string;
-  pre_exercise_code?: string;
-  sample_code?: string;
-  sct: string;
-  solution: string;
-  showRunButton: boolean;
-  noLazyLoad?: boolean;
-  type?: ExerciseType;
+const stripIndent = (str: string): string => {
+  const match = str.match(/^[ \t]*(?=\S)/gm);
+  if (!match) return str;
+  const indent = Math.min(...match.map((el) => el.length));
+  const regex = new RegExp(`^[ \\t]{${indent}}`, 'gm');
+  return indent > 0 ? str.replace(regex, '') : str;
 };
 
-export function getSettings(element: HTMLDivElement): Settings {
-  let settings: Settings = {
-    height: parseInt(element.getAttribute("data-height") || "auto", 10),
-    id: element.id,
-    language: "r",
-    lang_version: "",
-    sct: "",
-    showRunButton: false,
-    solution: "",
+export function getSettings(element: HTMLElement): DataCampExerciseProps {
+  const id = element.id || `dcl-${Math.random().toString(36).substring(2, 9)}`;
+
+  if (element.getAttribute('data-encoded')) {
+    try {
+      const decoded = atob(decodeURIComponent(element.textContent || ''));
+      const exercise = JSON.parse(decoded);
+      return {
+        id,
+        hint: exercise.hint,
+        language: exercise.language || 'python',
+        packages: exercise.packages ? exercise.packages.split(',').map((p: string) => p.trim()) : [],
+        preExerciseCode: exercise.pre_exercise_code || '',
+        sampleCode: exercise.sample || exercise.sample_code || '',
+        sct: exercise.sct || '',
+        solution: exercise.solution || '',
+        showRunButton: exercise.showRunButton !== false,
+      };
+    } catch (e) {
+      console.error('Failed to parse encoded DataCamp Light exercise:', e);
+    }
+  }
+
+  const getText = (type: string): string => {
+    const textElement = element.querySelector(`code[data-type="${type}"]`);
+    if (!textElement) return '';
+    return stripIndent(textElement.textContent || '').trim();
   };
 
-  if (element.getAttribute("data-encoded")) {
-    const exercise = JSON.parse(atob(decodeURIComponent(element.textContent)));
-    settings.hint = exercise.hint;
-    settings.language = exercise.language;
-    settings.lang_version = exercise.lang_version;
-    settings.pre_exercise_code =
-      getPackages(exercise.packages, exercise.language) +
-      exercise.pre_exercise_code;
-    settings.sample_code = exercise.sample || exercise.sample_code;
-    settings.sct = exercise.sct;
-    settings.solution = exercise.solution;
-    settings.showRunButton = exercise.showRunButton;
-    settings.noLazyLoad = exercise.noLazyLoad;
-  } else {
-    const getText = (type: string, isEncoded?: boolean) => {
-      const textElement = element.querySelector(`code[data-type=${type}]`);
-      if (!textElement) {
-        return "";
-      }
+  const getHint = (): string => {
+    const hintElement = element.querySelector('[data-type="hint"]');
+    return hintElement ? hintElement.innerHTML : '';
+  };
 
-      return outdent(textElement.textContent).trim();
-    };
+  const showRunButton =
+    !element.hasAttribute('data-show-run-button') ||
+    element.getAttribute('data-show-run-button')?.toLowerCase() !== 'false';
 
-    const getHint = () => {
-      const hintElement = element.querySelector("[data-type=hint]");
-      if (!hintElement) {
-        return undefined;
-      } else {
-        return hintElement.innerHTML;
-      }
-    };
+  const rawPackages = element.getAttribute('data-packages') || '';
+  const packages = rawPackages
+    .split(',')
+    .map((p) => p.trim())
+    .filter(Boolean);
 
-    const showRunButton =
-      element.hasAttribute("data-show-run-button") &&
-      element.getAttribute("data-show-run-button").toLowerCase() !== "false";
+  const rawHeight = element.getAttribute('data-height');
+  const height = rawHeight === 'auto' || !rawHeight ? 'auto' : parseInt(rawHeight, 10);
 
-    Object.assign(settings, {
-      hint: getHint(),
-      language: (element.getAttribute("data-lang") || "r") as Language,
-      lang_version: element.getAttribute("data-lang-version"),
-      packages: element.getAttribute("data-packages"),
-      pre_exercise_code:
-        getPackages(
-          element.getAttribute("data-packages"),
-          element.getAttribute("data-lang")
-        ) + getText("pre-exercise-code"),
-      sample_code: getText("sample-code"),
-      sct: getText("sct"),
-      solution: getText("solution"),
-      showRunButton: showRunButton,
-      noLazyLoad: undefined, // assigned later
-    });
-  }
-  // Encoded content can also have the data-no-lazy-load attribute
-  if (
-    element.hasAttribute("data-no-lazy-load") &&
-    settings.noLazyLoad === undefined
-  ) {
-    settings.noLazyLoad =
-      element.getAttribute("data-no-lazy-load").toLowerCase() !== "false";
-  }
-
-  if (isNaN(settings.height)) {
-    settings.height = 78 + settings.sample_code.split(/\r?\n/).length * 17;
-  }
-
-  settings.height = settings.height >= 300 ? settings.height : 300;
-
-  if (settings.language == "shell") {
-    settings.type = "ConsoleExercise";
-  }
-
-  return settings;
+  return {
+    id,
+    hint: getHint(),
+    language: element.getAttribute('data-lang') || 'python',
+    packages,
+    preExerciseCode: getText('pre-exercise-code'),
+    sampleCode: getText('sample-code'),
+    sct: getText('sct'),
+    solution: getText('solution'),
+    height,
+    showRunButton,
+    utmSource: element.getAttribute('data-utm-source') || undefined,
+    utmCampaign: element.getAttribute('data-utm-campaign') || undefined,
+  };
 }
 
-export default (element: HTMLDivElement, hub: Hub) => {
-  const storeEnhancer = composeWithDevTools(
-    applyMiddleware(createEpicMiddleware(rootEpic))
-  );
-
-  const utmSource = element.getAttribute("data-utm-source") || undefined;
-  const utmCampaign = element.getAttribute("data-utm-campaign") || undefined;
-  const impactTrackingLink =
-    element.getAttribute("data-impact-tracking-link") || undefined;
-  const settings = getSettings(element);
-
-  // Create the store
-  const store = createStore(storeEnhancer);
-  const App = createApp(store);
-
-  element.style.height = `${settings.height}px`;
-
-  const getAppContainer = () => {
-    return (
-      <AppContainer>
-        <Provider store={store}>
-          <App
-            height={settings.height}
-            language={settings.language}
-            utmSource={utmSource}
-            utmCampaign={utmCampaign}
-            impactTrackingLink={impactTrackingLink}
-          />
-        </Provider>
-      </AppContainer>
-    );
-  };
-
-  if (settings.noLazyLoad) {
-    render(getAppContainer(), element);
-  } else {
-    render(
-      <LazyLoad
-        height={settings.height}
-        offset={200}
-        once
-        placeholder={<Placeholder />}
-        debounce={50}
-      >
-        {getAppContainer()}
-      </LazyLoad>,
-      element
-    );
+export function bootElement(element: HTMLElement): void {
+  if (element.classList.contains('datacamp-exercise-initialized')) {
+    return;
   }
 
-  store.dispatch(setExercise(settings));
-  store.dispatch(updateCode(settings.sample_code));
-  const id = element.id || uuid();
-  store.dispatch(setId(id));
+  const noLazyLoad =
+    element.hasAttribute('data-no-lazy-load') &&
+    element.getAttribute('data-no-lazy-load')?.toLowerCase() !== 'false';
 
-  store.dispatch(setListener((t, p) => hub.process(t, p)));
+  const mount = () => {
+    if (element.classList.contains('datacamp-exercise-initialized')) {
+      return;
+    }
+    const settings = getSettings(element);
+    element.innerHTML = '';
+    element.classList.add('datacamp-exercise-initialized');
+    element.removeAttribute('data-datacamp-exercise');
 
-  element.removeAttribute("data-datacamp-exercise");
-  element.className += " datacamp-exercise";
+    const root = createRoot(element);
+    root.render(<DataCampExercise {...settings} />);
+  };
 
-  return id;
-};
+  if (noLazyLoad || typeof IntersectionObserver === 'undefined') {
+    mount();
+  } else {
+    const observer = new IntersectionObserver(
+      (entries, obs) => {
+        entries.forEach((entry) => {
+          if (entry.isIntersecting) {
+            obs.disconnect();
+            mount();
+          }
+        });
+      },
+      { rootMargin: '200px' },
+    );
+    observer.observe(element);
+  }
+}
+
+export function initAddedDCLightExercises(): void {
+  const elements = document.querySelectorAll<HTMLElement>('[data-datacamp-exercise]');
+  elements.forEach((element) => {
+    bootElement(element);
+  });
+}
+
+export const initDataCampLight = initAddedDCLightExercises;

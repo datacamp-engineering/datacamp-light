@@ -1,91 +1,140 @@
-jobs:
-  build:
+# DataCamp Light v4 (WebAssembly) CI pipeline.
+#
+# Rollout policy (see HANDOFF.md "Rollout & CI Release Strategy"):
+# - This pipeline never writes the root /dcl-react.js.gz entrypoint. That
+#   cutover (Phase 3) is a deliberate, separate change once the v4 bundle is
+#   proven on its own CDN paths.
+# - Production targets (tag deploys): /dcl/v4/<version>/ (immutable), /dcl/v4/
+#   (latest v4 tag), and the alias /dcl-react-v4.js.gz.
+# - Development/staging targets mirror the legacy v3 paths so QA links stay
+#   stable: /dcl-react-dev.js.gz (branch v4) and /dcl-react-staging.js.gz
+#   (master).
+#
+# Asset hosting contract (see src/config.ts):
+# - All secondary assets load from one canonical base: /dcl/v4/. Deploy jobs
+#   therefore upload busybox.js + busybox.wasm next to the bundles.
+# - busybox.wasm MUST be uploaded raw (no gzip) with content type
+#   application/wasm, and the CDN must send CORS headers for it (the worker
+#   fetches it from third-party embed pages).
+# - JS/CSS artifacts are uploaded gzip-compressed with the appropriate
+#   content-encoding header, matching the legacy .js.gz convention.
+version: 2.1
+
+executors:
+  node:
     docker:
-      - image: node:8.9.1
+      - image: cimg/node:20.18
+  aws-deploy:
+    docker:
+      - image: ${STAGING_ECR_URL}/docker-deploy
+        aws_auth:
+          aws_access_key_id: $STAGING_AWS_ACCESS_KEY_ID
+          aws_secret_access_key: $STAGING_AWS_SECRET_ACCESS_KEY
+
+commands:
+  install-and-verify:
+    description: Install dependencies and run the full verification cycle
     steps:
       - checkout
+      - restore_cache:
+          keys:
+            - dcl-v4-npm-{{ checksum "package-lock.json" }}
+            - dcl-v4-npm-
       - run:
-          name: Install node deps and build
-          command: |
-            npm install
-            if [ "$CIRCLE_BRANCH" == 'development' ]; then
-              NODE_WORKSPACE=PRODDUCTION npm run build:dev
-            else
-              NODE_WORKSPACE=PRODDUCTION npm run build:prod
-            fi
-            gzip dist/dcl-react.js
+          name: Install dependencies
+          command: npm install --legacy-peer-deps
+      - save_cache:
+          key: dcl-v4-npm-{{ checksum "package-lock.json" }}
+          paths:
+            - ~/.npm
+            - node_modules
       - run:
-          name: Run Tests
-          environment:
-            JEST_JUNIT_OUTPUT: reports/junit/js-test-results.xml
-          command: |
-            npm run test:ci
+          name: Typecheck
+          command: npm run typecheck
       - run:
-          name: Run Linter
+          name: Unit tests
+          command: npm test
+      - run:
+          name: Build
+          command: npm run build
+
+jobs:
+  build:
+    executor: node
+    steps:
+      - install-and-verify
+      - run:
+          name: Gzip deployable artifacts
           command: |
-            npm run lint:ci
-      - store_test_results:
-          path: reports/junit
+            gzip -9 -k -f dist/dcl-react.js dist/dcl-react.es.js dist/datacamp-light.css
       - persist_to_workspace:
-          root: "."
+          root: .
           paths:
             - dist/*
             - docs/*
+
   deploy-dev:
-    docker:
-      - image: ${STAGING_ECR_URL}/docker-deploy
-        aws_auth:
-          aws_access_key_id: $STAGING_AWS_ACCESS_KEY_ID
-          aws_secret_access_key: $STAGING_AWS_SECRET_ACCESS_KEY
+    executor: aws-deploy
     steps:
       - attach_workspace:
-          at: /tmp
+          at: /tmp/workspace
       - run:
-          name: S3 Sync
+          name: Sync dev CDN artifacts
           command: |
-            aws s3 cp /tmp/dist/dcl-react.js.gz s3://cdn.datacamp.com/dcl-react-dev.js.gz --acl public-read --content-encoding "gzip" --content-type "application/javascript" --cache-control "max-age=1296000"
+            # Entrypoint (mirrors the legacy dev path; not used by production embeds)
+            aws s3 cp /tmp/workspace/dist/dcl-react.js.gz s3://cdn.datacamp.com/dcl-react-dev.js.gz --acl public-read --content-encoding "gzip" --content-type "application/javascript" --cache-control "max-age=1296000"
             aws cloudfront create-invalidation --distribution-id E11JM11LLUSZQE --paths "/dcl-react-dev.js.gz"
 
-            aws s3 cp /tmp/dist/dcl-react.js.gz s3://cdn.datacamp.com/dcl-react-dev/dcl-react.js.gz --acl public-read --content-encoding "gzip" --content-type "application/javascript"
-            aws s3 cp /tmp/docs/index.html s3://cdn.datacamp.com/dcl-react-dev/index.html --acl public-read --content-type "text/html"
-            aws s3 cp /tmp/docs/example.html s3://cdn.datacamp.com/dcl-react-dev/example.html --acl public-read --content-type "text/html"
-  deploy:
-    docker:
-      - image: ${STAGING_ECR_URL}/docker-deploy
-        aws_auth:
-          aws_access_key_id: $STAGING_AWS_ACCESS_KEY_ID
-          aws_secret_access_key: $STAGING_AWS_SECRET_ACCESS_KEY
+            aws s3 cp /tmp/workspace/dist/dcl-react.js.gz s3://cdn.datacamp.com/dcl-react-dev/dcl-react.js.gz --acl public-read --content-encoding "gzip" --content-type "application/javascript"
+            aws s3 cp /tmp/workspace/dist/dcl-react.es.js s3://cdn.datacamp.com/dcl-react-dev/dcl-react.es.js --acl public-read --content-type "application/javascript"
+            aws s3 cp /tmp/workspace/dist/datacamp-light.css s3://cdn.datacamp.com/dcl-react-dev/datacamp-light.css --acl public-read --content-type "text/css"
+            aws s3 sync /tmp/workspace/docs s3://cdn.datacamp.com/dcl-react-dev/docs --acl public-read --exclude "*" --include "*.html"
+            aws cloudfront create-invalidation --distribution-id E11JM11LLUSZQE --paths "/dcl-react-dev/*"
+
+  deploy-staging:
+    executor: aws-deploy
     steps:
       - attach_workspace:
-          at: /tmp
+          at: /tmp/workspace
       - run:
-          name: S3 Sync
+          name: Sync staging CDN artifacts
           command: |
-            aws s3 cp /tmp/dist/dcl-react.js.gz s3://cdn.datacamp.com/dcl-react-staging.js.gz --acl public-read --content-encoding "gzip" --content-type "application/javascript" --cache-control "max-age=1296000"
+            aws s3 cp /tmp/workspace/dist/dcl-react.js.gz s3://cdn.datacamp.com/dcl-react-staging.js.gz --acl public-read --content-encoding "gzip" --content-type "application/javascript" --cache-control "max-age=1296000"
             aws cloudfront create-invalidation --distribution-id E11JM11LLUSZQE --paths "/dcl-react-staging.js.gz"
 
-            aws s3 cp /tmp/dist/dcl-react.js.gz s3://cdn.datacamp.com/dcl-react-staging/dcl-react.js.gz --acl public-read --content-encoding "gzip" --content-type "application/javascript"
-            aws s3 cp /tmp/docs/index.html s3://cdn.datacamp.com/dcl-react-staging/index.html --acl public-read --content-type "text/html"
-            aws s3 cp /tmp/docs/example.html s3://cdn.datacamp.com/dcl-react-staging/example.html --acl public-read --content-type "text/html"
+            aws s3 cp /tmp/workspace/dist/dcl-react.js.gz s3://cdn.datacamp.com/dcl-react-staging/dcl-react.js.gz --acl public-read --content-encoding "gzip" --content-type "application/javascript"
+            aws s3 cp /tmp/workspace/dist/dcl-react.es.js s3://cdn.datacamp.com/dcl-react-staging/dcl-react.es.js --acl public-read --content-type "application/javascript"
+            aws s3 cp /tmp/workspace/dist/datacamp-light.css s3://cdn.datacamp.com/dcl-react-staging/datacamp-light.css --acl public-read --content-type "text/css"
+            aws s3 sync /tmp/workspace/docs s3://cdn.datacamp.com/dcl-react-staging/docs --acl public-read --exclude "*" --include "*.html"
+            aws cloudfront create-invalidation --distribution-id E11JM11LLUSZQE --paths "/dcl-react-staging/*"
+
   deploy-prod:
-    docker:
-      - image: ${STAGING_ECR_URL}/docker-deploy
-        aws_auth:
-          aws_access_key_id: $STAGING_AWS_ACCESS_KEY_ID
-          aws_secret_access_key: $STAGING_AWS_SECRET_ACCESS_KEY
+    executor: aws-deploy
     steps:
       - attach_workspace:
-          at: /tmp
+          at: /tmp/workspace
       - run:
-          name: S3 Sync
+          name: Sync production CDN artifacts (v4 paths only)
           command: |
-            aws s3 cp /tmp/dist/dcl-react.js.gz s3://cdn.datacamp.com/dcl/latest/dcl-react.js.gz --acl public-read --content-encoding "gzip" --content-type "application/javascript" --cache-control "max-age=1296000"
-            aws s3 cp /tmp/dist/dcl-react.js.gz s3://cdn.datacamp.com/dcl/$CIRCLE_TAG/dcl-react.js.gz --acl public-read --content-encoding "gzip" --content-type "application/javascript" --cache-control "max-age=1296000"
-            aws cloudfront create-invalidation --distribution-id E11JM11LLUSZQE --paths "/dcl-react.js.gz"
+            # Fixed asset base baked into src/config.ts: https://cdn.datacamp.com/dcl/v4
+            # Versioned copy (immutable), latest-v4 copy, and entrypoint alias.
+            aws s3 cp /tmp/workspace/dist/dcl-react.js.gz s3://cdn.datacamp.com/dcl/v4/$CIRCLE_TAG/dcl-react.js.gz --acl public-read --content-encoding "gzip" --content-type "application/javascript" --cache-control "max-age=31536000"
+            aws s3 cp /tmp/workspace/dist/dcl-react.js.gz s3://cdn.datacamp.com/dcl/v4/dcl-react.js.gz --acl public-read --content-encoding "gzip" --content-type "application/javascript" --cache-control "max-age=1296000"
+            aws s3 cp /tmp/workspace/dist/dcl-react.js.gz s3://cdn.datacamp.com/dcl-react-v4.js.gz --acl public-read --content-encoding "gzip" --content-type "application/javascript" --cache-control "max-age=1296000"
+            aws cloudfront create-invalidation --distribution-id E11JM11LLUSZQE --paths "/dcl/v4/*" "/dcl-react-v4.js.gz"
 
-            aws s3 cp /tmp/dist/dcl-react.js.gz s3://cdn.datacamp.com/dcl-react-prod/dcl-react.js.gz --acl public-read --content-encoding "gzip" --content-type "application/javascript"
-            aws s3 cp /tmp/docs/index.html s3://cdn.datacamp.com/dcl-react-prod/index.html --acl public-read --content-type "text/html"
-            aws s3 cp /tmp/docs/example.html s3://cdn.datacamp.com/dcl-react-prod/example.html --acl public-read --content-type "text/html"
+            # Secondary assets under the canonical base. busybox.wasm is raw:
+            # no content-encoding, application/wasm, CDN CORS required.
+            aws s3 cp /tmp/workspace/dist/busybox.wasm s3://cdn.datacamp.com/dcl/v4/busybox.wasm --acl public-read --content-type "application/wasm" --cache-control "max-age=31536000"
+            aws s3 cp /tmp/workspace/dist/busybox.js s3://cdn.datacamp.com/dcl/v4/busybox.js --acl public-read --content-type "application/javascript" --cache-control "max-age=31536000"
+            aws s3 cp /tmp/workspace/dist/dcl-react.es.js s3://cdn.datacamp.com/dcl/v4/dcl-react.es.js --acl public-read --content-type "application/javascript" --cache-control "max-age=31536000"
+            aws s3 cp /tmp/workspace/dist/datacamp-light.css s3://cdn.datacamp.com/dcl/v4/datacamp-light.css --acl public-read --content-type "text/css" --cache-control "max-age=31536000"
+
+            # Demo pages rewritten to load bundles from the canonical base.
+            sed -e "s|\.\./dist/|https://cdn.datacamp.com/dcl/v4/|g" -i /tmp/workspace/docs/index.html /tmp/workspace/docs/example.html
+            aws s3 cp /tmp/workspace/docs/index.html s3://cdn.datacamp.com/dcl/v4/index.html --acl public-read --content-type "text/html"
+            aws s3 cp /tmp/workspace/docs/example.html s3://cdn.datacamp.com/dcl/v4/example.html --acl public-read --content-type "text/html"
+
 workflows:
   version: 2
   build_and_deploy:
@@ -102,8 +151,8 @@ workflows:
           filters:
             branches:
               only:
-                - development
-      - deploy:
+                - v4
+      - deploy-staging:
           requires:
             - build
           context: org-global
@@ -117,6 +166,6 @@ workflows:
           context: org-global
           filters:
             tags:
-              only: /^v\d+\.\d+\.\d+(-\w+\.\d+)?$/
+              only: /^v4\.\d+\.\d+(-[\w.]+\.\d+)?$/
             branches:
               ignore: /.*/

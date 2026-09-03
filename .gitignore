@@ -6,6 +6,8 @@ npm-debug.log
 ecs_task.json
 dist/
 public/
+!public/
+!public/fonts
 .idea
 .awcache
 
@@ -14,3 +16,4 @@ public/
 src/**/*.js
 src/**/*.js.map
 .vscode
+*.tsbuildinfo

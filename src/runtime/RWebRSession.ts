@@ -1,0 +1,440 @@
+import type {
+  IInitializeParams,
+  IRunCodeParams,
+  IRunCodeResult,
+  ISessionOutputNotification,
+  ISessionStatus,
+  ISubmitCodeParams,
+  ISubmitCodeResult,
+  SessionStatusCode,
+} from '../jsonrpc/types';
+import type { OutputListener, StatusListener } from '../jsonrpc/session';
+import { TESTWHAT_R_SOURCES } from './testwhatSources';
+
+/**
+ * webR-backed session for R exercises.
+ *
+ * webR (https://github.com/r-wasm/webr) is R compiled to WebAssembly. The
+ * standard browser pattern (used by the official webR REPL) is to import
+ * webr.mjs on the main thread - webR spawns its own internal R worker for
+ * computation, so the UI thread stays responsive.
+ *
+ * Full `testwhat` SCT support is built-in: testwhat's pure-R sources are
+ * injected directly into the webR virtual environment alongside pre-compiled
+ * CRAN WASM dependencies (`evaluate`, `stringdist`, `R6`, `magrittr`, `praise`).
+ */
+const WEBR_LATEST_URL = 'https://webr.r-wasm.org/latest/webr.mjs';
+
+const TESTWHAT_CRAN_DEPS = ['evaluate', 'R6', 'magrittr', 'stringdist', 'praise', 'markdown'];
+
+type WebRImage = {
+  width: number;
+  height: number;
+  toDataURL: () => string;
+};
+
+type WebROutputEntry = {
+  type: string;
+  data: unknown;
+};
+
+function imageBitmapToDataUrl(bitmap: WebRImage): string {
+  const canvas = document.createElement('canvas');
+  canvas.width = bitmap.width;
+  canvas.height = bitmap.height;
+  canvas.getContext('2d')?.drawImage(bitmap as unknown as CanvasImageSource, 0, 0);
+  return canvas.toDataURL('image/png');
+}
+
+export class RWebRSession {
+  private statusListeners = new Set<StatusListener>();
+  private outputListeners = new Set<OutputListener>();
+  private currentStatus: ISessionStatus = { status: 'none' };
+
+  private webRPromise: Promise<any> | null = null;
+  private testwhatReadyPromise: Promise<void> | null = null;
+
+  private async getWebR(): Promise<any> {
+    if (this.webRPromise == null) {
+      this.webRPromise = (async () => {
+        const { WebR } = await import(/* @vite-ignore */ WEBR_LATEST_URL);
+        const webR = new WebR();
+        await webR.init();
+        return webR;
+      })();
+    }
+    return this.webRPromise;
+  }
+
+  private async ensureTestwhatInstalled(webR: any): Promise<void> {
+    if (this.testwhatReadyPromise != null) {
+      return this.testwhatReadyPromise;
+    }
+
+    this.testwhatReadyPromise = (async () => {
+      // 1. Install prebuilt CRAN WASM dependencies from repo.r-wasm.org
+      try {
+        await webR.installPackages(TESTWHAT_CRAN_DEPS);
+      } catch (err) {
+        console.warn('Failed to install some testwhat CRAN dependencies:', err);
+      }
+
+      // 2. Load dependencies into R and create testwhat namespace environment
+      await webR.evalRVoid(`
+        suppressPackageStartupMessages({
+          if (requireNamespace("evaluate", quietly = TRUE)) library(evaluate)
+          if (requireNamespace("R6", quietly = TRUE)) library(R6)
+          if (requireNamespace("magrittr", quietly = TRUE)) library(magrittr)
+          if (requireNamespace("stringdist", quietly = TRUE)) library(stringdist)
+          if (requireNamespace("praise", quietly = TRUE)) library(praise)
+          if (requireNamespace("markdown", quietly = TRUE)) library(markdown)
+        })
+
+        if (!exists(".tw_ns", envir = .GlobalEnv)) {
+          .tw_ns <- new.env(parent = as.environment("package:stats"))
+        }
+      `);
+
+      // 3. Define all testwhat R files directly into .tw_ns and .GlobalEnv
+      for (const [filename, source] of Object.entries(TESTWHAT_R_SOURCES)) {
+        try {
+          await webR.evalRVoid(source);
+        } catch (fileErr) {
+          console.warn(`Warning loading testwhat file ${filename}:`, fileErr);
+        }
+      }
+
+      // 4. Export symbols from testwhat namespace to globalenv and register S3 methods
+      await webR.evalRVoid(`
+        suppressWarnings({
+          # Register S3 methods in global dispatch
+          .S3method("check_equal", "default", check_equal.default)
+          .S3method("check_equal", "ObjectState", check_equal.ObjectState)
+          .S3method("check_equal", "ObjectColumnState", check_equal.ObjectColumnState)
+          .S3method("check_equal", "ObjectElementState", check_equal.ObjectElementState)
+          .S3method("check_equal", "ArgumentState", check_equal.ArgumentState)
+          .S3method("check_equal", "ExprResultState", check_equal.ExprResultState)
+          .S3method("check_equal", "ExprOutputState", check_equal.ExprOutputState)
+          .S3method("check_equal", "ExprErrorState", check_equal.ExprErrorState)
+          .S3method("check_result", "default", check_result.default)
+          .S3method("check_result", "ExprState", check_result.ExprState)
+          .S3method("check_result", "FunctionState", check_result.FunctionState)
+          .S3method("check_result", "OperationState", check_result.OperationState)
+          .S3method("check_error", "default", check_error.default)
+          .S3method("check_error", "ExprState", check_error.ExprState)
+          .S3method("check_output", "default", check_output.default)
+          .S3method("check_output", "ExprState", check_output.ExprState)
+          .S3method("build_message", "default", build_message.default)
+          .S3method("build_message", "object", build_message.object)
+          .S3method("build_message", "column", build_message.column)
+          .S3method("build_message", "element", build_message.element)
+          .S3method("build_message", "function", build_message.function)
+          .S3method("build_message", "operator", build_message.operator)
+          .S3method("build_message", "argument", build_message.argument)
+          .S3method("build_message", "typed", build_message.typed)
+          .S3method("build_message", "fundef", build_message.fundef)
+          .S3method("build_message", "expr", build_message.expr)
+          .S3method("build_message", "output", build_message.output)
+          .S3method("get_diff", "default", get_diff.default)
+          .S3method("get_diff", "logical", get_diff.logical)
+          .S3method("get_diff", "numeric", get_diff.numeric)
+          .S3method("get_diff", "character", get_diff.character)
+          .S3method("get_diff", "data.frame", get_diff.data.frame)
+          .S3method("is_equal", "default", is_equal.default)
+          .S3method("is_equal", "formula", is_equal.formula)
+
+          # Global override of check_that and throw_sct_failure
+          throw_sct_failure <<- function(message, feedback, call = sys.call(-1)) {
+            cond <- structure(
+              list(message = message, call = call),
+              class = c("sct_failure", "error", "condition"),
+              feedback = feedback
+            )
+            stop(cond)
+          }
+
+          check_that <<- function(code, feedback, env = parent.frame()) {
+            if (is.character(feedback)) {
+              feedback <- list(list(message = feedback))
+            }
+            res <- tryCatch(eval(code, envir = env), error = function(e) FALSE)
+            if (!isTRUE(res)) {
+              msg <- build_feedback_message(feedback)
+              throw_sct_failure(feedback = feedback, message = msg)
+            }
+          }
+        })
+      `);
+    })();
+
+    return this.testwhatReadyPromise;
+  }
+
+  private emitOutput(notification: ISessionOutputNotification): void {
+    this.outputListeners.forEach((listener) => listener(notification));
+  }
+
+  private setStatus(status: SessionStatusCode, message?: string): void {
+    this.currentStatus = { status, message };
+    this.statusListeners.forEach((listener) => listener(this.currentStatus));
+  }
+
+  public async initialize(params: IInitializeParams): Promise<void> {
+    this.setStatus('starting');
+    try {
+      const webR = await this.getWebR();
+      const pec = params.pec || '';
+      if (pec.trim()) {
+        await webR.evalRVoid(pec);
+      }
+      this.setStatus('ready');
+    } catch (err: any) {
+      this.setStatus('broken', err?.message || 'Failed to initialize R session');
+      throw err;
+    }
+  }
+
+  public async runCode(params: IRunCodeParams): Promise<IRunCodeResult> {
+    this.setStatus('busy');
+    try {
+      const webR = await this.getWebR();
+
+      const { output, images } = await webR.globalShelter.captureR(params.code || '');
+
+      const stdout: string[] = [];
+      const stderr: string[] = [];
+
+      for (const entry of output as WebROutputEntry[]) {
+        if (entry.type === 'stdout') {
+          stdout.push(String(entry.data));
+          this.emitOutput({ type: 'output', payload: String(entry.data) });
+        } else if (entry.type === 'stderr') {
+          stderr.push(String(entry.data));
+          this.emitOutput({ type: 'error', payload: String(entry.data) });
+        }
+      }
+
+      for (const image of images as WebRImage[]) {
+        const dataUrl = imageBitmapToDataUrl(image);
+        this.emitOutput({ type: 'graph', payload: dataUrl });
+      }
+
+      this.setStatus('ready');
+      return {
+        output: stdout.join('\n'),
+        error: stderr.length > 0 ? stderr.join('\n') : undefined,
+        graph:
+          (images as WebRImage[]).length > 0
+            ? imageBitmapToDataUrl((images as WebRImage[])[images.length - 1])
+            : undefined,
+      };
+    } catch (err: any) {
+      this.setStatus('broken', err?.message);
+      throw err;
+    }
+  }
+
+  /**
+   * Executes a Submission Correctness Test for an R exercise using `testwhat`.
+   *
+   * Automatically prepares student and solution environments and runs
+   * `testwhat::test_exercise(...)` with full support for `test_object()`,
+   * `test_function()`, `test_error()`, and pipe chains (`ex() %>% check_object() ...`).
+   * Falls back to basic assertion testing if testwhat is not used in the SCT.
+   */
+  public async submitCode(params: ISubmitCodeParams): Promise<ISubmitCodeResult> {
+    this.setStatus('busy');
+    try {
+      const webR = await this.getWebR();
+      const sct = params.sct || '';
+      const pec = params.pec || '';
+      const code = params.code || '';
+      const solution = params.solution || '';
+
+      // Check if SCT uses testwhat syntax (ex() %>% ..., test_object, test_function, etc.)
+      const isTestwhatSct =
+        /\b(ex\s*\(\s*\)|check_object|check_function|check_error|check_output|check_code|test_object|test_function|test_output_contains|test_data_frame|success_msg)\b/.test(
+          sct,
+        );
+
+      if (isTestwhatSct) {
+        await this.ensureTestwhatInstalled(webR);
+
+        // Escape R strings safely
+        const escapeRString = (str: string) => JSON.stringify(str);
+
+        const evalHarness = `
+          local({
+            pec_code <- ${escapeRString(pec)}
+            student_code <- ${escapeRString(code)}
+            solution_code <- ${escapeRString(solution)}
+            sct_code <- ${escapeRString(sct)}
+
+            student_env <- new.env(parent = .GlobalEnv)
+            solution_env <- new.env(parent = .GlobalEnv)
+
+            if (nchar(trimws(pec_code)) > 0) {
+              eval(parse(text = pec_code), envir = student_env)
+              eval(parse(text = pec_code), envir = solution_env)
+            }
+
+            if (nchar(trimws(solution_code)) > 0) {
+              eval(parse(text = solution_code), envir = solution_env)
+            }
+
+            output_list <- list()
+            if (requireNamespace("evaluate", quietly = TRUE)) {
+              raw_output <- evaluate::evaluate(student_code, envir = student_env)
+              output_list <- lapply(raw_output, function(item) {
+                if (inherits(item, "source")) {
+                  list(type = "code", payload = gsub("\\n+$", "", item$src))
+                } else if (inherits(item, "message")) {
+                  list(type = "r-message", payload = gsub("\\n+$", "", item$message))
+                } else if (inherits(item, "warning")) {
+                  list(type = "r-warning", payload = paste0("Warning message: ", item$message))
+                } else if (inherits(item, "error")) {
+                  list(type = "r-error", payload = paste0("Error: ", item$message))
+                } else {
+                  list(type = "output", payload = gsub("\\n+$", "", item))
+                }
+              })
+            } else {
+              eval(parse(text = student_code), envir = student_env)
+            }
+
+testwhat_result <- test_exercise(sct = sct_code,
+                                             ex_type = "NormalExercise",
+                                             pec = pec_code,
+                                             student_code = student_code,
+                                             solution_code = solution_code,
+                                             student_env = student_env,
+                                             solution_env = solution_env,
+                                             output_list = output_list,
+                                             allow_errors = FALSE,
+                                             force_diagnose = FALSE,
+                                             seed = 42)
+
+            list(correct = testwhat_result$correct,
+                 message = if (is.null(testwhat_result$message)) "Great work!" else testwhat_result$message)
+          })
+        `;
+
+        try {
+          const resObj = await webR.evalR(evalHarness);
+          const jsRes: any = await resObj.toJs();
+          console.log('[r-sct] testwhat result:', jsRes);
+
+          let correct = false;
+          let message = '';
+
+          if (jsRes && typeof jsRes === 'object') {
+            if (Array.isArray(jsRes.names) && Array.isArray(jsRes.values)) {
+              const correctIdx = jsRes.names.indexOf('correct');
+              const messageIdx = jsRes.names.indexOf('message');
+              if (correctIdx !== -1) {
+                const valObj = jsRes.values[correctIdx];
+                correct = Array.isArray(valObj?.values)
+                  ? Boolean(valObj.values[0])
+                  : Boolean(valObj);
+              }
+              if (messageIdx !== -1) {
+                const valObj = jsRes.values[messageIdx];
+                message = Array.isArray(valObj?.values)
+                  ? String(valObj.values[0] ?? '')
+                  : String(valObj ?? '');
+              }
+            } else if ('correct' in jsRes) {
+              correct = Array.isArray(jsRes.correct)
+                ? Boolean(jsRes.correct[0])
+                : Boolean(jsRes.correct);
+              message = Array.isArray(jsRes.message)
+                ? String(jsRes.message[0] ?? '')
+                : String(jsRes.message ?? '');
+            }
+          }
+
+          message = message.trim();
+          if (!message) {
+            message = correct
+              ? 'Great work! Your solution passed all tests.'
+              : 'Incorrect solution.';
+          }
+
+          this.setStatus('ready');
+          return { correct, message, output: '' };
+        } catch (twErr: any) {
+          console.error('[DataCamp Light R SCT Exception]', twErr);
+          const rawErr = String(twErr?.message || twErr || '');
+          const cleanMsg = rawErr.replace(/^Error in [^:]+:\s*/, 'SCT Error: ') || 'Error during R SCT evaluation.';
+          this.setStatus('ready');
+          return { correct: false, message: cleanMsg, output: '' };
+        }
+      }
+
+      // Base R fallback / direct execution
+      if (pec.trim()) {
+        await webR.evalRVoid(pec);
+      }
+      await webR.evalRVoid(code);
+
+      let message = 'Great work! Your solution passed all tests.';
+      let correct = true;
+
+      if (sct.trim()) {
+        try {
+          await webR.evalRVoid(sct.trim());
+        } catch (err: any) {
+          correct = false;
+          message = String(err?.message || err || 'Incorrect solution.');
+        }
+      }
+
+      this.setStatus('ready');
+      return { correct, message, output: '' };
+    } catch (err: any) {
+      this.setStatus('broken', err?.message);
+      throw err;
+    }
+  }
+
+  public async request<TResult = unknown, TParams = Record<string, unknown>>(
+    method: string,
+    params?: TParams,
+  ): Promise<TResult> {
+    if (method === 'initialize') {
+      await this.initialize(params as any);
+      return undefined as TResult;
+    }
+    if (method === 'runCode') {
+      return (await this.runCode(params as any)) as TResult;
+    }
+    if (method === 'submitCode') {
+      return (await this.submitCode(params as any)) as TResult;
+    }
+    throw new Error(`Method not implemented in RWebRSession: ${method}`);
+  }
+
+  public onStatusChange(listener: StatusListener): () => void {
+    this.statusListeners.add(listener);
+    listener(this.currentStatus);
+    return () => {
+      this.statusListeners.delete(listener);
+    };
+  }
+
+  public onOutput(listener: OutputListener): () => void {
+    this.outputListeners.add(listener);
+    return () => {
+      this.outputListeners.delete(listener);
+    };
+  }
+
+  public getStatus(): ISessionStatus {
+    return this.currentStatus;
+  }
+
+  public destroy(): void {
+    this.statusListeners.clear();
+    this.outputListeners.clear();
+  }
+}
