@@ -73,6 +73,35 @@ jobs:
             - dist/*
             - docs/*
 
+  backup-legacy-cdn-artifacts:
+    executor: aws-deploy
+    steps:
+      - run:
+          name: Backup legacy CDN files (idempotent snapshot to dcl/v3/)
+          command: |
+            if aws s3 ls s3://cdn.datacamp.com/dcl/v3/dev/dcl-react.js.gz >/dev/null 2>&1; then
+              echo "Legacy CDN backup at dcl/v3/ already exists. Skipping."
+              exit 0
+            fi
+
+            echo "Backing up active legacy assets to dcl/v3/..."
+            # Dev prefix & root entrypoint
+            aws s3 sync s3://cdn.datacamp.com/dcl-react-dev/ s3://cdn.datacamp.com/dcl/v3/dev/
+            aws s3 cp s3://cdn.datacamp.com/dcl-react-dev.js.gz s3://cdn.datacamp.com/dcl/v3/dev/dcl-react-dev.js.gz || true
+
+            # Staging prefix & root entrypoint
+            aws s3 sync s3://cdn.datacamp.com/dcl-react-staging/ s3://cdn.datacamp.com/dcl/v3/staging/
+            aws s3 cp s3://cdn.datacamp.com/dcl-react-staging.js.gz s3://cdn.datacamp.com/dcl/v3/staging/dcl-react-staging.js.gz || true
+
+            # Prod prefix & root entrypoints
+            aws s3 sync s3://cdn.datacamp.com/dcl-react-prod/ s3://cdn.datacamp.com/dcl/v3/prod/
+            aws s3 cp s3://cdn.datacamp.com/dcl-react.js.gz s3://cdn.datacamp.com/dcl/v3/prod/dcl-react.js.gz || true
+            aws s3 sync s3://cdn.datacamp.com/dcl/latest/ s3://cdn.datacamp.com/dcl/v3/latest/ || true
+
+            # Historical standalone example
+            aws s3 cp s3://cdn.datacamp.com/dcl-react/standalone-example.html s3://cdn.datacamp.com/dcl/v3/legacy/standalone-example.html || true
+            echo "Legacy backup to dcl/v3/ completed successfully."
+
   deploy-dev:
     executor: aws-deploy
     steps:
@@ -88,7 +117,11 @@ jobs:
             aws s3 cp /tmp/workspace/dist/dcl-react.js.gz s3://cdn.datacamp.com/dcl-react-dev/dcl-react.js.gz --acl public-read --content-encoding "gzip" --content-type "application/javascript"
             aws s3 cp /tmp/workspace/dist/dcl-react.es.js s3://cdn.datacamp.com/dcl-react-dev/dcl-react.es.js --acl public-read --content-type "application/javascript"
             aws s3 cp /tmp/workspace/dist/datacamp-light.css s3://cdn.datacamp.com/dcl-react-dev/datacamp-light.css --acl public-read --content-type "text/css"
-            aws s3 sync /tmp/workspace/docs s3://cdn.datacamp.com/dcl-react-dev/docs --acl public-read --exclude "*" --include "*.html"
+
+            # Rewrite relative paths in HTML fixtures to point to dev CDN endpoints
+            sed -e "s|\.\./dist/|https://cdn.datacamp.com/dcl-react-dev/|g" -i /tmp/workspace/docs/index.html /tmp/workspace/docs/example.html
+            aws s3 cp /tmp/workspace/docs/index.html s3://cdn.datacamp.com/dcl-react-dev/index.html --acl public-read --content-type "text/html"
+            aws s3 cp /tmp/workspace/docs/example.html s3://cdn.datacamp.com/dcl-react-dev/example.html --acl public-read --content-type "text/html"
             aws cloudfront create-invalidation --distribution-id E11JM11LLUSZQE --paths "/dcl-react-dev/*"
 
   deploy-staging:
@@ -105,7 +138,11 @@ jobs:
             aws s3 cp /tmp/workspace/dist/dcl-react.js.gz s3://cdn.datacamp.com/dcl-react-staging/dcl-react.js.gz --acl public-read --content-encoding "gzip" --content-type "application/javascript"
             aws s3 cp /tmp/workspace/dist/dcl-react.es.js s3://cdn.datacamp.com/dcl-react-staging/dcl-react.es.js --acl public-read --content-type "application/javascript"
             aws s3 cp /tmp/workspace/dist/datacamp-light.css s3://cdn.datacamp.com/dcl-react-staging/datacamp-light.css --acl public-read --content-type "text/css"
-            aws s3 sync /tmp/workspace/docs s3://cdn.datacamp.com/dcl-react-staging/docs --acl public-read --exclude "*" --include "*.html"
+
+            # Rewrite relative paths in HTML fixtures to point to staging CDN endpoints
+            sed -e "s|\.\./dist/|https://cdn.datacamp.com/dcl-react-staging/|g" -i /tmp/workspace/docs/index.html /tmp/workspace/docs/example.html
+            aws s3 cp /tmp/workspace/docs/index.html s3://cdn.datacamp.com/dcl-react-staging/index.html --acl public-read --content-type "text/html"
+            aws s3 cp /tmp/workspace/docs/example.html s3://cdn.datacamp.com/dcl-react-staging/example.html --acl public-read --content-type "text/html"
             aws cloudfront create-invalidation --distribution-id E11JM11LLUSZQE --paths "/dcl-react-staging/*"
 
   deploy-prod:
@@ -144,9 +181,20 @@ workflows:
           filters:
             tags:
               only: /.*/
-      - deploy-dev:
+      - backup-legacy-cdn-artifacts:
           requires:
             - build
+          context: org-global
+          filters:
+            tags:
+              only: /.*/
+            branches:
+              only:
+                - v4
+                - master
+      - deploy-dev:
+          requires:
+            - backup-legacy-cdn-artifacts
           context: org-global
           filters:
             branches:
@@ -154,7 +202,7 @@ workflows:
                 - v4
       - deploy-staging:
           requires:
-            - build
+            - backup-legacy-cdn-artifacts
           context: org-global
           filters:
             branches:
@@ -162,7 +210,7 @@ workflows:
                 - master
       - deploy-prod:
           requires:
-            - build
+            - backup-legacy-cdn-artifacts
           context: org-global
           filters:
             tags:
