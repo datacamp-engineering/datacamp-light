@@ -4,18 +4,30 @@ import { theme } from '@datacamp/waffles/theme';
 import { tokens } from '@datacamp/waffles/tokens';
 import React from 'react';
 
-interface FooterProps {
+export interface FooterProps {
+  code?: string;
+  language?: string;
   utmSource?: string;
   utmCampaign?: string;
 }
 
 export const Footer: React.FC<FooterProps> = ({
+  code,
+  language = 'python',
   utmSource = 'datacamp_light',
   utmCampaign = 'powered_by_datalab',
 }) => {
-  const datalabUrl = `https://www.datacamp.com/datalab?utm_source=${encodeURIComponent(
-    utmSource,
-  )}&utm_campaign=${encodeURIComponent(utmCampaign)}`;
+  const queryParameters = new URLSearchParams();
+  queryParameters.set('_tag', utmSource);
+  queryParameters.set('utm_source', utmSource);
+  queryParameters.set('utm_campaign', utmCampaign);
+
+  if (code && (language === 'python' || language === 'r')) {
+    queryParameters.set('code', code);
+    queryParameters.set('language', language);
+  }
+
+  const datalabUrl = `https://www.datacamp.com/datalab/new?${queryParameters.toString()}`;
 
   return (
     <div

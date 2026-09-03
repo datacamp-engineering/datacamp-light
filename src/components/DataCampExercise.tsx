@@ -434,7 +434,12 @@ const CodeExercise: React.FC<DataCampExerciseProps> = ({
         </>
       )}
 
-      <Footer utmSource={utmSource} utmCampaign={utmCampaign} />
+      <Footer
+        code={code}
+        language={language}
+        utmSource={utmSource}
+        utmCampaign={utmCampaign}
+      />
     </DCLWidgetShell>
   );
 };

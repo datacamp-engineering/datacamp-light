@@ -41,7 +41,12 @@ function imageBitmapToDataUrl(bitmap: WebRImage): string {
   const canvas = document.createElement('canvas');
   canvas.width = bitmap.width;
   canvas.height = bitmap.height;
-  canvas.getContext('2d')?.drawImage(bitmap as unknown as CanvasImageSource, 0, 0);
+  const context = canvas.getContext('2d');
+  if (context) {
+    context.fillStyle = '#ffffff';
+    context.fillRect(0, 0, bitmap.width, bitmap.height);
+    context.drawImage(bitmap as unknown as CanvasImageSource, 0, 0);
+  }
   return canvas.toDataURL('image/png');
 }
 

@@ -82,6 +82,7 @@ export const PlotCanvas: React.FC<PlotCanvasProps> = ({ plots, height = 400 }) =
         <img
           alt={`Plot output ${safeIndex + 1} of ${totalPlots}`}
           css={{
+            backgroundColor: '#ffffff',
             borderRadius: tokens.borderRadius.medium,
             boxShadow: theme.boxShadow.xthick,
             display: 'block',
