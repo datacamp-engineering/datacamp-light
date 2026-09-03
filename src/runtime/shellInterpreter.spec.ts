@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { createShellInterpreter } from './shellInterpreter';
+import {
+  createBusyboxRunner,
+  createEmscriptenVfs,
+  createShellInterpreter,
+} from './shellInterpreter';
 
 describe('createShellInterpreter', () => {
   it('should report the initial working directory', () => {
@@ -61,15 +65,12 @@ describe('createShellInterpreter', () => {
     const shell = createShellInterpreter();
     shell.runCommand('echo one two three > words.txt');
     const result = shell.runCommand('wc words.txt');
-    // redirect appends a trailing newline, so content is "one two three\n"
-    // (2 lines when split on \n, 3 words, 14 chars)
     expect(result.output).toBe('2 3 14 words.txt');
   });
 
   it('should filter lines with grep', () => {
     const shell = createShellInterpreter();
     shell.runCommand('echo apple > fruit.txt');
-    // grep only inspects a single file per invocation in this minimal shell
     const result = shell.runCommand('grep apple fruit.txt');
     expect(result.output).toBe('apple');
   });
@@ -114,5 +115,71 @@ describe('createShellInterpreter', () => {
     shell.runCommand('echo line2 >> log.txt');
     const result = shell.runCommand('cat log.txt');
     expect(result.output).toBe('line1\nline2\n');
+  });
+});
+
+describe('createEmscriptenVfs and createBusyboxRunner', () => {
+  function createMockEmscriptenModule() {
+    let cwd = '/home/repl';
+    const store: Record<string, { type: 'file' | 'dir'; content: string }> = {
+      '/home': { type: 'dir', content: '' },
+      '/home/repl': { type: 'dir', content: '' },
+      '/tmp': { type: 'dir', content: '' },
+    };
+
+    return {
+      FS: {
+        cwd: () => cwd,
+        chdir: (p: string) => {
+          cwd = p;
+        },
+        readFile: (p: string) => store[p]?.content ?? '',
+        writeFile: (p: string, content: string) => {
+          store[p] = { type: 'file', content };
+        },
+        mkdir: (p: string) => {
+          store[p] = { type: 'dir', content: '' };
+        },
+        rmdir: (p: string) => {
+          delete store[p];
+        },
+        unlink: (p: string) => {
+          delete store[p];
+        },
+        analyzePath: (p: string) => ({ exists: Boolean(store[p]) }),
+        stat: (p: string) => ({ mode: store[p]?.type === 'dir' ? 0o040000 : 0o100000 }),
+        isDir: (mode: number) => (mode & 0o170000) === 0o040000,
+        readdir: (p: string) => {
+          const prefix = p === '/' ? '/' : p + '/';
+          return Object.keys(store)
+            .filter((k) => k.startsWith(prefix) && k !== p)
+            .map((k) => k.slice(prefix.length).split('/')[0])
+            .filter(Boolean);
+        },
+      },
+      print: (_t: string) => {},
+      printErr: (_t: string) => {},
+      callMain: (args: string[]) => {
+        if (args[0] === 'busybox_grep') {
+          // Mock applet execution
+        }
+      },
+    };
+  }
+
+  it('should adapt Emscripten MEMFS through IShellVfs and prioritize WASM runner', () => {
+    const mockMod = createMockEmscriptenModule();
+    const vfs = createEmscriptenVfs(mockMod);
+    const wasmRunner = createBusyboxRunner(mockMod, vfs);
+
+    const shell = createShellInterpreter({
+      vfs,
+      wasmRunner,
+      preferWasmOverBuiltins: true,
+    });
+
+    shell.runCommand('touch test.txt');
+    expect(vfs.exists('/home/repl/test.txt')).toBe(true);
+    expect(shell.getCwd()).toBe('/home/repl');
   });
 });

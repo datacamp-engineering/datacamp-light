@@ -15,7 +15,11 @@ export interface IShellVfs {
   readdir(path: string): string[];
 }
 
-export type WasmAppletRunner = (applet: string, args: string[], input?: string) => {
+export type WasmAppletRunner = (
+  applet: string,
+  args: string[],
+  input?: string,
+) => {
   output?: string;
   error?: string;
   exitCode: number;
@@ -29,6 +33,7 @@ export function createMemoryVfs(): IShellVfs {
   const files: Record<string, { type: 'file' | 'dir'; content?: string }> = {
     '/home': { type: 'dir' },
     '/home/repl': { type: 'dir' },
+    '/tmp': { type: 'dir' },
   };
 
   function normalizePath(path: string): string {
@@ -111,17 +116,150 @@ export function createMemoryVfs(): IShellVfs {
 }
 
 /**
+ * Emscripten MEMFS VFS adapter implementing IShellVfs.
+ */
+export function createEmscriptenVfs(mod: any): IShellVfs {
+  function normalizePath(path: string): string {
+    const parts = path.split('/').filter(Boolean);
+    const stack: string[] = [];
+    for (const part of parts) {
+      if (part === '.') continue;
+      if (part === '..') stack.pop();
+      else stack.push(part);
+    }
+    return '/' + stack.join('/');
+  }
+
+  function resolvePath(path: string): string {
+    if (!path) return mod.FS.cwd();
+    if (path === '~' || path.startsWith('~/')) {
+      return normalizePath(path.replace(/^~/, '/home/repl'));
+    }
+    if (path.startsWith('/')) return normalizePath(path);
+    const currentDirectory = mod.FS.cwd();
+    return normalizePath((currentDirectory === '/' ? '' : currentDirectory) + '/' + path);
+  }
+
+  return {
+    cwd: () => mod.FS.cwd(),
+    chdir: (path: string) => {
+      const target = resolvePath(path);
+      mod.FS.chdir(target);
+    },
+    readFile: (path: string) => {
+      const target = resolvePath(path);
+      return mod.FS.readFile(target, { encoding: 'utf8' });
+    },
+    writeFile: (path: string, content: string) => {
+      const target = resolvePath(path);
+      mod.FS.writeFile(target, content || '');
+    },
+    mkdir: (path: string) => {
+      const target = resolvePath(path);
+      mod.FS.mkdir(target);
+    },
+    rmdir: (path: string) => {
+      const target = resolvePath(path);
+      mod.FS.rmdir(target);
+    },
+    unlink: (path: string) => {
+      const target = resolvePath(path);
+      mod.FS.unlink(target);
+    },
+    exists: (path: string) => {
+      try {
+        const target = resolvePath(path);
+        return mod.FS.analyzePath(target).exists;
+      } catch (e) {
+        return false;
+      }
+    },
+    isDir: (path: string) => {
+      try {
+        const target = resolvePath(path);
+        const stat = mod.FS.stat(target);
+        return mod.FS.isDir(stat.mode);
+      } catch (e) {
+        return false;
+      }
+    },
+    readdir: (path: string) => {
+      const target = resolvePath(path);
+      const entries = mod.FS.readdir(target);
+      return entries.filter((e: string) => e !== '.' && e !== '..').sort();
+    },
+  };
+}
+
+/**
+ * Runner that invokes compiled BusyBox C applets via callMain().
+ */
+export function createBusyboxRunner(mod: any, vfs: IShellVfs): WasmAppletRunner {
+  let pipeCounter = 0;
+  return (applet: string, args: string[], input?: string) => {
+    let outputBuffer = '';
+    let errorBuffer = '';
+    const originalPrint = mod.print;
+    const originalPrintErr = mod.printErr;
+    mod.print = (text: string) => {
+      outputBuffer += (outputBuffer ? '\n' : '') + text;
+    };
+    mod.printErr = (text: string) => {
+      errorBuffer += (errorBuffer ? '\n' : '') + text;
+    };
+
+    let temporaryInputFile: string | null = null;
+    const effectiveArgs = [...args];
+    if (input !== undefined && input !== '') {
+      temporaryInputFile = `/tmp/.dcl_input_${++pipeCounter}`;
+      try {
+        vfs.writeFile(temporaryInputFile, input);
+        effectiveArgs.push(temporaryInputFile);
+      } catch (e) {
+        // Fallback
+      }
+    }
+
+    let exitCode = 0;
+    try {
+      mod.callMain([applet, ...effectiveArgs]);
+    } catch (e: any) {
+      if (typeof e === 'number') exitCode = e;
+      else if (e && typeof e.status === 'number') exitCode = e.status;
+    } finally {
+      mod.print = originalPrint;
+      mod.printErr = originalPrintErr;
+      if (temporaryInputFile) {
+        try {
+          vfs.unlink(temporaryInputFile);
+        } catch (e) {}
+      }
+    }
+
+    return {
+      output: outputBuffer || undefined,
+      error: errorBuffer || undefined,
+      exitCode,
+    };
+  };
+}
+
+export interface CreateShellInterpreterOptions {
+  vfs?: IShellVfs;
+  wasmRunner?: WasmAppletRunner;
+  preferWasmOverBuiltins?: boolean;
+}
+
+/**
  * Creates the unified shell interpreter.
  *
  * Can run with a pure-JS VFS (unit tests / fallback) or with an Emscripten MEMFS VFS +
  * BusyBox WASM runner (in real Web Workers).
  */
-export function createShellInterpreter(options?: {
-  vfs?: IShellVfs;
-  wasmRunner?: WasmAppletRunner;
-}) {
+export function createShellInterpreter(options?: CreateShellInterpreterOptions) {
   const vfs = options?.vfs || createMemoryVfs();
   const wasmRunner = options?.wasmRunner;
+  const preferWasm = options?.preferWasmOverBuiltins ?? Boolean(wasmRunner);
 
   function tokenize(command: string): string[] {
     const tokens: string[] = [];
@@ -211,6 +349,17 @@ export function createShellInterpreter(options?: {
   type CommandResult = { output?: string; error?: string; exitCode?: number };
   type Builtin = (args: string[], input?: string) => CommandResult;
 
+  const filesystemBuiltins = new Set([
+    'cd',
+    'pwd',
+    'touch',
+    'mkdir',
+    'rm',
+    'cp',
+    'mv',
+    'clear',
+  ]);
+
   const builtins: Record<string, Builtin> = {
     pwd: () => ({ output: vfs.cwd(), exitCode: 0 }),
     cd: (args) => {
@@ -219,7 +368,7 @@ export function createShellInterpreter(options?: {
         vfs.chdir(target);
         return { output: '', exitCode: 0 };
       } catch (err: any) {
-        return { error: `cd: ${err.message || 'no such file or directory'}`, exitCode: 1 };
+        return { error: `cd: ${args[0] || ''}: no such file or directory`, exitCode: 1 };
       }
     },
     ls: (args) => {
@@ -231,7 +380,8 @@ export function createShellInterpreter(options?: {
         if (!vfs.isDir(target)) {
           return { output: target, exitCode: 0 };
         }
-        return { output: vfs.readdir(target).join('  '), exitCode: 0 };
+        const entries = vfs.readdir(target);
+        return { output: entries.join('  '), exitCode: 0 };
       } catch (err: any) {
         return { error: `ls: ${err.message}`, exitCode: 1 };
       }
@@ -482,7 +632,23 @@ export function createShellInterpreter(options?: {
     const args = argv.slice(1);
 
     let res: CommandResult;
-    if (builtins[cmd]) {
+    if (preferWasm && wasmRunner && !filesystemBuiltins.has(cmd)) {
+      const wasmRes = wasmRunner(cmd, args, currentInput);
+      const isNotFound =
+        wasmRes.exitCode === 127 ||
+        (wasmRes.error && wasmRes.error.includes('applet not found'));
+      if (!isNotFound) {
+        res = {
+          output: wasmRes.output,
+          error: wasmRes.error,
+          exitCode: wasmRes.exitCode,
+        };
+      } else if (builtins[cmd]) {
+        res = builtins[cmd](args, currentInput);
+      } else {
+        res = { error: `${cmd}: command not found`, exitCode: 127 };
+      }
+    } else if (builtins[cmd]) {
       res = builtins[cmd](args, currentInput);
     } else if (wasmRunner) {
       const wasmRes = wasmRunner(cmd, args, currentInput);
