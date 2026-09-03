@@ -300,8 +300,16 @@ export class RWebRSession {
                                              force_diagnose = FALSE,
                                              seed = 42)
 
+            text_outputs <- character(0)
+            for (item in output_list) {
+              if (is.list(item) && !is.null(item$type) && item$type %in% c("output", "r-message", "r-warning", "r-error")) {
+                text_outputs <- c(text_outputs, item$payload)
+              }
+            }
+
             list(correct = testwhat_result$correct,
-                 message = if (is.null(testwhat_result$message)) "Great work!" else testwhat_result$message)
+                 message = if (is.null(testwhat_result$message)) "Great work!" else testwhat_result$message,
+                 output = paste(text_outputs, collapse = "\n"))
           })
         `;
 
@@ -312,11 +320,13 @@ export class RWebRSession {
 
           let correct = false;
           let message = '';
+          let output = '';
 
           if (jsRes && typeof jsRes === 'object') {
             if (Array.isArray(jsRes.names) && Array.isArray(jsRes.values)) {
               const correctIdx = jsRes.names.indexOf('correct');
               const messageIdx = jsRes.names.indexOf('message');
+              const outputIdx = jsRes.names.indexOf('output');
               if (correctIdx !== -1) {
                 const valObj = jsRes.values[correctIdx];
                 correct = Array.isArray(valObj?.values)
@@ -329,14 +339,33 @@ export class RWebRSession {
                   ? String(valObj.values[0] ?? '')
                   : String(valObj ?? '');
               }
-            } else if ('correct' in jsRes) {
-              correct = Array.isArray(jsRes.correct)
-                ? Boolean(jsRes.correct[0])
-                : Boolean(jsRes.correct);
-              message = Array.isArray(jsRes.message)
-                ? String(jsRes.message[0] ?? '')
-                : String(jsRes.message ?? '');
+              if (outputIdx !== -1) {
+                const valObj = jsRes.values[outputIdx];
+                output = Array.isArray(valObj?.values)
+                  ? String(valObj.values[0] ?? '')
+                  : String(valObj ?? '');
+              }
+            } else {
+              if ('correct' in jsRes) {
+                correct = Array.isArray(jsRes.correct)
+                  ? Boolean(jsRes.correct[0])
+                  : Boolean(jsRes.correct);
+              }
+              if ('message' in jsRes) {
+                message = Array.isArray(jsRes.message)
+                  ? String(jsRes.message[0] ?? '')
+                  : String(jsRes.message ?? '');
+              }
+              if ('output' in jsRes) {
+                output = Array.isArray(jsRes.output)
+                  ? String(jsRes.output[0] ?? '')
+                  : String(jsRes.output ?? '');
+              }
             }
+          }
+
+          if (output) {
+            this.lifecycle.emitOutput({ type: 'output', payload: output });
           }
 
           message = message.trim();
@@ -347,7 +376,7 @@ export class RWebRSession {
           }
 
           this.lifecycle.setStatus('ready');
-          return { correct, message, output: '' };
+          return { correct, message, output };
         } catch (twErr: any) {
           console.error('[DataCamp Light R SCT Exception]', twErr);
           const rawErr = String(twErr?.message || twErr || '');
@@ -361,7 +390,24 @@ export class RWebRSession {
       if (pec.trim()) {
         await webR.evalRVoid(pec);
       }
-      await webR.evalRVoid(code);
+      const { output: capturedOutput, images } = await webR.globalShelter.captureR(code || '');
+      const stdout: string[] = [];
+      const stderr: string[] = [];
+
+      for (const entry of capturedOutput as WebROutputEntry[]) {
+        if (entry.type === 'stdout') {
+          stdout.push(String(entry.data));
+          this.lifecycle.emitOutput({ type: 'output', payload: String(entry.data) });
+        } else if (entry.type === 'stderr') {
+          stderr.push(String(entry.data));
+          this.lifecycle.emitOutput({ type: 'error', payload: String(entry.data) });
+        }
+      }
+
+      for (const image of images as WebRImage[]) {
+        const dataUrl = imageBitmapToDataUrl(image);
+        this.lifecycle.emitOutput({ type: 'graph', payload: dataUrl });
+      }
 
       let message = 'Great work! Your solution passed all tests.';
       let correct = true;
@@ -375,8 +421,9 @@ export class RWebRSession {
         }
       }
 
+      const combinedOutput = stdout.join('\n');
       this.lifecycle.setStatus('ready');
-      return { correct, message, output: '' };
+      return { correct, message, output: combinedOutput };
     } catch (err: any) {
       this.lifecycle.setStatus('broken', err?.message);
       throw err;

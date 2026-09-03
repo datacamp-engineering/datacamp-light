@@ -16,10 +16,11 @@ describe('RWebRSession', () => {
       evalR: vi.fn().mockResolvedValue({
         toJs: vi.fn().mockResolvedValue({
           type: 'list',
-          names: ['correct', 'message'],
+          names: ['correct', 'message', 'output'],
           values: [
             { type: 'logical', names: null, values: [true] },
             { type: 'character', names: null, values: ['Well done!\n'] },
+            { type: 'character', names: null, values: ['[1] 78.53975'] },
           ],
         }),
       }),
@@ -27,6 +28,11 @@ describe('RWebRSession', () => {
 
     // Inject mocked webR instance
     (session as any).webRPromise = Promise.resolve(mockWebR);
+
+    const emittedOutputs: any[] = [];
+    session.onOutput((notif) => {
+      emittedOutputs.push(notif);
+    });
 
     const result = await session.submitCode({
       code: 'area <- pi * (radius ** 2)',
@@ -37,6 +43,8 @@ describe('RWebRSession', () => {
 
     expect(result.correct).toBe(true);
     expect(result.message).toBe('Well done!');
+    expect(result.output).toBe('[1] 78.53975');
+    expect(emittedOutputs).toEqual([{ type: 'output', payload: '[1] 78.53975' }]);
     expect(session.getStatus().status).toBe('ready');
   });
 
