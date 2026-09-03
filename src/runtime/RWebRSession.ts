@@ -2,13 +2,12 @@ import type {
   IInitializeParams,
   IRunCodeParams,
   IRunCodeResult,
-  ISessionOutputNotification,
   ISessionStatus,
   ISubmitCodeParams,
   ISubmitCodeResult,
-  SessionStatusCode,
 } from '../jsonrpc/types';
-import type { OutputListener, StatusListener } from '../jsonrpc/session';
+import { SessionLifecycle } from './sessionLifecycle';
+import type { OutputListener, StatusListener } from './sessionLifecycle';
 import { TESTWHAT_R_SOURCES } from './testwhatSources';
 
 /**
@@ -47,10 +46,7 @@ function imageBitmapToDataUrl(bitmap: WebRImage): string {
 }
 
 export class RWebRSession {
-  private statusListeners = new Set<StatusListener>();
-  private outputListeners = new Set<OutputListener>();
-  private currentStatus: ISessionStatus = { status: 'none' };
-
+  private lifecycle = new SessionLifecycle();
   private webRPromise: Promise<any> | null = null;
   private testwhatReadyPromise: Promise<void> | null = null;
 
@@ -170,32 +166,23 @@ export class RWebRSession {
     return this.testwhatReadyPromise;
   }
 
-  private emitOutput(notification: ISessionOutputNotification): void {
-    this.outputListeners.forEach((listener) => listener(notification));
-  }
-
-  private setStatus(status: SessionStatusCode, message?: string): void {
-    this.currentStatus = { status, message };
-    this.statusListeners.forEach((listener) => listener(this.currentStatus));
-  }
-
   public async initialize(params: IInitializeParams): Promise<void> {
-    this.setStatus('starting');
+    this.lifecycle.setStatus('starting');
     try {
       const webR = await this.getWebR();
       const pec = params.pec || '';
       if (pec.trim()) {
         await webR.evalRVoid(pec);
       }
-      this.setStatus('ready');
+      this.lifecycle.setStatus('ready');
     } catch (err: any) {
-      this.setStatus('broken', err?.message || 'Failed to initialize R session');
+      this.lifecycle.setStatus('broken', err?.message || 'Failed to initialize R session');
       throw err;
     }
   }
 
   public async runCode(params: IRunCodeParams): Promise<IRunCodeResult> {
-    this.setStatus('busy');
+    this.lifecycle.setStatus('busy');
     try {
       const webR = await this.getWebR();
 
@@ -207,29 +194,28 @@ export class RWebRSession {
       for (const entry of output as WebROutputEntry[]) {
         if (entry.type === 'stdout') {
           stdout.push(String(entry.data));
-          this.emitOutput({ type: 'output', payload: String(entry.data) });
+          this.lifecycle.emitOutput({ type: 'output', payload: String(entry.data) });
         } else if (entry.type === 'stderr') {
           stderr.push(String(entry.data));
-          this.emitOutput({ type: 'error', payload: String(entry.data) });
+          this.lifecycle.emitOutput({ type: 'error', payload: String(entry.data) });
         }
       }
 
+      let lastGraphDataUrl: string | undefined;
       for (const image of images as WebRImage[]) {
         const dataUrl = imageBitmapToDataUrl(image);
-        this.emitOutput({ type: 'graph', payload: dataUrl });
+        lastGraphDataUrl = dataUrl;
+        this.lifecycle.emitOutput({ type: 'graph', payload: dataUrl });
       }
 
-      this.setStatus('ready');
+      this.lifecycle.setStatus('ready');
       return {
         output: stdout.join('\n'),
         error: stderr.length > 0 ? stderr.join('\n') : undefined,
-        graph:
-          (images as WebRImage[]).length > 0
-            ? imageBitmapToDataUrl((images as WebRImage[])[images.length - 1])
-            : undefined,
+        graph: lastGraphDataUrl,
       };
     } catch (err: any) {
-      this.setStatus('broken', err?.message);
+      this.lifecycle.setStatus('broken', err?.message);
       throw err;
     }
   }
@@ -243,7 +229,7 @@ export class RWebRSession {
    * Falls back to basic assertion testing if testwhat is not used in the SCT.
    */
   public async submitCode(params: ISubmitCodeParams): Promise<ISubmitCodeResult> {
-    this.setStatus('busy');
+    this.lifecycle.setStatus('busy');
     try {
       const webR = await this.getWebR();
       const sct = params.sct || '';
@@ -302,7 +288,7 @@ export class RWebRSession {
               eval(parse(text = student_code), envir = student_env)
             }
 
-testwhat_result <- test_exercise(sct = sct_code,
+            testwhat_result <- test_exercise(sct = sct_code,
                                              ex_type = "NormalExercise",
                                              pec = pec_code,
                                              student_code = student_code,
@@ -360,13 +346,13 @@ testwhat_result <- test_exercise(sct = sct_code,
               : 'Incorrect solution.';
           }
 
-          this.setStatus('ready');
+          this.lifecycle.setStatus('ready');
           return { correct, message, output: '' };
         } catch (twErr: any) {
           console.error('[DataCamp Light R SCT Exception]', twErr);
           const rawErr = String(twErr?.message || twErr || '');
           const cleanMsg = rawErr.replace(/^Error in [^:]+:\s*/, 'SCT Error: ') || 'Error during R SCT evaluation.';
-          this.setStatus('ready');
+          this.lifecycle.setStatus('ready');
           return { correct: false, message: cleanMsg, output: '' };
         }
       }
@@ -389,10 +375,10 @@ testwhat_result <- test_exercise(sct = sct_code,
         }
       }
 
-      this.setStatus('ready');
+      this.lifecycle.setStatus('ready');
       return { correct, message, output: '' };
     } catch (err: any) {
-      this.setStatus('broken', err?.message);
+      this.lifecycle.setStatus('broken', err?.message);
       throw err;
     }
   }
@@ -415,26 +401,18 @@ testwhat_result <- test_exercise(sct = sct_code,
   }
 
   public onStatusChange(listener: StatusListener): () => void {
-    this.statusListeners.add(listener);
-    listener(this.currentStatus);
-    return () => {
-      this.statusListeners.delete(listener);
-    };
+    return this.lifecycle.onStatusChange(listener);
   }
 
   public onOutput(listener: OutputListener): () => void {
-    this.outputListeners.add(listener);
-    return () => {
-      this.outputListeners.delete(listener);
-    };
+    return this.lifecycle.onOutput(listener);
   }
 
   public getStatus(): ISessionStatus {
-    return this.currentStatus;
+    return this.lifecycle.getStatus();
   }
 
   public destroy(): void {
-    this.statusListeners.clear();
-    this.outputListeners.clear();
+    this.lifecycle.destroy();
   }
 }

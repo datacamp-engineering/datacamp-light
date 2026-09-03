@@ -1,3 +1,5 @@
+import { SessionLifecycle } from '../runtime/sessionLifecycle';
+import type { StatusListener, OutputListener } from '../runtime/sessionLifecycle';
 import type {
   IInitializeParams,
   IRunCodeParams,
@@ -12,11 +14,9 @@ import type {
   JsonRpcMessage,
   JsonRpcNotification,
   JsonRpcRequest,
-  SessionStatusCode,
 } from './types';
 
-export type StatusListener = (status: ISessionStatus) => void;
-export type OutputListener = (output: ISessionOutputNotification) => void;
+export type { StatusListener, OutputListener };
 
 /**
  * Interactive shell sessions additionally expose a single-command execution
@@ -51,9 +51,7 @@ export class JsonRpcSessionClient implements IJsonRpcSession {
       reject: (reason: any) => void;
     }
   >();
-  private statusListeners = new Set<StatusListener>();
-  private outputListeners = new Set<OutputListener>();
-  private currentStatus: ISessionStatus = { status: 'none' };
+  private lifecycle = new SessionLifecycle();
 
   constructor(private postToWorker: (message: JsonRpcMessage) => void) {}
 
@@ -80,15 +78,14 @@ export class JsonRpcSessionClient implements IJsonRpcSession {
       case 'session_status': {
         const status = notification.params as unknown as ISessionStatus;
         if (status) {
-          this.currentStatus = status;
-          this.statusListeners.forEach((listener) => listener(status));
+          this.lifecycle.setStatus(status.status, status.message);
         }
         break;
       }
       case 'session_output': {
         const output = notification.params as unknown as ISessionOutputNotification;
         if (output) {
-          this.outputListeners.forEach((listener) => listener(output));
+          this.lifecycle.emitOutput(output);
         }
         break;
       }
@@ -116,82 +113,69 @@ export class JsonRpcSessionClient implements IJsonRpcSession {
   }
 
   public async initialize(params: IInitializeParams): Promise<void> {
-    this.setStatus('starting');
+    this.lifecycle.setStatus('starting');
     try {
       await this.request('initialize', params);
-      this.setStatus('ready');
+      this.lifecycle.setStatus('ready');
     } catch (error: any) {
-      this.setStatus('broken', error?.message || 'Failed to initialize session');
+      this.lifecycle.setStatus('broken', error?.message || 'Failed to initialize session');
       throw error;
     }
   }
 
   public async runCode(params: IRunCodeParams): Promise<IRunCodeResult> {
-    this.setStatus('busy');
+    this.lifecycle.setStatus('busy');
     try {
       const result = await this.request<IRunCodeResult, IRunCodeParams>('runCode', params);
-      this.setStatus('ready');
+      this.lifecycle.setStatus('ready');
       return result;
     } catch (error: any) {
-      this.setStatus('ready');
+      this.lifecycle.setStatus('ready');
       throw error;
     }
   }
 
   public async runCommand(params: IRunCommandParams): Promise<IRunCommandResult> {
-    this.setStatus('busy');
+    this.lifecycle.setStatus('busy');
     try {
       const result = await this.request<IRunCommandResult, IRunCommandParams>(
         'runCommand',
         params,
       );
-      this.setStatus('ready');
+      this.lifecycle.setStatus('ready');
       return result;
     } catch (error: any) {
-      this.setStatus('ready');
+      this.lifecycle.setStatus('ready');
       throw error;
     }
   }
 
   public async submitCode(params: ISubmitCodeParams): Promise<ISubmitCodeResult> {
-    this.setStatus('busy');
+    this.lifecycle.setStatus('busy');
     try {
       const result = await this.request<ISubmitCodeResult, ISubmitCodeParams>('submitCode', params);
-      this.setStatus('ready');
+      this.lifecycle.setStatus('ready');
       return result;
     } catch (error: any) {
-      this.setStatus('ready');
+      this.lifecycle.setStatus('ready');
       throw error;
     }
   }
 
   public onStatusChange(listener: StatusListener): () => void {
-    this.statusListeners.add(listener);
-    listener(this.currentStatus);
-    return () => {
-      this.statusListeners.delete(listener);
-    };
+    return this.lifecycle.onStatusChange(listener);
   }
 
   public onOutput(listener: OutputListener): () => void {
-    this.outputListeners.add(listener);
-    return () => {
-      this.outputListeners.delete(listener);
-    };
+    return this.lifecycle.onOutput(listener);
   }
 
   public getStatus(): ISessionStatus {
-    return this.currentStatus;
-  }
-
-  private setStatus(status: SessionStatusCode, message?: string): void {
-    this.currentStatus = { status, message };
-    this.statusListeners.forEach((listener) => listener(this.currentStatus));
+    return this.lifecycle.getStatus();
   }
 
   public destroy(): void {
-    this.statusListeners.clear();
-    this.outputListeners.clear();
+    this.lifecycle.destroy();
     this.pendingRequests.forEach(({ reject }) => {
       reject(new Error('Session destroyed'));
     });
