@@ -5,11 +5,9 @@ build/
 npm-debug.log
 ecs_task.json
 dist/
-public/
-!public/
-!public/fonts
 .idea
 .awcache
+.Rhistory
 
 *.css.d.ts
 *.scss.d.ts
