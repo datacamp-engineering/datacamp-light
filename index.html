@@ -255,6 +255,30 @@
     Remember the formula: <code>area = pi * (radius ** 2)</code>.
   </div>
 </div>`
+        },
+        {
+          id: 'card-r-plot',
+          title: '5. R Data Visualization (webR Base Plotting)',
+          lang: 'r',
+          html: `<div data-datacamp-exercise data-lang="r">
+  <code data-type="pre-exercise-code"></code>
+  <code data-type="sample-code">
+    # Generate data in R
+    x <- seq(0, 2 * pi, length.out = 100)
+    y <- sin(x)
+
+    # Render base R graphics in the browser via webR
+    plot(x, y, type = "l", col = "#0578ff", lwd = 2,
+         main = "Sine Wave in webR WASM",
+         xlab = "x", ylab = "sin(x)")
+    grid()
+
+    print("Rendered R plot successfully in WebAssembly!")
+  </code>
+  <code data-type="solution"></code>
+  <code data-type="sct"></code>
+  <div data-type="hint">Click "Run Code" to render the plot with webR.</div>
+</div>`
         }
       ];
 

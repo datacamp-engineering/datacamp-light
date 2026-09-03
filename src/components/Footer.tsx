@@ -11,9 +11,9 @@ interface FooterProps {
 
 export const Footer: React.FC<FooterProps> = ({
   utmSource = 'datacamp_light',
-  utmCampaign = 'powered_by_datacamp',
+  utmCampaign = 'powered_by_datalab',
 }) => {
-  const datacampUrl = `https://www.datacamp.com/?utm_source=${encodeURIComponent(
+  const datalabUrl = `https://www.datacamp.com/datalab?utm_source=${encodeURIComponent(
     utmSource,
   )}&utm_campaign=${encodeURIComponent(utmCampaign)}`;
 
@@ -31,7 +31,7 @@ export const Footer: React.FC<FooterProps> = ({
       }}
     >
       <a
-        aria-label="Powered by DataCamp"
+        aria-label="Powered by DataLab"
         css={{
           alignItems: 'center',
           cursor: 'pointer',
@@ -39,7 +39,7 @@ export const Footer: React.FC<FooterProps> = ({
           gap: tokens.spacingNew.tiny,
           textDecoration: 'none !important',
         }}
-        href={datacampUrl}
+        href={datalabUrl}
         rel="noopener noreferrer"
         target="_blank"
       >
