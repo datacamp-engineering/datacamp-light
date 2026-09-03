@@ -4,8 +4,10 @@
 DataCamp Light v4 modernizes the embedded exercise widget by replacing legacy server-side Docker containers with client-side WebAssembly runtimes speaking a unified JSON-RPC 2.0 protocol, styled with `@datacamp/waffles` dark theme.
 
 ## Current Status
-- **Verification**: `npm run typecheck` (clean) and `npm test` (50/50 tests passing across 11 test suites).
+- **Verification**: `npm run typecheck` (clean) and `npm test` (51/51 tests passing across 11 test suites).
 - **Build**: Vite bundle generation emitting UMD (`dist/dcl-react.js`), ESM (`dist/dcl-react.es.js`), and self-contained CSS (`dist/datacamp-light.css`) with inlined Studio-Feixen-Sans and JetBrains Mono fonts.
+- **Legacy Preservation**: [`LEGACY_ASSETS_MANIFEST.md`](./LEGACY_ASSETS_MANIFEST.md) records all historical CDN asset hashes and rollback commands.
+- **CI Pipeline**: `.circleci/config.yml` includes automated legacy CDN backups to `dcl/v3/` prior to deployment, Node 20 LTS runner, and fixture URL rewrites.
 
 ## Implemented Features
 1. **Runtimes (JSON-RPC 2.0 Client)**:
