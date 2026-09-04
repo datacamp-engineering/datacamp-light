@@ -62,6 +62,12 @@ export const ActionBar: React.FC<ActionBarProps> = ({
         flexWrap: 'wrap',
         gap: tokens.spacingNew.xsmall,
         padding: `${tokens.spacingNew.xsmall} ${tokens.spacingNew.medium}`,
+        '& .reset-button-icon': {
+          display: 'none !important',
+        },
+        '& .reset-button-text': {
+          display: 'inline-flex !important',
+        },
         '@container (max-width: 540px)': {
           '& .btn-prefix-show': {
             display: 'none',
@@ -69,8 +75,11 @@ export const ActionBar: React.FC<ActionBarProps> = ({
           '& .btn-suffix-explain': {
             display: 'none',
           },
-          '& .reset-text': {
-            display: 'none',
+          '& .reset-button-text': {
+            display: 'none !important',
+          },
+          '& .reset-button-icon': {
+            display: 'inline-flex !important',
           },
         },
         '@container (max-width: 420px)': {
@@ -188,20 +197,25 @@ export const ActionBar: React.FC<ActionBarProps> = ({
         </span>
         <Button
           aria-label={resetAriaLabel}
+          className="reset-button-text"
           disabled={isExecuting}
-          iconLeft={<Redo size="small" />}
           onClick={onReset}
           size="small"
           title={resetAriaLabel}
           variant="plain"
-          css={{
-            minWidth: 'auto',
-            paddingLeft: `${tokens.spacingNew.xsmall} !important`,
-            paddingRight: `${tokens.spacingNew.xsmall} !important`,
-          }}
         >
-          <span className="reset-text">Reset</span>
+          Reset
         </Button>
+        <Button
+          aria-label={resetAriaLabel}
+          className="reset-button-icon"
+          disabled={isExecuting}
+          icon={<Redo size="small" />}
+          onClick={onReset}
+          size="small"
+          title={resetAriaLabel}
+          variant="plain"
+        />
       </div>
     </div>
   );
