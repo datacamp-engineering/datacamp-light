@@ -2,22 +2,8 @@ import { useCallback, useEffect, useState } from 'react';
 
 export type ThemeMode = 'light' | 'dark';
 
-const STORAGE_KEY = 'datacamp-light-theme-override';
-
 let userOverrideTheme: ThemeMode | null = null;
 const subscribers = new Set<() => void>();
-
-function cleanupLegacyLocalStorage(): void {
-  try {
-    if (typeof window !== 'undefined' && window.localStorage) {
-      window.localStorage.removeItem(STORAGE_KEY);
-    }
-  } catch {
-    // Ignore storage errors in sandboxed iframes
-  }
-}
-
-cleanupLegacyLocalStorage();
 
 export function getSystemTheme(): ThemeMode {
   if (typeof window !== 'undefined' && typeof window.matchMedia === 'function') {
