@@ -89,7 +89,7 @@ export const ActionBar: React.FC<ActionBarProps> = ({
         '& .reset-button-text': {
           display: 'inline-flex !important',
         },
-        '@container (max-width: 540px)': {
+        '@container (max-width: 720px)': {
           '& .btn-prefix-show': {
             display: 'none',
           },
@@ -106,7 +106,7 @@ export const ActionBar: React.FC<ActionBarProps> = ({
             display: 'none',
           },
         },
-        '@container (max-width: 420px)': {
+        '@container (max-width: 500px)': {
           '& .btn-suffix-run': {
             display: 'none',
           },
