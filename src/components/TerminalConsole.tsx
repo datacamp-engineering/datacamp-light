@@ -68,10 +68,24 @@ export const TerminalConsole: React.FC<TerminalConsoleProps> = ({
   useEffect(() => {
     if (!terminalContainerReference.current) return;
 
+    const computedStyle = getComputedStyle(terminalContainerReference.current);
+    const isLightMode =
+      terminalContainerReference.current.closest('[data-wf-theme="light"]') !== null;
+
     const terminalBackground =
-      getComputedStyle(terminalContainerReference.current)
-        .getPropertyValue('--wf-bg--main')
-        .trim() || '#05192D';
+      computedStyle.getPropertyValue('--wf-bg--main').trim() ||
+      (isLightMode ? '#FFFFFF' : '#05192D');
+
+    const terminalForeground =
+      computedStyle.getPropertyValue('--wf-text--main').trim() ||
+      (isLightMode ? '#05192D' : '#FFFFFF');
+
+    const cursorColor =
+      computedStyle.getPropertyValue('--wf-blue--main').trim() || '#0578FF';
+
+    const selectionColor =
+      computedStyle.getPropertyValue('--wf-blue--transparent').trim() ||
+      'rgba(5, 120, 255, 0.2)';
 
     const terminalInstance = new Xterm({
       cursorBlink: true,
@@ -80,9 +94,9 @@ export const TerminalConsole: React.FC<TerminalConsoleProps> = ({
       lineHeight: 1.3,
       theme: {
         background: terminalBackground,
-        foreground: theme.text.main as string,
-        cursor: theme.blue.main as string,
-        selectionBackground: theme.blue.transparent as string,
+        foreground: terminalForeground,
+        cursor: cursorColor,
+        selectionBackground: selectionColor,
       },
     });
 
