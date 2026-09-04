@@ -1,24 +1,30 @@
 import { Button } from '@datacamp/waffles/button';
-import { Checkmark, Cross } from '@datacamp/waffles/icon';
+import { Checkmark, Cross, Sparkles } from '@datacamp/waffles/icon';
 import { theme } from '@datacamp/waffles/theme';
 import { tokens } from '@datacamp/waffles/tokens';
 import React from 'react';
 import type { ISessionStatus } from '../jsonrpc/types';
 
 interface ActionBarProps {
-  onRun: () => void;
+  onRun?: () => void;
   onSubmit: () => void;
   onReset: () => void;
   onToggleSolution?: () => void;
   onToggleHint?: () => void;
+  onExplainCode?: () => void;
   isExecuting: boolean;
   executingAction?: 'run' | 'submit' | null;
-  hasSolution: boolean;
-  showingSolution: boolean;
-  hasHint: boolean;
+  isExplainingCode?: boolean;
+  hasSolution?: boolean;
+  showingSolution?: boolean;
+  hasHint?: boolean;
   showingHint?: boolean;
+  hasSct?: boolean;
   showRunButton?: boolean;
+  showAi?: boolean;
   status: ISessionStatus;
+  borderTop?: boolean;
+  resetAriaLabel?: string;
 }
 
 export const ActionBar: React.FC<ActionBarProps> = ({
@@ -27,14 +33,20 @@ export const ActionBar: React.FC<ActionBarProps> = ({
   onReset,
   onToggleSolution,
   onToggleHint,
+  onExplainCode,
   isExecuting,
   executingAction = null,
-  hasSolution,
-  showingSolution,
-  hasHint,
+  isExplainingCode = false,
+  hasSolution = false,
+  showingSolution = false,
+  hasHint = false,
   showingHint = false,
+  hasSct = true,
   showRunButton = true,
+  showAi = true,
   status,
+  borderTop = true,
+  resetAriaLabel = 'Reset exercise',
 }) => {
   const disabled = isExecuting || status.status === 'busy' || status.status === 'starting';
 
@@ -43,7 +55,9 @@ export const ActionBar: React.FC<ActionBarProps> = ({
       css={{
         alignItems: 'center',
         backgroundColor: theme.background.secondary,
-        borderTop: `${tokens.borderWidth.thin} solid ${theme.border.main}`,
+        ...(borderTop
+          ? { borderTop: `${tokens.borderWidth.thin} solid ${theme.border.main}` }
+          : {}),
         display: 'flex',
         flexWrap: 'wrap',
         gap: tokens.spacingNew.xsmall,
@@ -58,7 +72,7 @@ export const ActionBar: React.FC<ActionBarProps> = ({
           gap: tokens.spacingNew.xsmall,
         }}
       >
-        {showRunButton && (
+        {showRunButton && onRun && (
           <Button
             disabled={disabled}
             isLoading={isExecuting && executingAction === 'run'}
@@ -69,15 +83,17 @@ export const ActionBar: React.FC<ActionBarProps> = ({
             Run Code
           </Button>
         )}
-        <Button
-          disabled={disabled}
-          isLoading={isExecuting && executingAction === 'submit'}
-          onClick={onSubmit}
-          size="small"
-          variant="regularOutline"
-        >
-          Submit Answer
-        </Button>
+        {hasSct && (
+          <Button
+            disabled={disabled}
+            isLoading={isExecuting && executingAction === 'submit'}
+            onClick={onSubmit}
+            size="small"
+            variant="regularOutline"
+          >
+            Submit Answer
+          </Button>
+        )}
         {hasHint && onToggleHint && (
           <Button
             disabled={disabled}
@@ -96,6 +112,18 @@ export const ActionBar: React.FC<ActionBarProps> = ({
             variant="plain"
           >
             {showingSolution ? 'Hide Solution' : 'Show Solution'}
+          </Button>
+        )}
+        {showAi && onExplainCode && (
+          <Button
+            disabled={disabled}
+            iconLeft={<Sparkles size="small" />}
+            isLoading={isExplainingCode}
+            onClick={onExplainCode}
+            size="small"
+            variant="plain"
+          >
+            Explain Code
           </Button>
         )}
       </div>
@@ -133,7 +161,7 @@ export const ActionBar: React.FC<ActionBarProps> = ({
             : 'Idle'}
         </span>
         <Button
-          aria-label="Reset exercise"
+          aria-label={resetAriaLabel}
           disabled={isExecuting}
           onClick={onReset}
           size="small"

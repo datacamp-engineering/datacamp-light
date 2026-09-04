@@ -22,7 +22,10 @@ export function getSettings(element: HTMLElement): DataCampExerciseProps {
         id,
         hint: exercise.hint,
         language: exercise.language || 'python',
-        theme: exercise.theme === 'light' ? 'light' : 'dark',
+        theme:
+          exercise.theme === 'light' || exercise.theme === 'dark'
+            ? exercise.theme
+            : undefined,
         packages: exercise.packages
           ? exercise.packages.split(',').map((packageItem: string) => packageItem.trim())
           : [],
@@ -31,6 +34,11 @@ export function getSettings(element: HTMLElement): DataCampExerciseProps {
         sct: exercise.sct || '',
         solution: exercise.solution || '',
         showRunButton: exercise.showRunButton !== false,
+        showAi: exercise.showAi !== false && exercise.show_ai !== false,
+        sharedEnvironment:
+          exercise.sharedEnvironment ??
+          exercise.shared_environment ??
+          exercise.environment,
       };
     } catch (parseError) {
       console.error('Failed to parse encoded DataCamp Light exercise:', parseError);
@@ -62,7 +70,31 @@ export function getSettings(element: HTMLElement): DataCampExerciseProps {
   const height = rawHeight === 'auto' || !rawHeight ? 'auto' : parseInt(rawHeight, 10);
 
   const rawTheme = element.getAttribute('data-theme')?.toLowerCase();
-  const theme: 'light' | 'dark' = rawTheme === 'light' ? 'light' : 'dark';
+  const theme: 'light' | 'dark' | undefined =
+    rawTheme === 'light' || rawTheme === 'dark' ? rawTheme : undefined;
+
+  const showAi =
+    !element.hasAttribute('data-show-ai') &&
+    !element.hasAttribute('data-has-ai')
+      ? true
+      : element.getAttribute('data-show-ai')?.toLowerCase() !== 'false' &&
+        element.getAttribute('data-has-ai')?.toLowerCase() !== 'false';
+
+  const mockAi = element.hasAttribute('data-mock-ai')
+    ? element.getAttribute('data-mock-ai')?.toLowerCase() !== 'false'
+    : undefined;
+
+  const rawSharedEnv =
+    element.getAttribute('data-shared-environment') ??
+    element.getAttribute('data-environment');
+  const sharedEnvironment =
+    rawSharedEnv === null
+      ? undefined
+      : rawSharedEnv === '' || rawSharedEnv.toLowerCase() === 'true'
+      ? true
+      : rawSharedEnv.toLowerCase() === 'false'
+      ? false
+      : rawSharedEnv;
 
   return {
     id,
@@ -76,6 +108,9 @@ export function getSettings(element: HTMLElement): DataCampExerciseProps {
     solution: getText('solution'),
     height,
     showRunButton,
+    showAi,
+    mockAi,
+    sharedEnvironment,
     utmSource: element.getAttribute('data-utm-source') || undefined,
     utmCampaign: element.getAttribute('data-utm-campaign') || undefined,
   };

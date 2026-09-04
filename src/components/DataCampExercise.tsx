@@ -1,12 +1,22 @@
 import '../i18n';
-import { Button } from '@datacamp/waffles/button';
-import { Checkmark, Cross } from '@datacamp/waffles/icon';
 import { theme } from '@datacamp/waffles/theme';
 import { tokens } from '@datacamp/waffles/tokens';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import type { ISessionStatus } from '../jsonrpc/types';
-import { createSessionForLanguage } from '../runtime/createSessionForLanguage';
+import {
+  checkIsUserSignedIn,
+  explainCode,
+  fixAndExplainCode,
+  parseFixAndExplainResponse,
+} from '../ai/aiClient';
+import { isFirstPartyDomain } from '../ai/aiConfig';
+import { computeLineDiff } from '../ai/lineDiff';
+import type { LineChange } from '../ai/lineDiff';
+import type { ISessionOutputNotification, ISessionStatus } from '../jsonrpc/types';
+import { acquireSession } from '../runtime/sessionPool';
+import { useResolvedTheme } from '../theme/themeManager';
 import { ActionBar } from './ActionBar';
+import { AiExplanationPanel } from './AiExplanationPanel';
+import { AiUpsellBanner } from './AiUpsellBanner';
 import { CodeEditor } from './CodeEditor';
 import { DCLWidgetShell } from './DCLWidgetShell';
 import { FeedbackBanner } from './FeedbackBanner';
@@ -29,6 +39,9 @@ export interface DataCampExerciseProps {
   packages?: string[];
   height?: number | string;
   showRunButton?: boolean;
+  showAi?: boolean;
+  mockAi?: boolean;
+  sharedEnvironment?: boolean | string;
   utmSource?: string;
   utmCampaign?: string;
   onRun?: (code: string) => void;
@@ -63,6 +76,7 @@ const ShellExercise: React.FC<{
   sct: string;
   height: number | string;
   theme?: 'light' | 'dark';
+  sharedEnvironment?: boolean | string;
   utmSource?: string;
   utmCampaign?: string;
   onSubmit?: (code: string) => void;
@@ -73,38 +87,43 @@ const ShellExercise: React.FC<{
   sct,
   height,
   theme: themeMode,
+  sharedEnvironment,
   utmSource,
   utmCampaign,
   onSubmit,
   onFeedback,
 }) => {
+  const { theme: activeTheme, toggleTheme } = useResolvedTheme(themeMode);
   const [showingHint, setShowingHint] = useState(false);
   const [feedback, setFeedback] = useState<{ correct: boolean; message: string } | null>(null);
   const [typedHistory, setTypedHistory] = useState<string[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [status, setStatus] = useState<ISessionStatus>({ status: 'none' });
+  const [resetCounter, setResetCounter] = useState(0);
   const initialHeight = typeof height === 'number' ? height : 300;
   const [terminalHeight, setTerminalHeight] = useState<number>(initialHeight);
 
-  const session = useMemo(() => createSessionForLanguage('shell'), []);
+  const { session, release } = useMemo(
+    () => acquireSession('shell', sharedEnvironment),
+    [sharedEnvironment],
+  );
 
   useEffect(() => {
-    const unsubscribeStatus = session.onStatusChange((newStatus) => {
+    const unsubscribeStatus = session.onStatusChange((newStatus: ISessionStatus) => {
       setStatus(newStatus);
     });
 
     session
       .initialize({ pec: preExerciseCode, sct, language: 'shell' })
-      .catch((initializationError) => {
+      .catch((initializationError: any) => {
         console.warn('DataCamp Light shell initialization warning:', initializationError);
       });
 
     return () => {
       unsubscribeStatus();
-      session.destroy();
+      release();
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [session, release, preExerciseCode, sct]);
 
   // Terminal commands execute freely - no SCT on every line. Each keystroke
   // runs exactly one command via runCommand (never the replayed history), so
@@ -157,107 +176,30 @@ const ShellExercise: React.FC<{
     setTypedHistory([]);
     setFeedback(null);
     setShowingHint(false);
+    setResetCounter((previousCounter) => previousCounter + 1);
+    session
+      .initialize({ pec: preExerciseCode, sct, language: 'shell' })
+      .catch((initializationError: any) => {
+        console.warn('DataCamp Light shell reset warning:', initializationError);
+      });
   };
 
   return (
-    <DCLWidgetShell theme={themeMode}>
-      <div
-        css={{
-          alignItems: 'center',
-          backgroundColor: theme.background.secondary,
-          borderBottom: `${tokens.borderWidth.thin} solid ${theme.border.main}`,
-          display: 'flex',
-          flexWrap: 'wrap',
-          gap: tokens.spacingNew.xsmall,
-          justifyContent: 'space-between',
-          padding: `${tokens.spacingNew.xsmall} ${tokens.spacingNew.medium}`,
-        }}
-      >
-        <div
-          css={{
-            display: 'flex',
-            flexWrap: 'wrap',
-            gap: tokens.spacingNew.xsmall,
-          }}
-        >
-          <Button
-            disabled={
-              isSubmitting ||
-              status.status === 'busy' ||
-              status.status === 'starting'
-            }
-            isLoading={isSubmitting}
-            onClick={handleSubmit}
-            size="small"
-            variant="regularOutline"
-          >
-            Submit Answer
-          </Button>
-          {hint && (
-            <Button
-              disabled={
-                isSubmitting ||
-                status.status === 'busy' ||
-                status.status === 'starting'
-              }
-              onClick={() => setShowingHint((previous) => !previous)}
-              size="small"
-              variant="plain"
-            >
-              {showingHint ? 'Hide Hint' : 'Show Hint'}
-            </Button>
-          )}
-        </div>
-
-        <div
-          css={{
-            alignItems: 'center',
-            display: 'flex',
-            gap: tokens.spacingNew.small,
-          }}
-        >
-          <span
-            css={{
-              alignItems: 'center',
-              color:
-                status.status === 'ready'
-                  ? theme.success.text
-                  : status.status === 'busy' || status.status === 'starting'
-                  ? theme.warning.text
-                  : theme.text.subtle,
-              display: 'flex',
-              fontSize: tokens.fontSizes.xsmall,
-              gap: tokens.spacingNew.tiny,
-              justifyContent: 'flex-end',
-              minWidth: '65px',
-            }}
-          >
-            {status.status === 'ready' ? (
-              <Checkmark size="small" />
-            ) : status.status === 'broken' ? (
-              <Cross size="small" />
-            ) : null}
-            {status.status === 'ready'
-              ? 'Ready'
-              : status.status === 'busy'
-              ? 'Busy'
-              : status.status === 'starting'
-              ? 'Starting'
-              : status.status === 'broken'
-              ? 'Error'
-              : 'Idle'}
-          </span>
-          <Button
-            aria-label="Reset terminal"
-            disabled={isSubmitting}
-            onClick={handleReset}
-            size="small"
-            variant="plain"
-          >
-            Reset
-          </Button>
-        </div>
-      </div>
+    <DCLWidgetShell theme={activeTheme}>
+      <ActionBar
+        onSubmit={handleSubmit}
+        onReset={handleReset}
+        onToggleHint={hint ? () => setShowingHint((previous) => !previous) : undefined}
+        isExecuting={isSubmitting}
+        executingAction={isSubmitting ? 'submit' : null}
+        hasHint={Boolean(hint)}
+        showingHint={showingHint}
+        hasSct={Boolean(sct && sct.trim())}
+        showRunButton={false}
+        status={status}
+        borderTop={false}
+        resetAriaLabel="Reset terminal"
+      />
 
       {showingHint && hint && <HintPanel hint={hint} />}
 
@@ -273,6 +215,8 @@ const ShellExercise: React.FC<{
         onExecuteCommand={handleExecuteShellCommand}
         prompt="$ "
         height={terminalHeight}
+        resetKey={resetCounter}
+        theme={activeTheme}
       />
 
       <ResizeHandle
@@ -282,14 +226,19 @@ const ShellExercise: React.FC<{
         }
       />
 
-      <Footer utmSource={utmSource} utmCampaign={utmCampaign} />
+      <Footer
+        theme={activeTheme}
+        onToggleTheme={toggleTheme}
+        utmSource={utmSource}
+        utmCampaign={utmCampaign}
+      />
     </DCLWidgetShell>
   );
 };
 
 const CodeExercise: React.FC<DataCampExerciseProps> = ({
   language = 'python',
-  theme = 'dark',
+  theme: propTheme,
   sampleCode = '',
   preExerciseCode = '',
   solution = '',
@@ -298,12 +247,16 @@ const CodeExercise: React.FC<DataCampExerciseProps> = ({
   packages = [],
   height = 'auto',
   showRunButton = true,
+  showAi = true,
+  mockAi = false,
+  sharedEnvironment,
   utmSource,
   utmCampaign,
   onRun,
   onSubmit,
   onFeedback,
 }) => {
+  const { theme: activeTheme, toggleTheme } = useResolvedTheme(propTheme);
   const [code, setCode] = useState(sampleCode);
   const [showingSolution, setShowingSolution] = useState(false);
   const [showingHint, setShowingHint] = useState(false);
@@ -313,21 +266,42 @@ const CodeExercise: React.FC<DataCampExerciseProps> = ({
   const [executingAction, setExecutingAction] = useState<'run' | 'submit' | null>(null);
   const [status, setStatus] = useState<ISessionStatus>({ status: 'none' });
 
+  const [aiState, setAiState] = useState<{
+    visible: boolean;
+    type: 'explain' | 'fix' | 'upsell';
+    upsellVariant?: 'third-party' | 'signed-out';
+    title?: string;
+    explanation: string;
+    diff?: LineChange[];
+    proposedCode?: string;
+    isLoading: boolean;
+    error: string | null;
+  }>({
+    visible: false,
+    type: 'explain',
+    explanation: '',
+    isLoading: false,
+    error: null,
+  });
+
   const initialEditorHeight = typeof height === 'number' ? height : 240;
   const [editorHeight, setEditorHeight] = useState<number>(initialEditorHeight);
   const [outputHeight, setOutputHeight] = useState<number>(140);
   const [plotHeight, setPlotHeight] = useState<number>(400);
 
-  const session = useMemo(() => createSessionForLanguage(language), [language]);
+  const { session, release } = useMemo(
+    () => acquireSession(language, sharedEnvironment),
+    [language, sharedEnvironment],
+  );
 
   const prompt = language === 'r' ? '> ' : '>>> ';
 
   useEffect(() => {
-    const unsubscribeStatus = session.onStatusChange((newStatus) => {
+    const unsubscribeStatus = session.onStatusChange((newStatus: ISessionStatus) => {
       setStatus(newStatus);
     });
 
-    const unsubscribeOutput = session.onOutput((notification) => {
+    const unsubscribeOutput = session.onOutput((notification: ISessionOutputNotification) => {
       if (notification.type === 'output' && typeof notification.payload === 'string') {
         setConsoleEntries((previous) => [
           ...previous,
@@ -351,16 +325,16 @@ const CodeExercise: React.FC<DataCampExerciseProps> = ({
         packages,
         language,
       })
-      .catch((initializationError) => {
+      .catch((initializationError: any) => {
         console.warn('DataCamp Light initialization warning:', initializationError);
       });
 
     return () => {
       unsubscribeStatus();
       unsubscribeOutput();
-      session.destroy();
+      release();
     };
-  }, [session, preExerciseCode, solution, sct, language]);
+  }, [session, release, preExerciseCode, solution, sct, packages, language]);
 
   const handleRun = async () => {
     setExecutingAction('run');
@@ -430,6 +404,7 @@ const CodeExercise: React.FC<DataCampExerciseProps> = ({
     setConsoleEntries([]);
     setPlots([]);
     setFeedback(null);
+    setAiState((previous) => ({ ...previous, visible: false }));
   };
 
   const handleToggleSolution = () => {
@@ -446,8 +421,162 @@ const CodeExercise: React.FC<DataCampExerciseProps> = ({
     setShowingHint((previous) => !previous);
   };
 
+  const handleExplainCode = async () => {
+    if (!showAi) return;
+
+    if (!isFirstPartyDomain(mockAi)) {
+      setAiState({
+        visible: true,
+        type: 'upsell',
+        upsellVariant: 'third-party',
+        explanation: '',
+        isLoading: false,
+        error: null,
+      });
+      return;
+    }
+
+    setAiState({
+      visible: true,
+      type: 'explain',
+      title: 'Code Explanation',
+      explanation: '',
+      isLoading: true,
+      error: null,
+    });
+
+    const isSignedIn = await checkIsUserSignedIn(mockAi);
+    if (!isSignedIn) {
+      setAiState({
+        visible: true,
+        type: 'upsell',
+        upsellVariant: 'signed-out',
+        explanation: '',
+        isLoading: false,
+        error: null,
+      });
+      return;
+    }
+
+    try {
+      await explainCode({
+        code,
+        language,
+        mockAi,
+        onChunk: (chunk) => {
+          setAiState((previous) => ({
+            ...previous,
+            explanation: chunk,
+            isLoading: false,
+          }));
+        },
+      });
+      setAiState((previous) => ({ ...previous, isLoading: false }));
+    } catch (explanationError: any) {
+      setAiState((previous) => ({
+        ...previous,
+        isLoading: false,
+        error: explanationError.message || 'Failed to generate code explanation',
+      }));
+    }
+  };
+
+  const handleFixAndExplain = async () => {
+    if (!showAi) return;
+
+    const lastErrorEntry = consoleEntries
+      .slice()
+      .reverse()
+      .find((entry) => entry.type === 'error');
+    const errorMessage = lastErrorEntry?.text || feedback?.message || 'Error occurred';
+
+    if (!isFirstPartyDomain(mockAi)) {
+      setAiState({
+        visible: true,
+        type: 'upsell',
+        upsellVariant: 'third-party',
+        explanation: '',
+        isLoading: false,
+        error: null,
+      });
+      return;
+    }
+
+    setAiState({
+      visible: true,
+      type: 'fix',
+      title: 'Fix & Explain',
+      explanation: '',
+      isLoading: true,
+      error: null,
+    });
+
+    const isSignedIn = await checkIsUserSignedIn(mockAi);
+    if (!isSignedIn) {
+      setAiState({
+        visible: true,
+        type: 'upsell',
+        upsellVariant: 'signed-out',
+        explanation: '',
+        isLoading: false,
+        error: null,
+      });
+      return;
+    }
+
+    try {
+      const result = await fixAndExplainCode({
+        code,
+        error: errorMessage,
+        language,
+        mockAi,
+        onChunk: (chunk) => {
+          const parsed = parseFixAndExplainResponse(chunk);
+          if (parsed.explanation) {
+            setAiState((previous) => ({
+              ...previous,
+              explanation: parsed.explanation,
+              isLoading: false,
+            }));
+          }
+        },
+      });
+
+      const diff = result.updatedCode ? computeLineDiff(code, result.updatedCode) : undefined;
+
+      setAiState((previous) => ({
+        ...previous,
+        diff,
+        explanation: result.explanation || previous.explanation,
+        isLoading: false,
+        proposedCode: result.updatedCode,
+      }));
+    } catch (fixError: any) {
+      setAiState((previous) => ({
+        ...previous,
+        isLoading: false,
+        error: fixError.message || 'Failed to generate fix and explanation',
+      }));
+    }
+  };
+
+  const handleAcceptFix = () => {
+    if (aiState.proposedCode) {
+      setCode(aiState.proposedCode);
+    }
+    setAiState((previous) => ({ ...previous, visible: false }));
+  };
+
+  const handleRejectFix = () => {
+    setAiState((previous) => ({ ...previous, visible: false }));
+  };
+
+  const handleCloseAi = () => {
+    setAiState((previous) => ({ ...previous, visible: false }));
+  };
+
   return (
-    <DCLWidgetShell theme={theme}>
+    <DCLWidgetShell theme={activeTheme}>
       <CodeEditor
         code={code}
         onChange={setCode}
@@ -468,17 +597,45 @@ const CodeExercise: React.FC<DataCampExerciseProps> = ({
         onReset={handleReset}
         onToggleSolution={solution ? handleToggleSolution : undefined}
         onToggleHint={hint ? handleToggleHint : undefined}
+        onExplainCode={handleExplainCode}
         isExecuting={executingAction !== null}
         executingAction={executingAction}
+        isExplainingCode={aiState.isLoading && aiState.type === 'explain'}
         hasSolution={Boolean(solution)}
         showingSolution={showingSolution}
         hasHint={Boolean(hint)}
         showingHint={showingHint}
+        hasSct={Boolean(sct && sct.trim())}
         showRunButton={showRunButton}
+        showAi={showAi}
         status={status}
       />
 
       {showingHint && hint && <HintPanel hint={hint} />}
+
+      {aiState.visible && aiState.type === 'upsell' && (
+        <AiUpsellBanner
+          code={code}
+          language={language}
+          onClose={handleCloseAi}
+          utmCampaign={utmCampaign}
+          utmSource={utmSource}
+          variant={aiState.upsellVariant || 'third-party'}
+        />
+      )}
+
+      {aiState.visible && aiState.type !== 'upsell' && (
+        <AiExplanationPanel
+          diff={aiState.diff}
+          error={aiState.error}
+          explanation={aiState.explanation}
+          isLoading={aiState.isLoading}
+          onAcceptFix={handleAcceptFix}
+          onClose={handleCloseAi}
+          onRejectFix={handleRejectFix}
+          title={aiState.title}
+        />
+      )}
 
       {feedback && (
         <FeedbackBanner
@@ -492,7 +649,10 @@ const CodeExercise: React.FC<DataCampExerciseProps> = ({
         entries={consoleEntries}
         prompt={prompt}
         onExecuteCommand={handleExecuteConsoleCommand}
+        onFixAndExplain={handleFixAndExplain}
         isExecuting={executingAction !== null}
+        isFixingAndExplaining={aiState.isLoading && aiState.type === 'fix'}
+        showAi={showAi}
         height={outputHeight}
       />
 
@@ -518,6 +678,8 @@ const CodeExercise: React.FC<DataCampExerciseProps> = ({
       <Footer
         code={code}
         language={language}
+        theme={activeTheme}
+        onToggleTheme={toggleTheme}
         utmSource={utmSource}
         utmCampaign={utmCampaign}
       />
@@ -528,11 +690,12 @@ const CodeExercise: React.FC<DataCampExerciseProps> = ({
 export const DataCampExercise: React.FC<DataCampExerciseProps> = (props) => {
   const {
     language = 'python',
-    theme = 'dark',
+    theme,
     hint = '',
     preExerciseCode = '',
     sct = '',
     height = 'auto',
+    showAi = true,
     utmSource,
     utmCampaign,
     onSubmit,
@@ -547,6 +710,7 @@ export const DataCampExercise: React.FC<DataCampExerciseProps> = (props) => {
         sct={sct}
         height={height}
         theme={theme}
+        sharedEnvironment={props.sharedEnvironment}
         utmSource={utmSource}
         utmCampaign={utmCampaign}
         onSubmit={onSubmit}
@@ -555,5 +719,13 @@ export const DataCampExercise: React.FC<DataCampExerciseProps> = (props) => {
     );
   }
 
-  return <CodeExercise {...props} theme={theme} />;
+  return (
+    <CodeExercise
+      {...props}
+      mockAi={props.mockAi}
+      sharedEnvironment={props.sharedEnvironment}
+      showAi={showAi}
+      theme={theme}
+    />
+  );
 };

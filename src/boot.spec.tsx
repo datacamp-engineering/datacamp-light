@@ -14,7 +14,7 @@ describe('getSettings', () => {
     expect(settings.id).toBe('test-id');
     expect(settings.height).toBe('auto');
     expect(settings.language).toBe('python');
-    expect(settings.theme).toBe('dark');
+    expect(settings.theme).toBeUndefined();
     expect(settings.sct).toBe('');
     expect(settings.solution).toBe('');
     expect(settings.showRunButton).toBe(true);
@@ -22,8 +22,12 @@ describe('getSettings', () => {
 
   it('should parse theme attribute correctly', () => {
     element.setAttribute('data-theme', 'light');
-    const settings = getSettings(element);
-    expect(settings.theme).toBe('light');
+    const lightSettings = getSettings(element);
+    expect(lightSettings.theme).toBe('light');
+
+    element.setAttribute('data-theme', 'dark');
+    const darkSettings = getSettings(element);
+    expect(darkSettings.theme).toBe('dark');
   });
 
   it('should parse height attribute correctly', () => {
@@ -87,5 +91,34 @@ describe('getSettings', () => {
     const settings = getSettings(element);
     expect(settings.utmSource).toBe('my_blog');
     expect(settings.utmCampaign).toBe('my_campaign');
+  });
+
+  it('should parse showAi attribute correctly', () => {
+    const defaultSettings = getSettings(element);
+    expect(defaultSettings.showAi).toBe(true);
+
+    element.setAttribute('data-show-ai', 'false');
+    const disabledShowAiSettings = getSettings(element);
+    expect(disabledShowAiSettings.showAi).toBe(false);
+
+    element.removeAttribute('data-show-ai');
+    element.setAttribute('data-has-ai', 'false');
+    const disabledHasAiSettings = getSettings(element);
+    expect(disabledHasAiSettings.showAi).toBe(false);
+  });
+
+  it('should parse sharedEnvironment attribute correctly', () => {
+    const defaultSettings = getSettings(element);
+    expect(defaultSettings.sharedEnvironment).toBeUndefined();
+
+    element.setAttribute('data-shared-environment', 'true');
+    expect(getSettings(element).sharedEnvironment).toBe(true);
+
+    element.setAttribute('data-shared-environment', 'cohort-python-1');
+    expect(getSettings(element).sharedEnvironment).toBe('cohort-python-1');
+
+    element.removeAttribute('data-shared-environment');
+    element.setAttribute('data-environment', 'custom-group');
+    expect(getSettings(element).sharedEnvironment).toBe('custom-group');
   });
 });
