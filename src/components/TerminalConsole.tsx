@@ -98,6 +98,7 @@ export const TerminalConsole: React.FC<TerminalConsoleProps> = ({
   const terminalContainerReference = useRef<HTMLDivElement>(null);
   const terminalReference = useRef<Xterm | null>(null);
   const lineBufferReference = useRef('');
+  const cursorPositionReference = useRef(0);
   const historyReference = useRef<string[]>([]);
   const historyIndexReference = useRef<number | null>(null);
   const isExecutingReference = useRef(false);
@@ -172,20 +173,29 @@ export const TerminalConsole: React.FC<TerminalConsoleProps> = ({
     resizeObserver.observe(terminalContainerReference.current);
 
     const rewriteLine = () => {
+      const promptText = buildPrompt(
+        currentWorkingDirectoryReference.current,
+        promptReference.current,
+      );
+      const text = lineBufferReference.current;
+      const cursorPosition = cursorPositionReference.current;
+      const moveBackCount = text.length - cursorPosition;
+      const moveBackSequence = moveBackCount > 0 ? `\x1b[${moveBackCount}D` : '';
+
       terminalInstance.write(
-        '\r\x1b[K' +
-          buildPrompt(currentWorkingDirectoryReference.current, promptReference.current) +
-          lineBufferReference.current,
+        '\r\x1b[K' + promptText + text + moveBackSequence,
       );
     };
 
     terminalInstance.onData(async (data) => {
       if (isExecutingReference.current) return;
 
+      // Enter
       if (data === '\r') {
         const commandToExecute = lineBufferReference.current;
         terminalInstance.write('\r\n');
         lineBufferReference.current = '';
+        cursorPositionReference.current = 0;
         historyIndexReference.current = null;
 
         if (commandToExecute.trim()) {
@@ -234,12 +244,61 @@ export const TerminalConsole: React.FC<TerminalConsoleProps> = ({
 
       // Backspace
       if (data === '\x7f' || data === '\b') {
-        if (lineBufferReference.current.length > 0) {
-          lineBufferReference.current = lineBufferReference.current.slice(
-            0,
-            -1,
-          );
-          terminalInstance.write('\b \b');
+        const position = cursorPositionReference.current;
+        if (position > 0) {
+          const currentBuffer = lineBufferReference.current;
+          lineBufferReference.current =
+            currentBuffer.slice(0, position - 1) + currentBuffer.slice(position);
+          cursorPositionReference.current = position - 1;
+          rewriteLine();
+        }
+        return;
+      }
+
+      // Delete key (\x1b[3~)
+      if (data === '\x1b[3~') {
+        const position = cursorPositionReference.current;
+        const currentBuffer = lineBufferReference.current;
+        if (position < currentBuffer.length) {
+          lineBufferReference.current =
+            currentBuffer.slice(0, position) + currentBuffer.slice(position + 1);
+          rewriteLine();
+        }
+        return;
+      }
+
+      // Left Arrow
+      if (data === '\x1b[D') {
+        if (cursorPositionReference.current > 0) {
+          cursorPositionReference.current--;
+          terminalInstance.write('\x1b[D');
+        }
+        return;
+      }
+
+      // Right Arrow
+      if (data === '\x1b[C') {
+        if (cursorPositionReference.current < lineBufferReference.current.length) {
+          cursorPositionReference.current++;
+          terminalInstance.write('\x1b[C');
+        }
+        return;
+      }
+
+      // Home / Ctrl+A
+      if (data === '\x1b[H' || data === '\x1b[1~' || data === '\x1bOH' || data === '\x01') {
+        if (cursorPositionReference.current > 0) {
+          cursorPositionReference.current = 0;
+          rewriteLine();
+        }
+        return;
+      }
+
+      // End / Ctrl+E
+      if (data === '\x1b[F' || data === '\x1b[4~' || data === '\x1bOF' || data === '\x05') {
+        if (cursorPositionReference.current < lineBufferReference.current.length) {
+          cursorPositionReference.current = lineBufferReference.current.length;
+          rewriteLine();
         }
         return;
       }
@@ -253,7 +312,9 @@ export const TerminalConsole: React.FC<TerminalConsoleProps> = ({
             ? historyList.length - 1
             : Math.max(0, historyIndexReference.current - 1);
         historyIndexReference.current = nextIndex;
-        lineBufferReference.current = historyList[nextIndex];
+        const selectedHistory = historyList[nextIndex];
+        lineBufferReference.current = selectedHistory;
+        cursorPositionReference.current = selectedHistory.length;
         rewriteLine();
         return;
       }
@@ -266,9 +327,12 @@ export const TerminalConsole: React.FC<TerminalConsoleProps> = ({
         if (nextIndex >= historyList.length) {
           historyIndexReference.current = null;
           lineBufferReference.current = '';
+          cursorPositionReference.current = 0;
         } else {
           historyIndexReference.current = nextIndex;
-          lineBufferReference.current = historyList[nextIndex];
+          const selectedHistory = historyList[nextIndex];
+          lineBufferReference.current = selectedHistory;
+          cursorPositionReference.current = selectedHistory.length;
         }
         rewriteLine();
         return;
@@ -277,6 +341,7 @@ export const TerminalConsole: React.FC<TerminalConsoleProps> = ({
       // Ctrl+C: Cancel current line
       if (data === '\x03') {
         lineBufferReference.current = '';
+        cursorPositionReference.current = 0;
         historyIndexReference.current = null;
         terminalInstance.write(
           '^C\r\n' +
@@ -285,10 +350,31 @@ export const TerminalConsole: React.FC<TerminalConsoleProps> = ({
         return;
       }
 
-      // Normal character input
+      // Ctrl+U: Clear line before cursor
+      if (data === '\x15') {
+        const position = cursorPositionReference.current;
+        lineBufferReference.current = lineBufferReference.current.slice(position);
+        cursorPositionReference.current = 0;
+        rewriteLine();
+        return;
+      }
+
+      // Ctrl+K: Clear line after cursor
+      if (data === '\x0b') {
+        const position = cursorPositionReference.current;
+        lineBufferReference.current = lineBufferReference.current.slice(0, position);
+        rewriteLine();
+        return;
+      }
+
+      // Normal character input / paste
       if (data >= ' ' || data === '\t') {
-        lineBufferReference.current += data;
-        terminalInstance.write(data);
+        const position = cursorPositionReference.current;
+        const currentBuffer = lineBufferReference.current;
+        lineBufferReference.current =
+          currentBuffer.slice(0, position) + data + currentBuffer.slice(position);
+        cursorPositionReference.current = position + data.length;
+        rewriteLine();
       }
     });
 
