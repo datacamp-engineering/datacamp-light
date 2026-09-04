@@ -40,7 +40,7 @@ export interface DataCampExerciseProps {
   height?: number | string;
   showRunButton?: boolean;
   showAi?: boolean;
-  mockAi?: boolean;
+  mockAi?: boolean | string;
   sharedEnvironment?: boolean | string;
   utmSource?: string;
   utmCampaign?: string;

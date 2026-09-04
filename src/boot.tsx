@@ -80,9 +80,15 @@ export function getSettings(element: HTMLElement): DataCampExerciseProps {
       : element.getAttribute('data-show-ai')?.toLowerCase() !== 'false' &&
         element.getAttribute('data-has-ai')?.toLowerCase() !== 'false';
 
-  const mockAi = element.hasAttribute('data-mock-ai')
-    ? element.getAttribute('data-mock-ai')?.toLowerCase() !== 'false'
-    : undefined;
+  const rawMockAi = element.getAttribute('data-mock-ai');
+  const mockAi =
+    rawMockAi === null
+      ? undefined
+      : rawMockAi.toLowerCase() === 'false'
+      ? false
+      : rawMockAi.toLowerCase() === 'true'
+      ? true
+      : rawMockAi;
 
   const rawSharedEnv =
     element.getAttribute('data-shared-environment') ??

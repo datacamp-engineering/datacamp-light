@@ -10,12 +10,14 @@ import {
 
 let cachedSignedInStatus: boolean | null = null;
 
-export async function checkIsUserSignedIn(mockAiProp?: boolean): Promise<boolean> {
+export async function checkIsUserSignedIn(
+  mockAiProp?: boolean | string,
+): Promise<boolean> {
   if (isMockAiEnabled(mockAiProp)) {
     return true;
   }
 
-  if (!isFirstPartyDomain()) {
+  if (!isFirstPartyDomain(mockAiProp)) {
     return false;
   }
 
@@ -180,14 +182,14 @@ export async function explainCode({
   code,
   language = 'python',
   userLanguage = 'English',
-  mockAi = false,
+  mockAi,
   onChunk,
   signal,
 }: {
   code: string;
   language?: string;
   userLanguage?: string;
-  mockAi?: boolean;
+  mockAi?: boolean | string;
   onChunk: (accumulatedExplanation: string) => void;
   signal?: AbortSignal;
 }): Promise<string> {
@@ -216,7 +218,7 @@ export async function fixAndExplainCode({
   error,
   language = 'python',
   userLanguage = 'English',
-  mockAi = false,
+  mockAi,
   onChunk,
   signal,
 }: {
@@ -224,7 +226,7 @@ export async function fixAndExplainCode({
   error: string;
   language?: string;
   userLanguage?: string;
-  mockAi?: boolean;
+  mockAi?: boolean | string;
   onChunk: (accumulatedResponse: string) => void;
   signal?: AbortSignal;
 }): Promise<FixAndExplainResult> {

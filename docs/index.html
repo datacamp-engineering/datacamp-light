@@ -294,10 +294,10 @@
 </div>`
         },
         {
-          id: 'card-ai-assistance',
-          title: '7. AI Code Assistance (Live Explain Code & Fix & Explain Demo)',
+          id: 'card-ai-stream',
+          title: '7. AI Code Assistance (Live Streamed Explanation & Automated Fix)',
           lang: 'python',
-          html: `<div data-datacamp-exercise data-lang="python" data-mock-ai="true">
+          html: `<div data-datacamp-exercise data-lang="python" data-mock-ai="stream">
   <code data-type="sample-code">
     # Click 'Explain Code' (✨) in the action bar to stream an explanation!
     # Or click 'Run Code' to see an error, then click 'Fix & Explain' in the output console.
@@ -319,15 +319,56 @@
 </div>`
         },
         {
-          id: 'card-shared-environment',
-          title: '8. Shared Execution Environment (Multi-Step Tutorial)',
+          id: 'card-ai-signed-out',
+          title: '8. AI First-Party Auth Gate (Free Sign-Up Prompt)',
           lang: 'python',
-          html: `<div data-datacamp-exercise data-lang="python" data-shared-environment="stats-tutorial">
+          html: `<div data-datacamp-exercise data-lang="python" data-mock-ai="signed-out">
   <code data-type="sample-code">
-    # Step 1: Define dataset in shared environment 'stats-tutorial'
+    # Simulated first-party signed-out mode on *.datacamp.com.
+    # Click 'Explain Code' to see the inline free sign-up unlock prompt!
+    numbers = [10, 20, 30, 40]
+    total = sum(numbers)
+    print(f"Total: {total}")
+  </code>
+</div>`
+        },
+        {
+          id: 'card-ai-third-party',
+          title: '9. AI Third-Party Embed Gate (Open in DataLab Prompt)',
+          lang: 'python',
+          html: `<div data-datacamp-exercise data-lang="python" data-mock-ai="third-party">
+  <code data-type="sample-code">
+    # Simulated third-party embed mode (e.g. Medium, blog, or docs).
+    # Click 'Explain Code' to see the 'Open in DataLab' assistant prompt!
+    dataset = {"Python": 1991, "R": 1993, "WebAssembly": 2017}
+    for name, year in dataset.items():
+        print(f"{name} was released in {year}")
+  </code>
+</div>`
+        },
+        {
+          id: 'card-shared-environment',
+          title: '10. Shared Execution Environment (Multi-Step Tutorial)',
+          lang: 'python',
+          html: `<!-- Step 1: Define dataset and import libraries -->
+<div data-datacamp-exercise data-lang="python" data-shared-environment="stats-tutorial">
+  <code data-type="sample-code">
+    # Step 1: Run this block first to load data into shared environment 'stats-tutorial'
     import statistics
     temperatures = [68, 72, 75, 71, 69, 74, 70]
-    print(f"Loaded {len(temperatures)} temperature readings.")
+    print(f"Step 1: Successfully loaded {len(temperatures)} temperature readings.")
+  </code>
+</div>
+
+<div style="height: 16px;"></div>
+
+<!-- Step 2: Directly access 'statistics' and 'temperatures' from Step 1 without redefining -->
+<div data-datacamp-exercise data-lang="python" data-shared-environment="stats-tutorial">
+  <code data-type="sample-code">
+    # Step 2: Directly calculates statistics using the memory from Step 1!
+    mean_temp = statistics.mean(temperatures)
+    stdev_temp = statistics.stdev(temperatures)
+    print(f"Step 2 (Shared Memory): Mean = {mean_temp:.1f}°F, StdDev = {stdev_temp:.2f}")
   </code>
 </div>`
         }
@@ -389,10 +430,15 @@
         const html = editor.value;
         mount.innerHTML = html;
 
-        const exerciseEl = mount.querySelector('[data-datacamp-exercise]') || mount.firstElementChild;
-        if (exerciseEl) {
-          exerciseEl.setAttribute('data-no-lazy-load', 'true');
-          bootElement(exerciseEl);
+        const exerciseElements = mount.querySelectorAll('[data-datacamp-exercise]');
+        if (exerciseElements.length > 0) {
+          exerciseElements.forEach((element) => {
+            element.setAttribute('data-no-lazy-load', 'true');
+            bootElement(element);
+          });
+        } else if (mount.firstElementChild) {
+          mount.firstElementChild.setAttribute('data-no-lazy-load', 'true');
+          bootElement(mount.firstElementChild);
         }
       }
 

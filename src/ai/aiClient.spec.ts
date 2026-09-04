@@ -152,4 +152,16 @@ describe('aiClient', () => {
     expect(fixResult.updatedCode).toContain('radius');
     expect(fixResult.explanation).toContain('Corrected');
   });
+
+  it('handles simulated mock AI modes for auth and domain gates', async () => {
+    expect(isFirstPartyDomain('third-party')).toBe(false);
+    expect(isFirstPartyDomain('signed-out')).toBe(true);
+    expect(isFirstPartyDomain('stream')).toBe(true);
+
+    const signedOutStatus = await checkIsUserSignedIn('signed-out');
+    expect(signedOutStatus).toBe(false);
+
+    const streamStatus = await checkIsUserSignedIn('stream');
+    expect(streamStatus).toBe(true);
+  });
 });
