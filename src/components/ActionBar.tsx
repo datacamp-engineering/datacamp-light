@@ -1,5 +1,5 @@
 import { Button } from '@datacamp/waffles/button';
-import { Checkmark, Cross, Sparkles } from '@datacamp/waffles/icon';
+import { Checkmark, Cross, Redo, Sparkles } from '@datacamp/waffles/icon';
 import { theme } from '@datacamp/waffles/theme';
 import { tokens } from '@datacamp/waffles/tokens';
 import React from 'react';
@@ -62,6 +62,28 @@ export const ActionBar: React.FC<ActionBarProps> = ({
         flexWrap: 'wrap',
         gap: tokens.spacingNew.xsmall,
         padding: `${tokens.spacingNew.xsmall} ${tokens.spacingNew.medium}`,
+        '@container (max-width: 540px)': {
+          '& .btn-prefix-show': {
+            display: 'none',
+          },
+          '& .btn-suffix-explain': {
+            display: 'none',
+          },
+          '& .reset-text': {
+            display: 'none',
+          },
+        },
+        '@container (max-width: 420px)': {
+          '& .btn-suffix-run': {
+            display: 'none',
+          },
+          '& .btn-suffix-submit': {
+            display: 'none',
+          },
+          '& .status-text': {
+            display: 'none',
+          },
+        },
       }}
     >
       {showRunButton && onRun && (
@@ -72,7 +94,7 @@ export const ActionBar: React.FC<ActionBarProps> = ({
           size="small"
           variant="regular"
         >
-          Run Code
+          Run<span className="btn-suffix-run"> Code</span>
         </Button>
       )}
       {hasSct && (
@@ -83,7 +105,7 @@ export const ActionBar: React.FC<ActionBarProps> = ({
           size="small"
           variant="regularOutline"
         >
-          Submit Answer
+          Submit<span className="btn-suffix-submit"> Answer</span>
         </Button>
       )}
       {hasHint && onToggleHint && (
@@ -93,7 +115,7 @@ export const ActionBar: React.FC<ActionBarProps> = ({
           size="small"
           variant="plain"
         >
-          {showingHint ? 'Hide Hint' : 'Show Hint'}
+          <span className="btn-prefix-show">{showingHint ? 'Hide ' : 'Show '}</span>Hint
         </Button>
       )}
       {hasSolution && onToggleSolution && (
@@ -103,7 +125,7 @@ export const ActionBar: React.FC<ActionBarProps> = ({
           size="small"
           variant="plain"
         >
-          {showingSolution ? 'Hide Solution' : 'Show Solution'}
+          <span className="btn-prefix-show">{showingSolution ? 'Hide ' : 'Show '}</span>Solution
         </Button>
       )}
       {showAi && onExplainCode && (
@@ -115,7 +137,7 @@ export const ActionBar: React.FC<ActionBarProps> = ({
           size="small"
           variant="plain"
         >
-          Explain Code
+          Explain<span className="btn-suffix-explain"> Code</span>
         </Button>
       )}
 
@@ -145,11 +167,6 @@ export const ActionBar: React.FC<ActionBarProps> = ({
             '@container (max-width: 480px)': {
               fontSize: '11px',
             },
-            '@container (max-width: 360px)': {
-              '& .status-text': {
-                display: 'none',
-              },
-            },
           }}
         >
           {status.status === 'ready' ? (
@@ -172,21 +189,18 @@ export const ActionBar: React.FC<ActionBarProps> = ({
         <Button
           aria-label={resetAriaLabel}
           disabled={isExecuting}
+          iconLeft={<Redo size="small" />}
           onClick={onReset}
           size="small"
+          title={resetAriaLabel}
           variant="plain"
           css={{
             minWidth: 'auto',
             paddingLeft: `${tokens.spacingNew.xsmall} !important`,
             paddingRight: `${tokens.spacingNew.xsmall} !important`,
-            '@container (max-width: 420px)': {
-              fontSize: tokens.fontSizes.small,
-              paddingLeft: '6px !important',
-              paddingRight: '6px !important',
-            },
           }}
         >
-          Reset
+          <span className="reset-text">Reset</span>
         </Button>
       </div>
     </div>

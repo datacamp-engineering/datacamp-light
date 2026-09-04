@@ -48,22 +48,21 @@ export const Footer: React.FC<FooterProps> = ({
         borderBottomRightRadius: tokens.borderRadius.medium,
         borderTop: `${tokens.borderWidth.thin} solid ${theme.border.main}`,
         display: 'flex',
-        justifyContent: 'space-between',
+        gap: tokens.spacingNew.medium,
+        justifyContent: 'flex-end',
         padding: `${tokens.spacingNew.xsmall} ${tokens.spacingNew.medium}`,
       }}
     >
-      <div>
-        {onToggleTheme && (
-          <Button
-            aria-label={toggleLabel}
-            icon={isDarkMode ? <Sun size="small" /> : <Moon size="small" />}
-            onClick={onToggleTheme}
-            size="small"
-            title={toggleLabel}
-            variant="plain"
-          />
-        )}
-      </div>
+      {onToggleTheme && (
+        <Button
+          aria-label={toggleLabel}
+          icon={isDarkMode ? <Sun size="small" /> : <Moon size="small" />}
+          onClick={onToggleTheme}
+          size="small"
+          title={toggleLabel}
+          variant="plain"
+        />
+      )}
 
       <a
         aria-label="Powered by DataCamp DataLab - Open this code in a cloud workbook"
