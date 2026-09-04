@@ -2,7 +2,7 @@ import '../i18n';
 import { Button } from '@datacamp/waffles/button';
 import { theme } from '@datacamp/waffles/theme';
 import { tokens } from '@datacamp/waffles/tokens';
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import type { ISessionStatus } from '../jsonrpc/types';
 import { createSessionForLanguage } from '../runtime/createSessionForLanguage';
 import { ActionBar } from './ActionBar';
@@ -103,21 +103,26 @@ const ShellExercise: React.FC<{
   // runs exactly one command via runCommand (never the replayed history), so
   // shared state like the working directory persists and silent commands such
   // as cd still report their new cwd back to the terminal.
-  const handleExecuteShellCommand = async (
-    command: string,
-  ): Promise<{ output?: string; error?: string; cwd?: string }> => {
-    const nextHistory = [...typedHistory, command];
-    setTypedHistory(nextHistory);
-    setFeedback(null);
+  const handleExecuteShellCommand = useCallback(
+    async (
+      command: string,
+    ): Promise<{ output?: string; error?: string; cwd?: string }> => {
+      setTypedHistory((previousHistory) => {
+        const nextHistory = [...previousHistory, command];
+        onSubmit?.(nextHistory.join('\n'));
+        return nextHistory;
+      });
+      setFeedback(null);
 
-    try {
-      const result = await session.runCommand({ command });
-      onSubmit?.(nextHistory.join('\n'));
-      return result;
-    } catch (executionError: any) {
-      return { error: executionError.message || 'Execution error' };
-    }
-  };
+      try {
+        const result = await session.runCommand({ command });
+        return result;
+      } catch (executionError: any) {
+        return { error: executionError.message || 'Execution error' };
+      }
+    },
+    [session, onSubmit],
+  );
 
   // SCT grading only on explicit submit, against the full typed history.
   const handleSubmit = async () => {

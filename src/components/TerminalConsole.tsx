@@ -65,6 +65,17 @@ export const TerminalConsole: React.FC<TerminalConsoleProps> = ({
   const isExecutingReference = useRef(false);
   const currentWorkingDirectoryReference = useRef<string | null>(null);
 
+  // Keep a stable callback reference so parent re-renders never destroy the xterm instance
+  const onExecuteCommandReference = useRef(onExecuteCommand);
+  useEffect(() => {
+    onExecuteCommandReference.current = onExecuteCommand;
+  }, [onExecuteCommand]);
+
+  const promptReference = useRef(prompt);
+  useEffect(() => {
+    promptReference.current = prompt;
+  }, [prompt]);
+
   useEffect(() => {
     if (!terminalContainerReference.current) return;
 
@@ -107,7 +118,7 @@ export const TerminalConsole: React.FC<TerminalConsoleProps> = ({
 
     terminalInstance.write(welcomeMessage);
     terminalInstance.write(
-      buildPrompt(currentWorkingDirectoryReference.current, prompt),
+      buildPrompt(currentWorkingDirectoryReference.current, promptReference.current),
     );
 
     const resizeObserver = new ResizeObserver(() => {
@@ -122,7 +133,7 @@ export const TerminalConsole: React.FC<TerminalConsoleProps> = ({
     const rewriteLine = () => {
       terminalInstance.write(
         '\r\x1b[K' +
-          buildPrompt(currentWorkingDirectoryReference.current, prompt) +
+          buildPrompt(currentWorkingDirectoryReference.current, promptReference.current) +
           lineBufferReference.current,
       );
     };
@@ -142,7 +153,7 @@ export const TerminalConsole: React.FC<TerminalConsoleProps> = ({
 
         isExecutingReference.current = true;
         try {
-          const result = await onExecuteCommand(commandToExecute);
+          const result = await onExecuteCommandReference.current(commandToExecute);
           if (result.cwd) {
             currentWorkingDirectoryReference.current = result.cwd;
           }
@@ -174,7 +185,7 @@ export const TerminalConsole: React.FC<TerminalConsoleProps> = ({
         } finally {
           isExecutingReference.current = false;
           terminalInstance.write(
-            buildPrompt(currentWorkingDirectoryReference.current, prompt),
+            buildPrompt(currentWorkingDirectoryReference.current, promptReference.current),
           );
         }
         return;
@@ -228,7 +239,7 @@ export const TerminalConsole: React.FC<TerminalConsoleProps> = ({
         historyIndexReference.current = null;
         terminalInstance.write(
           '^C\r\n' +
-            buildPrompt(currentWorkingDirectoryReference.current, prompt),
+            buildPrompt(currentWorkingDirectoryReference.current, promptReference.current),
         );
         return;
       }
@@ -247,7 +258,9 @@ export const TerminalConsole: React.FC<TerminalConsoleProps> = ({
       terminalInstance.dispose();
       terminalReference.current = null;
     };
-  }, [prompt, welcomeMessage, onExecuteCommand]);
+    // Initialize xterm only once on mount
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   return (
     <div
