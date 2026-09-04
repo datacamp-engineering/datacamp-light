@@ -44,6 +44,44 @@ export function formatTerminalResult(result: {
   return entries;
 }
 
+const darkAnsiPalette = {
+  black: '#152535',
+  red: '#FF5C5C',
+  green: '#00D06C',
+  yellow: '#FFD15C',
+  blue: '#58A6FF',
+  magenta: '#E06CFF',
+  cyan: '#39C5BB',
+  white: '#FFFFFF',
+  brightBlack: '#6A7D8F',
+  brightRed: '#FF7B7B',
+  brightGreen: '#2EE58B',
+  brightYellow: '#FFE08A',
+  brightBlue: '#79B8FF',
+  brightMagenta: '#EB8CFF',
+  brightCyan: '#56D4CB',
+  brightWhite: '#FFFFFF',
+};
+
+const lightAnsiPalette = {
+  black: '#05192D',
+  red: '#D91E18',
+  green: '#0E7C3B',
+  yellow: '#B78103',
+  blue: '#0052CC',
+  magenta: '#7B1FA2',
+  cyan: '#006D75',
+  white: '#F0F4F8',
+  brightBlack: '#8FA6B2',
+  brightRed: '#E83E38',
+  brightGreen: '#1A9E4E',
+  brightYellow: '#D49605',
+  brightBlue: '#0747A6',
+  brightMagenta: '#9C27B0',
+  brightCyan: '#00838F',
+  brightWhite: '#FFFFFF',
+};
+
 interface TerminalConsoleProps {
   onExecuteCommand: (command: string) => Promise<TerminalCommandResult>;
   prompt?: string;
@@ -98,6 +136,8 @@ export const TerminalConsole: React.FC<TerminalConsoleProps> = ({
       computedStyle.getPropertyValue('--wf-blue--transparent').trim() ||
       'rgba(5, 120, 255, 0.2)';
 
+    const ansiPalette = isLightMode ? lightAnsiPalette : darkAnsiPalette;
+
     const terminalInstance = new Xterm({
       cursorBlink: true,
       fontFamily: tokens.fontFamilies.mono,
@@ -108,6 +148,7 @@ export const TerminalConsole: React.FC<TerminalConsoleProps> = ({
         foreground: terminalForeground,
         cursor: cursorColor,
         selectionBackground: selectionColor,
+        ...ansiPalette,
       },
     });
 
