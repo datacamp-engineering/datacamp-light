@@ -352,6 +352,7 @@ export function createShellInterpreter(options?: CreateShellInterpreterOptions) 
   const filesystemBuiltins = new Set([
     'cd',
     'pwd',
+    'ls',
     'touch',
     'mkdir',
     'rm',

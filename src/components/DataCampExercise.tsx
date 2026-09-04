@@ -1,5 +1,6 @@
 import '../i18n';
 import { Button } from '@datacamp/waffles/button';
+import { Checkmark, Cross } from '@datacamp/waffles/icon';
 import { theme } from '@datacamp/waffles/theme';
 import { tokens } from '@datacamp/waffles/tokens';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
@@ -81,12 +82,17 @@ const ShellExercise: React.FC<{
   const [feedback, setFeedback] = useState<{ correct: boolean; message: string } | null>(null);
   const [typedHistory, setTypedHistory] = useState<string[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [status, setStatus] = useState<ISessionStatus>({ status: 'none' });
   const initialHeight = typeof height === 'number' ? height : 300;
   const [terminalHeight, setTerminalHeight] = useState<number>(initialHeight);
 
   const session = useMemo(() => createSessionForLanguage('shell'), []);
 
   useEffect(() => {
+    const unsubscribeStatus = session.onStatusChange((newStatus) => {
+      setStatus(newStatus);
+    });
+
     session
       .initialize({ pec: preExerciseCode, sct, language: 'shell' })
       .catch((initializationError) => {
@@ -94,6 +100,7 @@ const ShellExercise: React.FC<{
       });
 
     return () => {
+      unsubscribeStatus();
       session.destroy();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -158,33 +165,98 @@ const ShellExercise: React.FC<{
         css={{
           alignItems: 'center',
           backgroundColor: theme.background.secondary,
+          borderBottom: `${tokens.borderWidth.thin} solid ${theme.border.main}`,
           display: 'flex',
+          flexWrap: 'wrap',
           gap: tokens.spacingNew.xsmall,
-          justifyContent: 'flex-end',
+          justifyContent: 'space-between',
           padding: `${tokens.spacingNew.xsmall} ${tokens.spacingNew.medium}`,
         }}
       >
-        {hint && (
+        <div
+          css={{
+            display: 'flex',
+            flexWrap: 'wrap',
+            gap: tokens.spacingNew.xsmall,
+          }}
+        >
           <Button
-            onClick={() => setShowingHint((previous) => !previous)}
+            disabled={
+              isSubmitting ||
+              status.status === 'busy' ||
+              status.status === 'starting'
+            }
+            isLoading={isSubmitting}
+            onClick={handleSubmit}
+            size="small"
+            variant="regularOutline"
+          >
+            Submit Answer
+          </Button>
+          {hint && (
+            <Button
+              disabled={
+                isSubmitting ||
+                status.status === 'busy' ||
+                status.status === 'starting'
+              }
+              onClick={() => setShowingHint((previous) => !previous)}
+              size="small"
+              variant="plain"
+            >
+              {showingHint ? 'Hide Hint' : 'Show Hint'}
+            </Button>
+          )}
+        </div>
+
+        <div
+          css={{
+            alignItems: 'center',
+            display: 'flex',
+            gap: tokens.spacingNew.small,
+          }}
+        >
+          <span
+            css={{
+              alignItems: 'center',
+              color:
+                status.status === 'ready'
+                  ? theme.success.text
+                  : status.status === 'busy' || status.status === 'starting'
+                  ? theme.warning.text
+                  : theme.text.subtle,
+              display: 'flex',
+              fontSize: tokens.fontSizes.xsmall,
+              gap: tokens.spacingNew.tiny,
+              justifyContent: 'flex-end',
+              minWidth: '65px',
+            }}
+          >
+            {status.status === 'ready' ? (
+              <Checkmark size="small" />
+            ) : status.status === 'broken' ? (
+              <Cross size="small" />
+            ) : null}
+            {status.status === 'ready'
+              ? 'Ready'
+              : status.status === 'busy'
+              ? 'Busy'
+              : status.status === 'starting'
+              ? 'Starting'
+              : status.status === 'broken'
+              ? 'Error'
+              : 'Idle'}
+          </span>
+          <Button
+            aria-label="Reset terminal"
+            disabled={isSubmitting}
+            onClick={handleReset}
             size="small"
             variant="plain"
           >
-            {showingHint ? 'Hide Hint' : 'Show Hint'}
+            Reset
           </Button>
-        )}
-        <Button
-          disabled={isSubmitting}
-          isLoading={isSubmitting}
-          onClick={handleSubmit}
-          size="small"
-          variant="regularOutline"
-        >
-          Submit Answer
-        </Button>
-        <Button aria-label="Reset terminal" onClick={handleReset} size="small" variant="plain">
-          Reset
-        </Button>
+        </div>
       </div>
 
       {showingHint && hint && <HintPanel hint={hint} />}

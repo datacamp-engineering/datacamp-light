@@ -33,6 +33,20 @@ describe('createShellInterpreter', () => {
     expect(shell.getCwd()).toBe('/home/repl');
   });
 
+  it('should support full navigation and listing sequence (mkdir -> ls -> cd -> ls -> touch -> ls)', () => {
+    const shell = createShellInterpreter();
+    expect(shell.runCommand('mkdir my_folder')).toEqual({ output: '' });
+    expect(shell.runCommand('ls').output).toContain('my_folder');
+    expect(shell.runCommand('cd my_folder')).toEqual({ output: '' });
+    expect(shell.getCwd()).toBe('/home/repl/my_folder');
+    expect(shell.runCommand('ls').output).toBe('');
+    expect(shell.runCommand('touch script.sh')).toEqual({ output: '' });
+    expect(shell.runCommand('ls').output).toContain('script.sh');
+    expect(shell.runCommand('cd ..')).toEqual({ output: '' });
+    expect(shell.getCwd()).toBe('/home/repl');
+    expect(shell.runCommand('ls').output).toContain('my_folder');
+  });
+
   it('should error on cd into a non-existent directory', () => {
     const shell = createShellInterpreter();
     const result = shell.runCommand('cd does-not-exist');
@@ -65,6 +79,8 @@ describe('createShellInterpreter', () => {
     const shell = createShellInterpreter();
     shell.runCommand('echo one two three > words.txt');
     const result = shell.runCommand('wc words.txt');
+    // redirect appends a trailing newline, so content is "one two three\n"
+    // (2 lines when split on \n, 3 words, 14 chars)
     expect(result.output).toBe('2 3 14 words.txt');
   });
 
