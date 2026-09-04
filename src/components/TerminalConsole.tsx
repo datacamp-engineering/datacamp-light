@@ -18,8 +18,13 @@ export interface TerminalCommandResult {
  * silent command such as `cd` still produces visible state feedback - exactly
  * like a real terminal whose prompt tracks the shell's cwd.
  */
-export function buildPrompt(cwd: string | null | undefined, prompt: string): string {
-  return cwd ? `${cwd} ${prompt.trimEnd()} ` : prompt;
+export function buildPrompt(
+  currentWorkingDirectory: string | null | undefined,
+  prompt: string,
+): string {
+  return currentWorkingDirectory
+    ? `${currentWorkingDirectory} ${prompt.trimEnd()} `
+    : prompt;
 }
 
 /**
@@ -28,9 +33,10 @@ export function buildPrompt(cwd: string | null | undefined, prompt: string): str
  * mkdir, touch, ls on an empty directory) still yields one blank line so the
  * learner sees the shell respond and the next prompt arrive.
  */
-export function formatTerminalResult(
-  result: { output?: string; error?: string },
-): Array<{ text: string; color?: 'error' }> {
+export function formatTerminalResult(result: {
+  output?: string;
+  error?: string;
+}): Array<{ text: string; color?: 'error' }> {
   const entries: Array<{ text: string; color?: 'error' }> = [];
   if (result.output) entries.push({ text: result.output });
   if (result.error) entries.push({ text: result.error, color: 'error' });
@@ -51,146 +57,205 @@ export const TerminalConsole: React.FC<TerminalConsoleProps> = ({
   height = 260,
   welcomeMessage = 'Welcome to the DataCamp Light shell (WebAssembly).\r\n',
 }) => {
-  const containerRef = useRef<HTMLDivElement>(null);
-  const termRef = useRef<Xterm | null>(null);
-  const lineBufferRef = useRef('');
-  const historyRef = useRef<string[]>([]);
-  const historyIndexRef = useRef<number | null>(null);
-  const isExecutingRef = useRef(false);
-  const cwdRef = useRef<string | null>(null);
+  const terminalContainerReference = useRef<HTMLDivElement>(null);
+  const terminalReference = useRef<Xterm | null>(null);
+  const lineBufferReference = useRef('');
+  const historyReference = useRef<string[]>([]);
+  const historyIndexReference = useRef<number | null>(null);
+  const isExecutingReference = useRef(false);
+  const currentWorkingDirectoryReference = useRef<string | null>(null);
 
   useEffect(() => {
-    if (!containerRef.current) return;
+    if (!terminalContainerReference.current) return;
 
-    const termBg =
-      getComputedStyle(containerRef.current).getPropertyValue('--wf-bg--main').trim() ||
-      '#05192D';
+    const terminalBackground =
+      getComputedStyle(terminalContainerReference.current)
+        .getPropertyValue('--wf-bg--main')
+        .trim() || '#05192D';
 
-    const term = new Xterm({
+    const terminalInstance = new Xterm({
       cursorBlink: true,
       fontFamily: tokens.fontFamilies.mono,
       fontSize: 13,
       lineHeight: 1.3,
       theme: {
-        background: termBg,
+        background: terminalBackground,
         foreground: theme.text.main as string,
         cursor: theme.blue.main as string,
         selectionBackground: theme.blue.transparent as string,
       },
     });
 
-    const fitAddon = new FitAddon();
-    term.loadAddon(fitAddon);
-    term.open(containerRef.current);
-    fitAddon.fit();
+    const fitTerminalAddon = new FitAddon();
+    terminalInstance.loadAddon(fitTerminalAddon);
+    terminalInstance.open(terminalContainerReference.current);
+    fitTerminalAddon.fit();
 
-    term.write(welcomeMessage);
-    term.write(buildPrompt(cwdRef.current, prompt));
+    terminalInstance.write(welcomeMessage);
+    terminalInstance.write(
+      buildPrompt(currentWorkingDirectoryReference.current, prompt),
+    );
 
     const resizeObserver = new ResizeObserver(() => {
       try {
-        fitAddon.fit();
+        fitTerminalAddon.fit();
       } catch {
         // ignore transient resize race on unmount
       }
     });
-    resizeObserver.observe(containerRef.current);
+    resizeObserver.observe(terminalContainerReference.current);
 
     const rewriteLine = () => {
-      term.write('\r\x1b[K' + buildPrompt(cwdRef.current, prompt) + lineBufferRef.current);
+      terminalInstance.write(
+        '\r\x1b[K' +
+          buildPrompt(currentWorkingDirectoryReference.current, prompt) +
+          lineBufferReference.current,
+      );
     };
 
-    term.onData(async (data) => {
-      if (isExecutingRef.current) return;
-
-      const code = data.charCodeAt(0);
+    terminalInstance.onData(async (data) => {
+      if (isExecutingReference.current) return;
 
       if (data === '\r') {
-        const command = lineBufferRef.current;
-        term.write('\r\n');
-        lineBufferRef.current = '';
-        historyIndexRef.current = null;
+        const commandToExecute = lineBufferReference.current;
+        terminalInstance.write('\r\n');
+        lineBufferReference.current = '';
+        historyIndexReference.current = null;
 
-        if (command.trim()) {
-          historyRef.current.push(command);
-          isExecutingRef.current = true;
-          try {
-            const result = await onExecuteCommand(command);
-            if (result.cwd) {
-              cwdRef.current = result.cwd;
-            }
-            for (const entry of formatTerminalResult(result)) {
-              const text = entry.text.replace(/\n/g, '\r\n');
-              term.write(entry.color === 'error' ? `\x1b[31m${text}\x1b[0m\r\n` : `${text}\r\n`);
-            }
-          } finally {
-            isExecutingRef.current = false;
+        if (commandToExecute.trim()) {
+          historyReference.current.push(commandToExecute);
+        }
+
+        isExecutingReference.current = true;
+        try {
+          const result = await onExecuteCommand(commandToExecute);
+          if (result.cwd) {
+            currentWorkingDirectoryReference.current = result.cwd;
           }
-        }
 
-        term.write(buildPrompt(cwdRef.current, prompt));
-      } else if (code === 127) {
-        if (lineBufferRef.current.length > 0) {
-          lineBufferRef.current = lineBufferRef.current.slice(0, -1);
-          rewriteLine();
+          if (result.output === '\x1bc') {
+            terminalInstance.clear();
+          } else {
+            const formattedEntries = formatTerminalResult(result);
+            for (const entry of formattedEntries) {
+              if (entry.color === 'error') {
+                terminalInstance.write(
+                  `\x1b[31m${entry.text.replace(/\n/g, '\r\n')}\x1b[0m`,
+                );
+              } else if (entry.text) {
+                terminalInstance.write(entry.text.replace(/\n/g, '\r\n'));
+              }
+              if (!entry.text.endsWith('\n') && !entry.text.endsWith('\r\n')) {
+                terminalInstance.write('\r\n');
+              }
+            }
+          }
+        } catch (executionError: any) {
+          terminalInstance.write(
+            `\x1b[31m${(executionError.message || 'Execution error').replace(
+              /\n/g,
+              '\r\n',
+            )}\x1b[0m\r\n`,
+          );
+        } finally {
+          isExecutingReference.current = false;
+          terminalInstance.write(
+            buildPrompt(currentWorkingDirectoryReference.current, prompt),
+          );
         }
-      } else if (data === '\x1b[A') {
-        const history = historyRef.current;
-        if (history.length === 0) return;
+        return;
+      }
+
+      // Backspace
+      if (data === '\x7f' || data === '\b') {
+        if (lineBufferReference.current.length > 0) {
+          lineBufferReference.current = lineBufferReference.current.slice(
+            0,
+            -1,
+          );
+          terminalInstance.write('\b \b');
+        }
+        return;
+      }
+
+      // Arrow Up (History previous)
+      if (data === '\x1b[A') {
+        const historyList = historyReference.current;
+        if (historyList.length === 0) return;
         const nextIndex =
-          historyIndexRef.current === null
-            ? history.length - 1
-            : Math.max(0, historyIndexRef.current - 1);
-        historyIndexRef.current = nextIndex;
-        lineBufferRef.current = history[nextIndex] || '';
+          historyIndexReference.current === null
+            ? historyList.length - 1
+            : Math.max(0, historyIndexReference.current - 1);
+        historyIndexReference.current = nextIndex;
+        lineBufferReference.current = historyList[nextIndex];
         rewriteLine();
-      } else if (data === '\x1b[B') {
-        const history = historyRef.current;
-        if (historyIndexRef.current === null) return;
-        const nextIndex = historyIndexRef.current + 1;
-        if (nextIndex >= history.length) {
-          historyIndexRef.current = null;
-          lineBufferRef.current = '';
+        return;
+      }
+
+      // Arrow Down (History next)
+      if (data === '\x1b[B') {
+        const historyList = historyReference.current;
+        if (historyIndexReference.current === null) return;
+        const nextIndex = historyIndexReference.current + 1;
+        if (nextIndex >= historyList.length) {
+          historyIndexReference.current = null;
+          lineBufferReference.current = '';
         } else {
-          historyIndexRef.current = nextIndex;
-          lineBufferRef.current = history[nextIndex] || '';
+          historyIndexReference.current = nextIndex;
+          lineBufferReference.current = historyList[nextIndex];
         }
         rewriteLine();
-      } else if (code >= 32) {
-        lineBufferRef.current += data;
-        term.write(data);
+        return;
+      }
+
+      // Ctrl+C: Cancel current line
+      if (data === '\x03') {
+        lineBufferReference.current = '';
+        historyIndexReference.current = null;
+        terminalInstance.write(
+          '^C\r\n' +
+            buildPrompt(currentWorkingDirectoryReference.current, prompt),
+        );
+        return;
+      }
+
+      // Normal character input
+      if (data >= ' ' || data === '\t') {
+        lineBufferReference.current += data;
+        terminalInstance.write(data);
       }
     });
 
-    termRef.current = term;
+    terminalReference.current = terminalInstance;
 
     return () => {
       resizeObserver.disconnect();
-      term.dispose();
-      termRef.current = null;
+      terminalInstance.dispose();
+      terminalReference.current = null;
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [prompt, welcomeMessage, onExecuteCommand]);
 
-return (
+  return (
     <div
       css={{
         backgroundColor: theme.background.main,
         borderTop: `${tokens.borderWidth.thin} solid ${theme.border.main}`,
         height: typeof height === 'number' ? `${height}px` : height,
-        padding: `${tokens.spacingNew.medium} 0 ${tokens.spacingNew.medium} ${tokens.spacingNew.medium}`,
-      }}
-    >
-      <div
-        ref={containerRef}
-        css={{
+        minHeight: 120,
+        overflow: 'hidden',
+        padding: tokens.spacingNew.xsmall,
+        position: 'relative',
+        width: '100%',
+        '& .xterm': {
           backgroundColor: theme.background.main,
           height: '100%',
-          '& .xterm-viewport': {
-            backgroundColor: `${theme.background.main} !important`,
-          },
-        }}
-      />
-    </div>
+          padding: tokens.spacingNew.tiny,
+        },
+        '& .xterm-viewport': {
+          backgroundColor: `${theme.background.main} !important`,
+        },
+      }}
+      ref={terminalContainerReference}
+    />
   );
 };

@@ -28,7 +28,7 @@ export const PlotCanvas: React.FC<PlotCanvasProps> = ({ plots, height = 400 }) =
   const totalPlots = plots.length;
   const currentPlotUrl = plots[safeIndex];
 
-  const maxImgHeight =
+  const maximumImageHeight =
     typeof height === 'number' ? `${Math.max(80, height - 65)}px` : '335px';
 
   return (
@@ -62,7 +62,7 @@ export const PlotCanvas: React.FC<PlotCanvasProps> = ({ plots, height = 400 }) =
               aria-label="Previous plot"
               disabled={safeIndex === 0}
               icon={<ChevronLeft size="small" />}
-              onClick={() => setCurrentIndex((prev) => Math.max(0, prev - 1))}
+              onClick={() => setCurrentIndex((previousIndex) => Math.max(0, previousIndex - 1))}
               size="small"
               variant="plain"
             />
@@ -70,7 +70,7 @@ export const PlotCanvas: React.FC<PlotCanvasProps> = ({ plots, height = 400 }) =
               aria-label="Next plot"
               disabled={safeIndex === totalPlots - 1}
               icon={<ChevronRight size="small" />}
-              onClick={() => setCurrentIndex((prev) => Math.min(totalPlots - 1, prev + 1))}
+              onClick={() => setCurrentIndex((previousIndex) => Math.min(totalPlots - 1, previousIndex + 1))}
               size="small"
               variant="plain"
             />
@@ -88,7 +88,7 @@ export const PlotCanvas: React.FC<PlotCanvasProps> = ({ plots, height = 400 }) =
             display: 'block',
             height: 'auto',
             margin: '0 auto',
-            maxHeight: maxImgHeight,
+            maxHeight: maximumImageHeight,
             maxWidth: '100%',
             objectFit: 'contain',
             width: 'auto',

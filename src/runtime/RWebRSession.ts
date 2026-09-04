@@ -319,52 +319,52 @@ export class RWebRSession {
         `;
 
         try {
-          const resObj = await webR.evalR(evalHarness);
-          const jsRes: any = await resObj.toJs();
-          console.log('[r-sct] testwhat result:', jsRes);
+          const evaluationResultObject = await webR.evalR(evalHarness);
+          const unpackedResult: any = await evaluationResultObject.toJs();
+          console.log('[r-sct] testwhat result:', unpackedResult);
 
           let correct = false;
           let message = '';
           let output = '';
 
-          if (jsRes && typeof jsRes === 'object') {
-            if (Array.isArray(jsRes.names) && Array.isArray(jsRes.values)) {
-              const correctIdx = jsRes.names.indexOf('correct');
-              const messageIdx = jsRes.names.indexOf('message');
-              const outputIdx = jsRes.names.indexOf('output');
-              if (correctIdx !== -1) {
-                const valObj = jsRes.values[correctIdx];
-                correct = Array.isArray(valObj?.values)
-                  ? Boolean(valObj.values[0])
-                  : Boolean(valObj);
+          if (unpackedResult && typeof unpackedResult === 'object') {
+            if (Array.isArray(unpackedResult.names) && Array.isArray(unpackedResult.values)) {
+              const correctIndex = unpackedResult.names.indexOf('correct');
+              const messageIndex = unpackedResult.names.indexOf('message');
+              const outputIndex = unpackedResult.names.indexOf('output');
+              if (correctIndex !== -1) {
+                const targetValueObject = unpackedResult.values[correctIndex];
+                correct = Array.isArray(targetValueObject?.values)
+                  ? Boolean(targetValueObject.values[0])
+                  : Boolean(targetValueObject);
               }
-              if (messageIdx !== -1) {
-                const valObj = jsRes.values[messageIdx];
-                message = Array.isArray(valObj?.values)
-                  ? String(valObj.values[0] ?? '')
-                  : String(valObj ?? '');
+              if (messageIndex !== -1) {
+                const targetValueObject = unpackedResult.values[messageIndex];
+                message = Array.isArray(targetValueObject?.values)
+                  ? String(targetValueObject.values[0] ?? '')
+                  : String(targetValueObject ?? '');
               }
-              if (outputIdx !== -1) {
-                const valObj = jsRes.values[outputIdx];
-                output = Array.isArray(valObj?.values)
-                  ? String(valObj.values[0] ?? '')
-                  : String(valObj ?? '');
+              if (outputIndex !== -1) {
+                const targetValueObject = unpackedResult.values[outputIndex];
+                output = Array.isArray(targetValueObject?.values)
+                  ? String(targetValueObject.values[0] ?? '')
+                  : String(targetValueObject ?? '');
               }
             } else {
-              if ('correct' in jsRes) {
-                correct = Array.isArray(jsRes.correct)
-                  ? Boolean(jsRes.correct[0])
-                  : Boolean(jsRes.correct);
+              if ('correct' in unpackedResult) {
+                correct = Array.isArray(unpackedResult.correct)
+                  ? Boolean(unpackedResult.correct[0])
+                  : Boolean(unpackedResult.correct);
               }
-              if ('message' in jsRes) {
-                message = Array.isArray(jsRes.message)
-                  ? String(jsRes.message[0] ?? '')
-                  : String(jsRes.message ?? '');
+              if ('message' in unpackedResult) {
+                message = Array.isArray(unpackedResult.message)
+                  ? String(unpackedResult.message[0] ?? '')
+                  : String(unpackedResult.message ?? '');
               }
-              if ('output' in jsRes) {
-                output = Array.isArray(jsRes.output)
-                  ? String(jsRes.output[0] ?? '')
-                  : String(jsRes.output ?? '');
+              if ('output' in unpackedResult) {
+                output = Array.isArray(unpackedResult.output)
+                  ? String(unpackedResult.output[0] ?? '')
+                  : String(unpackedResult.output ?? '');
               }
             }
           }
@@ -382,12 +382,14 @@ export class RWebRSession {
 
           this.lifecycle.setStatus('ready');
           return { correct, message, output };
-        } catch (twErr: any) {
-          console.error('[DataCamp Light R SCT Exception]', twErr);
-          const rawErr = String(twErr?.message || twErr || '');
-          const cleanMsg = rawErr.replace(/^Error in [^:]+:\s*/, 'SCT Error: ') || 'Error during R SCT evaluation.';
+        } catch (testwhatError: any) {
+          console.error('[DataCamp Light R SCT Exception]', testwhatError);
+          const rawErrorMessage = String(testwhatError?.message || testwhatError || '');
+          const sanitizedMessage =
+            rawErrorMessage.replace(/^Error in [^:]+:\s*/, 'SCT Error: ') ||
+            'Error during R SCT evaluation.';
           this.lifecycle.setStatus('ready');
-          return { correct: false, message: cleanMsg, output: '' };
+          return { correct: false, message: sanitizedMessage, output: '' };
         }
       }
 

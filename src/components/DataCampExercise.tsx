@@ -19,6 +19,7 @@ import { TerminalConsole } from './TerminalConsole';
 export interface DataCampExerciseProps {
   id?: string;
   language?: string;
+  theme?: 'light' | 'dark';
   sampleCode?: string;
   preExerciseCode?: string;
   solution?: string;
@@ -60,6 +61,7 @@ const ShellExercise: React.FC<{
   preExerciseCode: string;
   sct: string;
   height: number | string;
+  theme?: 'light' | 'dark';
   utmSource?: string;
   utmCampaign?: string;
   onSubmit?: (code: string) => void;
@@ -69,6 +71,7 @@ const ShellExercise: React.FC<{
   preExerciseCode,
   sct,
   height,
+  theme: themeMode,
   utmSource,
   utmCampaign,
   onSubmit,
@@ -145,7 +148,7 @@ const ShellExercise: React.FC<{
   };
 
   return (
-    <DCLWidgetShell>
+    <DCLWidgetShell theme={themeMode}>
       <div
         css={{
           alignItems: 'center',
@@ -209,6 +212,7 @@ const ShellExercise: React.FC<{
 
 const CodeExercise: React.FC<DataCampExerciseProps> = ({
   language = 'python',
+  theme = 'dark',
   sampleCode = '',
   preExerciseCode = '',
   solution = '',
@@ -366,7 +370,7 @@ const CodeExercise: React.FC<DataCampExerciseProps> = ({
   };
 
   return (
-    <DCLWidgetShell>
+    <DCLWidgetShell theme={theme}>
       <CodeEditor
         code={code}
         onChange={setCode}
@@ -447,6 +451,7 @@ const CodeExercise: React.FC<DataCampExerciseProps> = ({
 export const DataCampExercise: React.FC<DataCampExerciseProps> = (props) => {
   const {
     language = 'python',
+    theme = 'dark',
     hint = '',
     preExerciseCode = '',
     sct = '',
@@ -464,6 +469,7 @@ export const DataCampExercise: React.FC<DataCampExerciseProps> = (props) => {
         preExerciseCode={preExerciseCode}
         sct={sct}
         height={height}
+        theme={theme}
         utmSource={utmSource}
         utmCampaign={utmCampaign}
         onSubmit={onSubmit}
@@ -472,5 +478,5 @@ export const DataCampExercise: React.FC<DataCampExerciseProps> = (props) => {
     );
   }
 
-  return <CodeExercise {...props} />;
+  return <CodeExercise {...props} theme={theme} />;
 };

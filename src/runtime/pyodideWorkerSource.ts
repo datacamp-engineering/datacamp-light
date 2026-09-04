@@ -251,10 +251,10 @@ async function loadExplicitPackages(packages) {
   if (!pyodide || !packages || packages.length === 0) return;
   const packagesToLoad = [];
   for (const pkg of packages) {
-    const cleanPkg = pkg.split("==")[0].trim();
-    if (cleanPkg && !loadedPackages.has(cleanPkg)) {
-      packagesToLoad.push(cleanPkg);
-      loadedPackages.add(cleanPkg);
+    const normalizedPackageName = pkg.split("==")[0].trim();
+    if (normalizedPackageName && !loadedPackages.has(normalizedPackageName)) {
+      packagesToLoad.push(normalizedPackageName);
+      loadedPackages.add(normalizedPackageName);
     }
   }
   if (packagesToLoad.length > 0) {
@@ -267,8 +267,8 @@ async function loadExplicitPackages(packages) {
         for (const pkg of packagesToLoad) {
           await micropip.install(pkg);
         }
-      } catch (mpErr) {
-        console.error("Failed to install package via micropip:", mpErr);
+      } catch (micropipError) {
+        console.error("Failed to install package via micropip:", micropipError);
       }
     }
   }
@@ -407,30 +407,30 @@ self.onmessage = async function (e) {
       let resultJson;
       try {
         resultJson = exercise.run_submit(code || "", height || 320, width || 320);
-      } catch (submitErr) {
-        console.error("[DataCamp Light SCT Exception]", submitErr);
-        const rawErrStr = String(submitErr && submitErr.message ? submitErr.message : submitErr);
-        let cleanMsg = rawErrStr;
+      } catch (submitError) {
+        console.error("[DataCamp Light SCT Exception]", submitError);
+        const rawErrorString = String(submitError && submitError.message ? submitError.message : submitError);
+        let sanitizedErrorMessage = rawErrorString;
 
-        if (rawErrStr.indexOf("InstructorError:") !== -1) {
-          const parts = rawErrStr.split("InstructorError:")[1];
+        if (rawErrorString.indexOf("InstructorError:") !== -1) {
+          const parts = rawErrorString.split("InstructorError:")[1];
           const desc = parts.split("Debug on error:")[0].split("\\n")[0].trim();
-          cleanMsg = "SCT Error: " + desc;
-        } else if (rawErrStr.indexOf("SyntaxError:") !== -1) {
-          const parts = rawErrStr.split("SyntaxError:")[1];
-          cleanMsg = "SCT SyntaxError: " + parts.split("\\n")[0].trim();
-        } else if (rawErrStr.indexOf("NameError:") !== -1) {
-          const parts = rawErrStr.split("NameError:")[1];
-          cleanMsg = "SCT NameError: " + parts.split("\\n")[0].trim();
+          sanitizedErrorMessage = "SCT Error: " + desc;
+        } else if (rawErrorString.indexOf("SyntaxError:") !== -1) {
+          const parts = rawErrorString.split("SyntaxError:")[1];
+          sanitizedErrorMessage = "SCT SyntaxError: " + parts.split("\\n")[0].trim();
+        } else if (rawErrorString.indexOf("NameError:") !== -1) {
+          const parts = rawErrorString.split("NameError:")[1];
+          sanitizedErrorMessage = "SCT NameError: " + parts.split("\\n")[0].trim();
         } else {
-          const lines = rawErrStr.split("\\n").map((l) => l.trim()).filter(Boolean);
-          cleanMsg = lines[lines.length - 1] || "Error during SCT evaluation.";
+          const lines = rawErrorString.split("\\n").map((l) => l.trim()).filter(Boolean);
+          sanitizedErrorMessage = lines[lines.length - 1] || "Error during SCT evaluation.";
         }
 
         self.postMessage({
           jsonrpc: "2.0",
           method: "session_output",
-          params: { type: "sct", payload: { correct: false, message: cleanMsg } },
+          params: { type: "sct", payload: { correct: false, message: sanitizedErrorMessage } },
         });
 
         self.postMessage({
@@ -438,7 +438,7 @@ self.onmessage = async function (e) {
           id,
           result: {
             correct: false,
-            message: cleanMsg,
+            message: sanitizedErrorMessage,
             output: "",
           },
         });

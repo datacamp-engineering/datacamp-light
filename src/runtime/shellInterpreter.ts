@@ -387,33 +387,33 @@ export function createShellInterpreter(options?: CreateShellInterpreterOptions) 
       }
     },
     mkdir: (args) => {
-      const pFlag = args.includes('-p');
-      const dirs = args.filter((a) => !a.startsWith('-'));
-      if (dirs.length === 0) return { error: 'mkdir: missing operand', exitCode: 1 };
-      for (const d of dirs) {
+      const shouldCreateParents = args.includes('-p');
+      const targetDirectories = args.filter((arg) => !arg.startsWith('-'));
+      if (targetDirectories.length === 0) return { error: 'mkdir: missing operand', exitCode: 1 };
+      for (const directoryPath of targetDirectories) {
         try {
-          if (pFlag) {
-            const parts = d.startsWith('/')
-              ? d.split('/').filter(Boolean).map((_part, idx, arr) => '/' + arr.slice(0, idx + 1).join('/'))
-              : d.split('/').filter(Boolean).reduce((acc: string[], cur) => {
-                  const prev = acc.length > 0 ? acc[acc.length - 1] + '/' : '';
-                  acc.push(prev + cur);
-                  return acc;
+          if (shouldCreateParents) {
+            const parts = directoryPath.startsWith('/')
+              ? directoryPath.split('/').filter(Boolean).map((_part, index, array) => '/' + array.slice(0, index + 1).join('/'))
+              : directoryPath.split('/').filter(Boolean).reduce((accumulator: string[], current) => {
+                  const previous = accumulator.length > 0 ? accumulator[accumulator.length - 1] + '/' : '';
+                  accumulator.push(previous + current);
+                  return accumulator;
                 }, []);
-            for (const p of parts) {
-              if (!vfs.exists(p)) vfs.mkdir(p);
+            for (const part of parts) {
+              if (!vfs.exists(part)) vfs.mkdir(part);
             }
           } else {
-            vfs.mkdir(d);
+            vfs.mkdir(directoryPath);
           }
-        } catch (e: any) {
-          return { error: `mkdir: cannot create directory '${d}': File exists`, exitCode: 1 };
+        } catch (directoryError: any) {
+          return { error: `mkdir: cannot create directory '${directoryPath}': File exists`, exitCode: 1 };
         }
       }
       return { output: '', exitCode: 0 };
     },
     touch: (args) => {
-      const targetFiles = args.filter((a) => !a.startsWith('-'));
+      const targetFiles = args.filter((arg) => !arg.startsWith('-'));
       if (targetFiles.length === 0) return { error: 'touch: missing file operand', exitCode: 1 };
       for (const file of targetFiles) {
         if (!vfs.exists(file)) vfs.writeFile(file, '');
@@ -423,169 +423,169 @@ export function createShellInterpreter(options?: CreateShellInterpreterOptions) 
     echo: (args) => ({ output: args.join(' '), exitCode: 0 }),
     printf: (args) => ({ output: args.join(' '), exitCode: 0 }),
     cat: (args, input = '') => {
-      const fileArgs = args.filter((a) => !a.startsWith('-'));
-      if (fileArgs.length === 0) return { output: input, exitCode: 0 };
+      const fileArguments = args.filter((arg) => !arg.startsWith('-'));
+      if (fileArguments.length === 0) return { output: input, exitCode: 0 };
       const contents: string[] = [];
-      for (const path of fileArgs) {
+      for (const path of fileArguments) {
         try {
           contents.push(vfs.readFile(path));
-        } catch (e) {
+        } catch (readError) {
           return { error: `cat: ${path}: No such file or directory`, exitCode: 1 };
         }
       }
       return { output: contents.join('\n'), exitCode: 0 };
     },
     rm: (args) => {
-      const rFlag = args.includes('-r') || args.includes('-rf') || args.includes('-R');
-      const targetFiles = args.filter((a) => !a.startsWith('-'));
+      const isRecursive = args.includes('-r') || args.includes('-rf') || args.includes('-R');
+      const targetFiles = args.filter((arg) => !arg.startsWith('-'));
       if (targetFiles.length === 0) return { error: 'rm: missing operand', exitCode: 1 };
       for (const path of targetFiles) {
         try {
-          if (vfs.isDir(path) && rFlag) {
+          if (vfs.isDir(path) && isRecursive) {
             vfs.rmdir(path);
           } else {
             vfs.unlink(path);
           }
-        } catch (e) {
+        } catch (removeError) {
           return { error: `rm: cannot remove '${path}': No such file or directory`, exitCode: 1 };
         }
       }
       return { output: '', exitCode: 0 };
     },
     cp: (args) => {
-      const nonFlags = args.filter((a) => !a.startsWith('-'));
-      if (nonFlags.length < 2) return { error: 'cp: missing destination file operand', exitCode: 1 };
+      const positionalArguments = args.filter((arg) => !arg.startsWith('-'));
+      if (positionalArguments.length < 2) return { error: 'cp: missing destination file operand', exitCode: 1 };
       try {
-        const content = vfs.readFile(nonFlags[0]);
-        vfs.writeFile(nonFlags[1], content);
+        const content = vfs.readFile(positionalArguments[0]);
+        vfs.writeFile(positionalArguments[1], content);
         return { output: '', exitCode: 0 };
-      } catch (e) {
-        return { error: `cp: cannot stat '${nonFlags[0]}': No such file or directory`, exitCode: 1 };
+      } catch (copyError) {
+        return { error: `cp: cannot stat '${positionalArguments[0]}': No such file or directory`, exitCode: 1 };
       }
     },
     mv: (args) => {
-      const nonFlags = args.filter((a) => !a.startsWith('-'));
-      if (nonFlags.length < 2) return { error: 'mv: missing destination file operand', exitCode: 1 };
+      const positionalArguments = args.filter((arg) => !arg.startsWith('-'));
+      if (positionalArguments.length < 2) return { error: 'mv: missing destination file operand', exitCode: 1 };
       try {
-        const content = vfs.readFile(nonFlags[0]);
-        vfs.unlink(nonFlags[0]);
-        vfs.writeFile(nonFlags[1], content);
+        const content = vfs.readFile(positionalArguments[0]);
+        vfs.unlink(positionalArguments[0]);
+        vfs.writeFile(positionalArguments[1], content);
         return { output: '', exitCode: 0 };
-      } catch (e) {
-        return { error: `mv: cannot stat '${nonFlags[0]}': No such file or directory`, exitCode: 1 };
+      } catch (moveError) {
+        return { error: `mv: cannot stat '${positionalArguments[0]}': No such file or directory`, exitCode: 1 };
       }
     },
     wc: (args, input = '') => {
-      const lFlag = args.includes('-l');
-      const wFlag = args.includes('-w');
-      const targetFiles = args.filter((a) => !a.startsWith('-'));
+      const countLinesOnly = args.includes('-l');
+      const countWordsOnly = args.includes('-w');
+      const targetFiles = args.filter((arg) => !arg.startsWith('-'));
       let text = input;
       let label = '';
       if (targetFiles.length > 0) {
         label = ' ' + targetFiles[0];
         try {
           text = vfs.readFile(targetFiles[0]);
-        } catch (e) {
+        } catch (readError) {
           return { error: `wc: ${targetFiles[0]}: No such file or directory`, exitCode: 1 };
         }
       }
       const lines = text ? text.split('\n').length : 0;
       const words = text ? text.split(/\s+/).filter(Boolean).length : 0;
-      if (lFlag) return { output: `${lines}${label}`, exitCode: 0 };
-      if (wFlag) return { output: `${words}${label}`, exitCode: 0 };
+      if (countLinesOnly) return { output: `${lines}${label}`, exitCode: 0 };
+      if (countWordsOnly) return { output: `${words}${label}`, exitCode: 0 };
       return { output: `${lines} ${words} ${text.length}${label}`, exitCode: 0 };
     },
     grep: (args, input = '') => {
-      const iFlag = args.includes('-i');
-      const vFlag = args.includes('-v');
-      const nonFlags = args.filter((a) => !a.startsWith('-'));
-      if (nonFlags.length === 0) return { error: 'grep: missing pattern', exitCode: 1 };
-      const pattern = nonFlags[0];
-      const file = nonFlags[1];
+      const caseInsensitive = args.includes('-i');
+      const invertMatch = args.includes('-v');
+      const positionalArguments = args.filter((arg) => !arg.startsWith('-'));
+      if (positionalArguments.length === 0) return { error: 'grep: missing pattern', exitCode: 1 };
+      const pattern = positionalArguments[0];
+      const file = positionalArguments[1];
       let sourceText = input;
       if (file) {
         try {
           sourceText = vfs.readFile(file);
-        } catch (e) {
+        } catch (readError) {
           return { error: `grep: ${file}: No such file or directory`, exitCode: 1 };
         }
       }
-      const regex = new RegExp(pattern, iFlag ? 'i' : '');
+      const regex = new RegExp(pattern, caseInsensitive ? 'i' : '');
       const lines = sourceText.split('\n');
-      const matches = lines.filter((line) => (vFlag ? !regex.test(line) : regex.test(line)));
+      const matches = lines.filter((line) => (invertMatch ? !regex.test(line) : regex.test(line)));
       return { output: matches.join('\n'), exitCode: matches.length > 0 ? 0 : 1 };
     },
     head: (args, input = '') => {
-      const nIdx = args.indexOf('-n');
-      const count = nIdx !== -1 && args[nIdx + 1] ? parseInt(args[nIdx + 1], 10) : 10;
-      const nonFlags = args.filter((a, idx) => !a.startsWith('-') && (nIdx === -1 || idx !== nIdx + 1));
+      const linesArgumentIndex = args.indexOf('-n');
+      const count = linesArgumentIndex !== -1 && args[linesArgumentIndex + 1] ? parseInt(args[linesArgumentIndex + 1], 10) : 10;
+      const positionalArguments = args.filter((arg, index) => !arg.startsWith('-') && (linesArgumentIndex === -1 || index !== linesArgumentIndex + 1));
       let text = input;
-      if (nonFlags.length > 0) {
+      if (positionalArguments.length > 0) {
         try {
-          text = vfs.readFile(nonFlags[0]);
-        } catch (e) {
-          return { error: `head: ${nonFlags[0]}: No such file or directory`, exitCode: 1 };
+          text = vfs.readFile(positionalArguments[0]);
+        } catch (readError) {
+          return { error: `head: ${positionalArguments[0]}: No such file or directory`, exitCode: 1 };
         }
       }
       return { output: text.split('\n').slice(0, count).join('\n'), exitCode: 0 };
     },
     tail: (args, input = '') => {
-      const nIdx = args.indexOf('-n');
-      const count = nIdx !== -1 && args[nIdx + 1] ? parseInt(args[nIdx + 1], 10) : 10;
-      const nonFlags = args.filter((a, idx) => !a.startsWith('-') && (nIdx === -1 || idx !== nIdx + 1));
+      const linesArgumentIndex = args.indexOf('-n');
+      const count = linesArgumentIndex !== -1 && args[linesArgumentIndex + 1] ? parseInt(args[linesArgumentIndex + 1], 10) : 10;
+      const positionalArguments = args.filter((arg, index) => !arg.startsWith('-') && (linesArgumentIndex === -1 || index !== linesArgumentIndex + 1));
       let text = input;
-      if (nonFlags.length > 0) {
+      if (positionalArguments.length > 0) {
         try {
-          text = vfs.readFile(nonFlags[0]);
-        } catch (e) {
-          return { error: `tail: ${nonFlags[0]}: No such file or directory`, exitCode: 1 };
+          text = vfs.readFile(positionalArguments[0]);
+        } catch (readError) {
+          return { error: `tail: ${positionalArguments[0]}: No such file or directory`, exitCode: 1 };
         }
       }
       const lines = text.split('\n');
       return { output: lines.slice(Math.max(0, lines.length - count)).join('\n'), exitCode: 0 };
     },
     sort: (args, input = '') => {
-      const rFlag = args.includes('-r');
-      const uFlag = args.includes('-u');
-      const nonFlags = args.filter((a) => !a.startsWith('-'));
+      const reverseOrder = args.includes('-r');
+      const uniqueOnly = args.includes('-u');
+      const positionalArguments = args.filter((arg) => !arg.startsWith('-'));
       let text = input;
-      if (nonFlags.length > 0) {
+      if (positionalArguments.length > 0) {
         try {
-          text = vfs.readFile(nonFlags[0]);
-        } catch (e) {
-          return { error: `sort: ${nonFlags[0]}: No such file or directory`, exitCode: 1 };
+          text = vfs.readFile(positionalArguments[0]);
+        } catch (readError) {
+          return { error: `sort: ${positionalArguments[0]}: No such file or directory`, exitCode: 1 };
         }
       }
       let lines = text.split('\n').filter(Boolean).sort();
-      if (uFlag) lines = Array.from(new Set(lines));
-      if (rFlag) lines.reverse();
+      if (uniqueOnly) lines = Array.from(new Set(lines));
+      if (reverseOrder) lines.reverse();
       return { output: lines.join('\n'), exitCode: 0 };
     },
     uniq: (args, input = '') => {
-      const cFlag = args.includes('-c');
-      const nonFlags = args.filter((a) => !a.startsWith('-'));
+      const countPrefix = args.includes('-c');
+      const positionalArguments = args.filter((arg) => !arg.startsWith('-'));
       let text = input;
-      if (nonFlags.length > 0) {
+      if (positionalArguments.length > 0) {
         try {
-          text = vfs.readFile(nonFlags[0]);
-        } catch (e) {
-          return { error: `uniq: ${nonFlags[0]}: No such file or directory`, exitCode: 1 };
+          text = vfs.readFile(positionalArguments[0]);
+        } catch (readError) {
+          return { error: `uniq: ${positionalArguments[0]}: No such file or directory`, exitCode: 1 };
         }
       }
       const lines = text.split('\n');
       const result: string[] = [];
-      let prev = '';
+      let previousLine = '';
       let count = 0;
       for (const line of lines) {
-        if (line === prev) {
+        if (line === previousLine) {
           count++;
         } else {
-          if (prev) result.push(cFlag ? `${count} ${prev}` : prev);
-          prev = line;
+          if (previousLine) result.push(countPrefix ? `${count} ${previousLine}` : previousLine);
+          previousLine = line;
           count = 1;
         }
       }
-      if (prev) result.push(cFlag ? `${count} ${prev}` : prev);
+      if (previousLine) result.push(countPrefix ? `${count} ${previousLine}` : previousLine);
       return { output: result.join('\n'), exitCode: 0 };
     },
     true: () => ({ output: '', exitCode: 0 }),
@@ -593,101 +593,101 @@ export function createShellInterpreter(options?: CreateShellInterpreterOptions) 
     clear: () => ({ output: '\x1bc', exitCode: 0 }),
   };
 
-  function executeStage(stageStr: string, input = ''): CommandResult {
-    const tokens = tokenize(stageStr);
+  function executeStage(stageString: string, input = ''): CommandResult {
+    const tokens = tokenize(stageString);
     if (tokens.length === 0) return { output: '', exitCode: 0 };
 
-    const argv: string[] = [];
+    const argumentVector: string[] = [];
     let stdinFile: string | undefined;
     let stdoutFile: string | undefined;
     let stdoutAppend = false;
 
     for (let i = 0; i < tokens.length; i++) {
-      const t = tokens[i];
-      if (t === '<' && i + 1 < tokens.length) {
+      const token = tokens[i];
+      if (token === '<' && i + 1 < tokens.length) {
         stdinFile = tokens[++i];
-      } else if (t === '>' && i + 1 < tokens.length) {
+      } else if (token === '>' && i + 1 < tokens.length) {
         stdoutFile = tokens[++i];
         stdoutAppend = false;
-      } else if (t === '>>' && i + 1 < tokens.length) {
+      } else if (token === '>>' && i + 1 < tokens.length) {
         stdoutFile = tokens[++i];
         stdoutAppend = true;
       } else {
-        argv.push(t);
+        argumentVector.push(token);
       }
     }
 
-    if (argv.length === 0) return { output: '', exitCode: 0 };
+    if (argumentVector.length === 0) return { output: '', exitCode: 0 };
 
     let currentInput = input;
     if (stdinFile) {
       try {
         currentInput = vfs.readFile(stdinFile);
-      } catch (e: any) {
+      } catch (readError: any) {
         return { error: `sh: ${stdinFile}: No such file or directory`, exitCode: 1 };
       }
     }
 
-    const cmd = argv[0];
-    const args = argv.slice(1);
+    const command = argumentVector[0];
+    const args = argumentVector.slice(1);
 
-    let res: CommandResult;
-    if (preferWasm && wasmRunner && !filesystemBuiltins.has(cmd)) {
-      const wasmRes = wasmRunner(cmd, args, currentInput);
+    let commandResult: CommandResult;
+    if (preferWasm && wasmRunner && !filesystemBuiltins.has(command)) {
+      const wasmResult = wasmRunner(command, args, currentInput);
       const isNotFound =
-        wasmRes.exitCode === 127 ||
-        (wasmRes.error && wasmRes.error.includes('applet not found'));
+        wasmResult.exitCode === 127 ||
+        (wasmResult.error && wasmResult.error.includes('applet not found'));
       if (!isNotFound) {
-        res = {
-          output: wasmRes.output,
-          error: wasmRes.error,
-          exitCode: wasmRes.exitCode,
+        commandResult = {
+          output: wasmResult.output,
+          error: wasmResult.error,
+          exitCode: wasmResult.exitCode,
         };
-      } else if (builtins[cmd]) {
-        res = builtins[cmd](args, currentInput);
+      } else if (builtins[command]) {
+        commandResult = builtins[command](args, currentInput);
       } else {
-        res = { error: `${cmd}: command not found`, exitCode: 127 };
+        return { error: `${command}: command not found`, exitCode: 127 };
       }
-    } else if (builtins[cmd]) {
-      res = builtins[cmd](args, currentInput);
+    } else if (builtins[command]) {
+      commandResult = builtins[command](args, currentInput);
     } else if (wasmRunner) {
-      const wasmRes = wasmRunner(cmd, args, currentInput);
-      res = {
-        output: wasmRes.output,
-        error: wasmRes.error,
-        exitCode: wasmRes.exitCode,
+      const wasmResult = wasmRunner(command, args, currentInput);
+      commandResult = {
+        output: wasmResult.output,
+        error: wasmResult.error,
+        exitCode: wasmResult.exitCode,
       };
     } else {
-      return { error: `${cmd}: command not found`, exitCode: 127 };
+      return { error: `${command}: command not found`, exitCode: 127 };
     }
 
     if (stdoutFile) {
       try {
         const existing = stdoutAppend && vfs.exists(stdoutFile) ? vfs.readFile(stdoutFile) : '';
-        vfs.writeFile(stdoutFile, existing + (res.output || '') + '\n');
-        return { output: '', error: res.error, exitCode: res.exitCode };
-      } catch (e: any) {
-        return { error: `sh: cannot write ${stdoutFile}: ${e.message}`, exitCode: 1 };
+        vfs.writeFile(stdoutFile, existing + (commandResult.output || '') + '\n');
+        return { output: '', error: commandResult.error, exitCode: commandResult.exitCode };
+      } catch (writeError: any) {
+        return { error: `sh: cannot write ${stdoutFile}: ${writeError.message}`, exitCode: 1 };
       }
     }
 
-    return res;
+    return commandResult;
   }
 
-  function executePipeline(pipeStr: string, input = ''): CommandResult {
-    const stages = splitPipes(pipeStr);
-    let curInput = input;
-    let finalRes: CommandResult = { output: '', exitCode: 0 };
+  function executePipeline(pipelineString: string, input = ''): CommandResult {
+    const stages = splitPipes(pipelineString);
+    let currentStageInput = input;
+    let finalResult: CommandResult = { output: '', exitCode: 0 };
 
     for (let i = 0; i < stages.length; i++) {
-      finalRes = executeStage(stages[i], curInput);
-      if (finalRes.exitCode !== 0 && finalRes.error) {
-        return finalRes;
+      finalResult = executeStage(stages[i], currentStageInput);
+      if (finalResult.exitCode !== 0 && finalResult.error) {
+        return finalResult;
       }
-      curInput = finalRes.output || '';
+      currentStageInput = finalResult.output || '';
     }
 
-    return finalRes;
+    return finalResult;
   }
 
   function runCommand(commandLine: string): CommandResult {
@@ -700,24 +700,24 @@ export function createShellInterpreter(options?: CreateShellInterpreterOptions) 
     const errors: string[] = [];
 
     for (let i = 0; i < chains.length; i++) {
-      const { cmd, op } = chains[i];
-      if (!cmd) continue;
+      const { cmd: chainedCommand, op: operator } = chains[i];
+      if (!chainedCommand) continue;
 
-      lastResult = executePipeline(cmd);
+      lastResult = executePipeline(chainedCommand);
       if (lastResult.output) outputs.push(lastResult.output);
       if (lastResult.error) errors.push(lastResult.error);
 
-      if (op === '&&' && (lastResult.exitCode ?? 0) !== 0) break;
-      if (op === '||' && (lastResult.exitCode ?? 0) === 0) break;
+      if (operator === '&&' && (lastResult.exitCode ?? 0) !== 0) break;
+      if (operator === '||' && (lastResult.exitCode ?? 0) === 0) break;
     }
 
-    const res: CommandResult = {
+    const commandResult: CommandResult = {
       output: outputs.join('\n'),
     };
     if (errors.length > 0) {
-      res.error = errors.join('\n');
+      commandResult.error = errors.join('\n');
     }
-    return res;
+    return commandResult;
   }
 
   function runScript(script: string): { output: string; error?: string } {

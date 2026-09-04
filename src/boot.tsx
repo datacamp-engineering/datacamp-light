@@ -3,12 +3,12 @@ import { createRoot } from 'react-dom/client';
 import { DataCampExercise } from './components/DataCampExercise';
 import type { DataCampExerciseProps } from './components/DataCampExercise';
 
-const stripIndent = (str: string): string => {
-  const match = str.match(/^[ \t]*(?=\S)/gm);
-  if (!match) return str;
-  const indent = Math.min(...match.map((el) => el.length));
+const stripIndent = (sourceString: string): string => {
+  const match = sourceString.match(/^[ \t]*(?=\S)/gm);
+  if (!match) return sourceString;
+  const indent = Math.min(...match.map((element) => element.length));
   const regex = new RegExp(`^[ \\t]{${indent}}`, 'gm');
-  return indent > 0 ? str.replace(regex, '') : str;
+  return indent > 0 ? sourceString.replace(regex, '') : sourceString;
 };
 
 export function getSettings(element: HTMLElement): DataCampExerciseProps {
@@ -22,15 +22,18 @@ export function getSettings(element: HTMLElement): DataCampExerciseProps {
         id,
         hint: exercise.hint,
         language: exercise.language || 'python',
-        packages: exercise.packages ? exercise.packages.split(',').map((p: string) => p.trim()) : [],
+        theme: exercise.theme === 'light' ? 'light' : 'dark',
+        packages: exercise.packages
+          ? exercise.packages.split(',').map((packageItem: string) => packageItem.trim())
+          : [],
         preExerciseCode: exercise.pre_exercise_code || '',
         sampleCode: exercise.sample || exercise.sample_code || '',
         sct: exercise.sct || '',
         solution: exercise.solution || '',
         showRunButton: exercise.showRunButton !== false,
       };
-    } catch (e) {
-      console.error('Failed to parse encoded DataCamp Light exercise:', e);
+    } catch (parseError) {
+      console.error('Failed to parse encoded DataCamp Light exercise:', parseError);
     }
   }
 
@@ -52,16 +55,20 @@ export function getSettings(element: HTMLElement): DataCampExerciseProps {
   const rawPackages = element.getAttribute('data-packages') || '';
   const packages = rawPackages
     .split(',')
-    .map((p) => p.trim())
+    .map((packageItem) => packageItem.trim())
     .filter(Boolean);
 
   const rawHeight = element.getAttribute('data-height');
   const height = rawHeight === 'auto' || !rawHeight ? 'auto' : parseInt(rawHeight, 10);
 
+  const rawTheme = element.getAttribute('data-theme')?.toLowerCase();
+  const theme: 'light' | 'dark' = rawTheme === 'light' ? 'light' : 'dark';
+
   return {
     id,
     hint: getHint(),
     language: element.getAttribute('data-lang') || 'python',
+    theme,
     packages,
     preExerciseCode: getText('pre-exercise-code'),
     sampleCode: getText('sample-code'),
@@ -100,10 +107,10 @@ export function bootElement(element: HTMLElement): void {
     mount();
   } else {
     const observer = new IntersectionObserver(
-      (entries, obs) => {
+      (entries, intersectionObserver) => {
         entries.forEach((entry) => {
           if (entry.isIntersecting) {
-            obs.disconnect();
+            intersectionObserver.disconnect();
             mount();
           }
         });

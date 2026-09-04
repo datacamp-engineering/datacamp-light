@@ -14,9 +14,16 @@ describe('getSettings', () => {
     expect(settings.id).toBe('test-id');
     expect(settings.height).toBe('auto');
     expect(settings.language).toBe('python');
+    expect(settings.theme).toBe('dark');
     expect(settings.sct).toBe('');
     expect(settings.solution).toBe('');
     expect(settings.showRunButton).toBe(true);
+  });
+
+  it('should parse theme attribute correctly', () => {
+    element.setAttribute('data-theme', 'light');
+    const settings = getSettings(element);
+    expect(settings.theme).toBe('light');
   });
 
   it('should parse height attribute correctly', () => {
@@ -35,6 +42,7 @@ describe('getSettings', () => {
     const data = {
       hint: 'Test hint',
       language: 'python',
+      theme: 'light',
       pre_exercise_code: 'pre code',
       sample_code: 'sample code',
       sct: 'sct code',
@@ -48,6 +56,7 @@ describe('getSettings', () => {
     const settings = getSettings(element);
     expect(settings.hint).toBe(data.hint);
     expect(settings.language).toBe(data.language);
+    expect(settings.theme).toBe('light');
     expect(settings.preExerciseCode).toBe(data.pre_exercise_code);
     expect(settings.sampleCode).toBe(data.sample_code);
     expect(settings.sct).toBe(data.sct);
