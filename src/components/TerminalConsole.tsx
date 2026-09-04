@@ -87,6 +87,8 @@ interface TerminalConsoleProps {
   prompt?: string;
   height?: number | string;
   welcomeMessage?: string;
+  resetKey?: number | string;
+  theme?: 'light' | 'dark';
 }
 
 export const TerminalConsole: React.FC<TerminalConsoleProps> = ({
@@ -94,6 +96,8 @@ export const TerminalConsole: React.FC<TerminalConsoleProps> = ({
   prompt = '$ ',
   height = 260,
   welcomeMessage = 'Welcome to the DataCamp Light shell (WebAssembly).\r\n',
+  resetKey,
+  theme: themeMode = 'dark',
 }) => {
   const terminalContainerReference = useRef<HTMLDivElement>(null);
   const terminalReference = useRef<Xterm | null>(null);
@@ -115,28 +119,55 @@ export const TerminalConsole: React.FC<TerminalConsoleProps> = ({
     promptReference.current = prompt;
   }, [prompt]);
 
+  // Handle external reset triggers
+  const resetKeyReference = useRef(resetKey);
+  useEffect(() => {
+    if (resetKey !== undefined && resetKey !== resetKeyReference.current) {
+      resetKeyReference.current = resetKey;
+      const terminalInstance = terminalReference.current;
+      if (terminalInstance) {
+        terminalInstance.clear();
+        lineBufferReference.current = '';
+        cursorPositionReference.current = 0;
+        historyReference.current = [];
+        historyIndexReference.current = null;
+        terminalInstance.write(welcomeMessage);
+        terminalInstance.write(
+          buildPrompt(currentWorkingDirectoryReference.current, promptReference.current),
+        );
+      }
+    }
+  }, [resetKey, welcomeMessage]);
+
+  // Dynamically update xterm theme options when themeMode changes
+  useEffect(() => {
+    const terminalInstance = terminalReference.current;
+    if (!terminalInstance) return;
+
+    const isLightMode = themeMode === 'light';
+    const terminalBackground = isLightMode ? '#F7F7FC' : '#05192D';
+    const terminalForeground = isLightMode ? '#05192D' : '#FFFFFF';
+    const cursorColor = '#0578FF';
+    const selectionColor = 'rgba(5, 120, 255, 0.2)';
+    const ansiPalette = isLightMode ? lightAnsiPalette : darkAnsiPalette;
+
+    terminalInstance.options.theme = {
+      background: terminalBackground,
+      foreground: terminalForeground,
+      cursor: cursorColor,
+      selectionBackground: selectionColor,
+      ...ansiPalette,
+    };
+  }, [themeMode]);
+
   useEffect(() => {
     if (!terminalContainerReference.current) return;
 
-    const computedStyle = getComputedStyle(terminalContainerReference.current);
-    const isLightMode =
-      terminalContainerReference.current.closest('[data-wf-theme="light"]') !== null;
-
-    const terminalBackground =
-      computedStyle.getPropertyValue('--wf-bg--main').trim() ||
-      (isLightMode ? '#FFFFFF' : '#05192D');
-
-    const terminalForeground =
-      computedStyle.getPropertyValue('--wf-text--main').trim() ||
-      (isLightMode ? '#05192D' : '#FFFFFF');
-
-    const cursorColor =
-      computedStyle.getPropertyValue('--wf-blue--main').trim() || '#0578FF';
-
-    const selectionColor =
-      computedStyle.getPropertyValue('--wf-blue--transparent').trim() ||
-      'rgba(5, 120, 255, 0.2)';
-
+    const isLightMode = themeMode === 'light';
+    const terminalBackground = isLightMode ? '#F7F7FC' : '#05192D';
+    const terminalForeground = isLightMode ? '#05192D' : '#FFFFFF';
+    const cursorColor = '#0578FF';
+    const selectionColor = 'rgba(5, 120, 255, 0.2)';
     const ansiPalette = isLightMode ? lightAnsiPalette : darkAnsiPalette;
 
     const terminalInstance = new Xterm({
@@ -190,6 +221,13 @@ export const TerminalConsole: React.FC<TerminalConsoleProps> = ({
     terminalInstance.onData(async (data) => {
       if (isExecutingReference.current) return;
 
+      // Ctrl+L: Clear screen
+      if (data === '\x0c') {
+        terminalInstance.clear();
+        rewriteLine();
+        return;
+      }
+
       // Enter
       if (data === '\r') {
         const commandToExecute = lineBufferReference.current;
@@ -238,6 +276,65 @@ export const TerminalConsole: React.FC<TerminalConsoleProps> = ({
           terminalInstance.write(
             buildPrompt(currentWorkingDirectoryReference.current, promptReference.current),
           );
+        }
+        return;
+      }
+
+      // Multiline paste
+      if (data.includes('\n') || (data.includes('\r') && data.length > 1)) {
+        const lines = data.split(/\r\n|\r|\n/);
+        for (let i = 0; i < lines.length; i++) {
+          const chunk = lines[i];
+          if (i === lines.length - 1) {
+            const position = cursorPositionReference.current;
+            const currentBuffer = lineBufferReference.current;
+            lineBufferReference.current =
+              currentBuffer.slice(0, position) + chunk + currentBuffer.slice(position);
+            cursorPositionReference.current = position + chunk.length;
+            rewriteLine();
+          } else {
+            const fullCommand = lineBufferReference.current + chunk;
+            terminalInstance.write(chunk + '\r\n');
+            lineBufferReference.current = '';
+            cursorPositionReference.current = 0;
+            historyIndexReference.current = null;
+            if (fullCommand.trim()) {
+              historyReference.current.push(fullCommand);
+            }
+            isExecutingReference.current = true;
+            try {
+              const result = await onExecuteCommandReference.current(fullCommand);
+              if (result.cwd) {
+                currentWorkingDirectoryReference.current = result.cwd;
+              }
+              if (result.output === '\x1bc') {
+                terminalInstance.clear();
+              } else {
+                const formattedEntries = formatTerminalResult(result);
+                for (const entry of formattedEntries) {
+                  if (entry.color === 'error') {
+                    terminalInstance.write(
+                      `\x1b[31m${entry.text.replace(/\n/g, '\r\n')}\x1b[0m`,
+                    );
+                  } else if (entry.text) {
+                    terminalInstance.write(entry.text.replace(/\n/g, '\r\n'));
+                  }
+                  if (!entry.text.endsWith('\n') && !entry.text.endsWith('\r\n')) {
+                    terminalInstance.write('\r\n');
+                  }
+                }
+              }
+            } catch (executionError: any) {
+              terminalInstance.write(
+                `\x1b[31m${(executionError.message || 'Execution error').replace(
+                  /\n/g,
+                  '\r\n',
+                )}\x1b[0m\r\n`,
+              );
+            } finally {
+              isExecutingReference.current = false;
+            }
+          }
         }
         return;
       }
@@ -367,7 +464,7 @@ export const TerminalConsole: React.FC<TerminalConsoleProps> = ({
         return;
       }
 
-      // Normal character input / paste
+      // Normal character input
       if (data >= ' ' || data === '\t') {
         const position = cursorPositionReference.current;
         const currentBuffer = lineBufferReference.current;

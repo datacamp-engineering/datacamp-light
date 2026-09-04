@@ -120,11 +120,16 @@ export const CodeEditor: React.FC<CodeEditorProps> = ({
   readOnly = false,
   language = 'python',
 }) => {
-  const containerRef = useRef<HTMLDivElement>(null);
-  const viewRef = useRef<EditorView | null>(null);
+  const containerReference = useRef<HTMLDivElement>(null);
+  const viewReference = useRef<EditorView | null>(null);
+
+  const onChangeReference = useRef(onChange);
+  useEffect(() => {
+    onChangeReference.current = onChange;
+  }, [onChange]);
 
   useEffect(() => {
-    if (!containerRef.current) return;
+    if (!containerReference.current) return;
 
     const startState = EditorState.create({
       doc: code,
@@ -138,7 +143,7 @@ export const CodeEditor: React.FC<CodeEditorProps> = ({
         EditorState.readOnly.of(readOnly),
         EditorView.updateListener.of((update: ViewUpdate) => {
           if (update.docChanged) {
-            onChange(update.state.doc.toString());
+            onChangeReference.current(update.state.doc.toString());
           }
         }),
       ],
@@ -146,10 +151,10 @@ export const CodeEditor: React.FC<CodeEditorProps> = ({
 
     const view = new EditorView({
       state: startState,
-      parent: containerRef.current,
+      parent: containerReference.current,
     });
 
-    viewRef.current = view;
+    viewReference.current = view;
 
     return () => {
       view.destroy();
@@ -158,7 +163,7 @@ export const CodeEditor: React.FC<CodeEditorProps> = ({
   }, []);
 
   useEffect(() => {
-    const view = viewRef.current;
+    const view = viewReference.current;
     if (view && view.state.doc.toString() !== code) {
       view.dispatch({
         changes: { from: 0, to: view.state.doc.length, insert: code },
@@ -168,7 +173,7 @@ export const CodeEditor: React.FC<CodeEditorProps> = ({
 
   return (
     <div
-      ref={containerRef}
+      ref={containerReference}
       css={{
         height: typeof height === 'number' ? `${height}px` : height,
         overflow: 'hidden',
