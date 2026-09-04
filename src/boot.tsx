@@ -39,6 +39,11 @@ export function getSettings(element: HTMLElement): DataCampExerciseProps {
           exercise.sharedEnvironment ??
           exercise.shared_environment ??
           exercise.environment,
+        impactTrackingLink:
+          exercise.impact_tracking_link ||
+          exercise.impactTrackingLink ||
+          element.getAttribute('data-impact-tracking-link') ||
+          undefined,
       };
     } catch (parseError) {
       console.error('Failed to parse encoded DataCamp Light exercise:', parseError);
@@ -119,6 +124,8 @@ export function getSettings(element: HTMLElement): DataCampExerciseProps {
     sharedEnvironment,
     utmSource: element.getAttribute('data-utm-source') || undefined,
     utmCampaign: element.getAttribute('data-utm-campaign') || undefined,
+    impactTrackingLink:
+      element.getAttribute('data-impact-tracking-link') || undefined,
   };
 }
 

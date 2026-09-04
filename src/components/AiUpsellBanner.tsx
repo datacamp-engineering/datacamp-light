@@ -11,6 +11,7 @@ export interface AiUpsellBannerProps {
   language?: string;
   utmSource?: string;
   utmCampaign?: string;
+  impactTrackingLink?: string;
   onClose: () => void;
 }
 
@@ -20,6 +21,7 @@ export const AiUpsellBanner: React.FC<AiUpsellBannerProps> = ({
   language = 'python',
   utmSource = 'datacamp_light',
   utmCampaign = 'ai_upsell',
+  impactTrackingLink,
   onClose,
 }) => {
   const isThirdParty = variant === 'third-party';
@@ -33,7 +35,22 @@ export const AiUpsellBanner: React.FC<AiUpsellBannerProps> = ({
     queryParameters.set('language', language);
   }
 
-  const datalabUrl = `https://www.datacamp.com/datalab/new?${queryParameters.toString()}`;
+  const directDatalabUrl = `https://www.datacamp.com/datalab/new?${queryParameters.toString()}`;
+
+  let datalabUrl = directDatalabUrl;
+  if (impactTrackingLink) {
+    const baseAffiliateUrl =
+      impactTrackingLink.startsWith('http://') || impactTrackingLink.startsWith('https://')
+        ? impactTrackingLink
+        : `https://datacamp.pxf.io${impactTrackingLink.startsWith('/') ? '' : '/'}${impactTrackingLink}`;
+    try {
+      const affiliateUrl = new URL(baseAffiliateUrl);
+      affiliateUrl.searchParams.set('u', directDatalabUrl);
+      datalabUrl = affiliateUrl.toString();
+    } catch {
+      datalabUrl = baseAffiliateUrl;
+    }
+  }
 
   const currentUrl = typeof window !== 'undefined' ? window.location.href : 'https://www.datacamp.com';
   const signUpUrl = `${getMainAppBaseUrl()}/users/sign_up?redirect=${encodeURIComponent(

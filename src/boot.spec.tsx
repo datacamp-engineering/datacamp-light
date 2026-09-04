@@ -93,6 +93,24 @@ describe('getSettings', () => {
     expect(settings.utmCampaign).toBe('my_campaign');
   });
 
+  it('should parse impact tracking link attribute correctly', () => {
+    element.setAttribute('data-impact-tracking-link', '/c/67577/1012793/13294');
+    const settings = getSettings(element);
+    expect(settings.impactTrackingLink).toBe('/c/67577/1012793/13294');
+  });
+
+  it('should parse impact tracking link in encoded data correctly', () => {
+    const data = {
+      language: 'python',
+      impact_tracking_link: '/c/67577/1012793/13294',
+    };
+    const encodedData = btoa(JSON.stringify(data));
+    element.setAttribute('data-encoded', 'true');
+    element.textContent = encodeURIComponent(encodedData);
+    const settings = getSettings(element);
+    expect(settings.impactTrackingLink).toBe('/c/67577/1012793/13294');
+  });
+
   it('should parse showAi attribute correctly', () => {
     const defaultSettings = getSettings(element);
     expect(defaultSettings.showAi).toBe(true);

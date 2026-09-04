@@ -13,6 +13,7 @@ export interface FooterProps {
   language?: string;
   utmSource?: string;
   utmCampaign?: string;
+  impactTrackingLink?: string;
   theme?: ThemeMode;
   onToggleTheme?: () => void;
 }
@@ -22,6 +23,7 @@ export const Footer: React.FC<FooterProps> = ({
   language = 'python',
   utmSource = 'datacamp_light',
   utmCampaign = 'powered_by_datalab',
+  impactTrackingLink,
   theme: activeTheme = 'dark',
   onToggleTheme,
 }) => {
@@ -35,7 +37,23 @@ export const Footer: React.FC<FooterProps> = ({
     queryParameters.set('language', language);
   }
 
-  const datalabUrl = `https://www.datacamp.com/datalab/new?${queryParameters.toString()}`;
+  const directDatalabUrl = `https://www.datacamp.com/datalab/new?${queryParameters.toString()}`;
+
+  let datalabUrl = directDatalabUrl;
+  if (impactTrackingLink) {
+    const baseAffiliateUrl =
+      impactTrackingLink.startsWith('http://') || impactTrackingLink.startsWith('https://')
+        ? impactTrackingLink
+        : `https://datacamp.pxf.io${impactTrackingLink.startsWith('/') ? '' : '/'}${impactTrackingLink}`;
+    try {
+      const affiliateUrl = new URL(baseAffiliateUrl);
+      affiliateUrl.searchParams.set('u', directDatalabUrl);
+      datalabUrl = affiliateUrl.toString();
+    } catch {
+      datalabUrl = baseAffiliateUrl;
+    }
+  }
+
   const isDarkMode = activeTheme === 'dark';
   const toggleLabel = isDarkMode ? 'Switch to light theme' : 'Switch to dark theme';
 

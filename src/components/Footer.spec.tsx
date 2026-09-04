@@ -48,6 +48,33 @@ describe('Footer', () => {
     );
   });
 
+  it('should format affiliate tracking URL when impactTrackingLink is provided', () => {
+    const code = 'x = 10\nprint(x)';
+    renderWithShell(
+      <Footer
+        code={code}
+        impactTrackingLink="/c/67577/1012793/13294"
+        language="python"
+        utmCampaign="test_campaign"
+        utmSource="test_source"
+      />,
+    );
+    const link = screen.getByRole('link', { name: /DataLab/i });
+    expect(link).toBeInTheDocument();
+
+    const expectedParameters = new URLSearchParams({
+      _tag: 'test_source',
+      utm_source: 'test_source',
+      utm_campaign: 'test_campaign',
+      code,
+      language: 'python',
+    });
+    const expectedDatalabUrl = `https://www.datacamp.com/datalab/new?${expectedParameters.toString()}`;
+    const expectedHref = `https://datacamp.pxf.io/c/67577/1012793/13294?u=${encodeURIComponent(expectedDatalabUrl)}`;
+
+    expect(link).toHaveAttribute('href', expectedHref);
+  });
+
   it('should render theme toggle button and trigger callback when clicked in dark mode', () => {
     const handleToggleTheme = vi.fn();
     renderWithShell(<Footer theme="dark" onToggleTheme={handleToggleTheme} />);

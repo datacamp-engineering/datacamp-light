@@ -44,6 +44,7 @@ export interface DataCampExerciseProps {
   sharedEnvironment?: boolean | string;
   utmSource?: string;
   utmCampaign?: string;
+  impactTrackingLink?: string;
   onRun?: (code: string) => void;
   onSubmit?: (code: string) => void;
   onFeedback?: (correct: boolean, message: string) => void;
@@ -79,6 +80,7 @@ const ShellExercise: React.FC<{
   sharedEnvironment?: boolean | string;
   utmSource?: string;
   utmCampaign?: string;
+  impactTrackingLink?: string;
   onSubmit?: (code: string) => void;
   onFeedback?: (correct: boolean, message: string) => void;
 }> = ({
@@ -90,6 +92,7 @@ const ShellExercise: React.FC<{
   sharedEnvironment,
   utmSource,
   utmCampaign,
+  impactTrackingLink,
   onSubmit,
   onFeedback,
 }) => {
@@ -231,6 +234,7 @@ const ShellExercise: React.FC<{
         onToggleTheme={toggleTheme}
         utmSource={utmSource}
         utmCampaign={utmCampaign}
+        impactTrackingLink={impactTrackingLink}
       />
     </DCLWidgetShell>
   );
@@ -252,6 +256,7 @@ const CodeExercise: React.FC<DataCampExerciseProps> = ({
   sharedEnvironment,
   utmSource,
   utmCampaign,
+  impactTrackingLink,
   onRun,
   onSubmit,
   onFeedback,
@@ -616,6 +621,7 @@ const CodeExercise: React.FC<DataCampExerciseProps> = ({
       {aiState.visible && aiState.type === 'upsell' && (
         <AiUpsellBanner
           code={code}
+          impactTrackingLink={impactTrackingLink}
           language={language}
           onClose={handleCloseAi}
           utmCampaign={utmCampaign}
@@ -677,11 +683,12 @@ const CodeExercise: React.FC<DataCampExerciseProps> = ({
 
       <Footer
         code={code}
+        impactTrackingLink={impactTrackingLink}
         language={language}
-        theme={activeTheme}
         onToggleTheme={toggleTheme}
-        utmSource={utmSource}
+        theme={activeTheme}
         utmCampaign={utmCampaign}
+        utmSource={utmSource}
       />
     </DCLWidgetShell>
   );
@@ -698,6 +705,7 @@ export const DataCampExercise: React.FC<DataCampExerciseProps> = (props) => {
     showAi = true,
     utmSource,
     utmCampaign,
+    impactTrackingLink,
     onSubmit,
     onFeedback,
   } = props;
@@ -705,16 +713,17 @@ export const DataCampExercise: React.FC<DataCampExerciseProps> = (props) => {
   if (language === 'shell') {
     return (
       <ShellExercise
+        height={height}
         hint={hint}
+        impactTrackingLink={impactTrackingLink}
+        onFeedback={onFeedback}
+        onSubmit={onSubmit}
         preExerciseCode={preExerciseCode}
         sct={sct}
-        height={height}
-        theme={theme}
         sharedEnvironment={props.sharedEnvironment}
-        utmSource={utmSource}
+        theme={theme}
         utmCampaign={utmCampaign}
-        onSubmit={onSubmit}
-        onFeedback={onFeedback}
+        utmSource={utmSource}
       />
     );
   }
@@ -722,6 +731,7 @@ export const DataCampExercise: React.FC<DataCampExerciseProps> = (props) => {
   return (
     <CodeExercise
       {...props}
+      impactTrackingLink={impactTrackingLink}
       mockAi={props.mockAi}
       sharedEnvironment={props.sharedEnvironment}
       showAi={showAi}
