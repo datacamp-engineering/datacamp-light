@@ -15,3 +15,5 @@ src/**/*.js
 src/**/*.js.map
 .vscode
 *.tsbuildinfo
+.cache/
+.temp/
