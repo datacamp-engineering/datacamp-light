@@ -373,7 +373,10 @@ export function createShellInterpreter(options?: CreateShellInterpreterOptions) 
       }
     },
     ls: (args) => {
-      const target = args.find((a) => !a.startsWith('-')) || vfs.cwd();
+      const showAll = args.includes('-a') || args.includes('-la') || args.includes('-al');
+      const showAlmostAll = args.includes('-A');
+      const positionalArguments = args.filter((arg) => !arg.startsWith('-'));
+      const target = positionalArguments[0] || vfs.cwd();
       try {
         if (!vfs.exists(target)) {
           return { error: `ls: cannot access '${target}': No such file or directory`, exitCode: 1 };
@@ -381,10 +384,16 @@ export function createShellInterpreter(options?: CreateShellInterpreterOptions) 
         if (!vfs.isDir(target)) {
           return { output: target, exitCode: 0 };
         }
-        const entries = vfs.readdir(target);
+        let entries = vfs.readdir(target);
+        if (showAll) {
+          entries = ['.', '..', ...entries];
+        } else if (!showAlmostAll) {
+          // Standard POSIX ls hides dotfiles and hidden directories (.name)
+          entries = entries.filter((name) => !name.startsWith('.'));
+        }
         return { output: entries.join('  '), exitCode: 0 };
-      } catch (err: any) {
-        return { error: `ls: ${err.message}`, exitCode: 1 };
+      } catch (readDirectoryError: any) {
+        return { error: `ls: ${readDirectoryError.message}`, exitCode: 1 };
       }
     },
     mkdir: (args) => {

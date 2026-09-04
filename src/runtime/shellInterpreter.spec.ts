@@ -23,6 +23,25 @@ describe('createShellInterpreter', () => {
     expect(result.output).toContain('projects');
   });
 
+  it('should hide dotfiles by default and reveal them with -a or -A', () => {
+    const shell = createShellInterpreter();
+    shell.runCommand('touch .secret');
+    shell.runCommand('touch public.txt');
+
+    const defaultList = shell.runCommand('ls');
+    expect(defaultList.output).toContain('public.txt');
+    expect(defaultList.output).not.toContain('.secret');
+
+    const allList = shell.runCommand('ls -a');
+    expect(allList.output).toContain('.secret');
+    expect(allList.output).toContain('.');
+    expect(allList.output).toContain('..');
+
+    const almostAllList = shell.runCommand('ls -A');
+    expect(almostAllList.output).toContain('.secret');
+    expect(almostAllList.output).not.toContain('..');
+  });
+
   it('should support cd into a created directory and back up', () => {
     const shell = createShellInterpreter();
     shell.runCommand('mkdir projects');
