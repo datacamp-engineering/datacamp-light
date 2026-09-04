@@ -101,15 +101,6 @@ export const ActionBar: React.FC<ActionBarProps> = ({
       </div>
 
       <div css={{ alignItems: 'center', display: 'flex', gap: tokens.spacingNew.small }}>
-        <Button
-          aria-label="Reset exercise"
-          disabled={isExecuting}
-          onClick={onReset}
-          size="small"
-          variant="plain"
-        >
-          Reset
-        </Button>
         <span
           css={{
             alignItems: 'center',
@@ -122,6 +113,8 @@ export const ActionBar: React.FC<ActionBarProps> = ({
             display: 'flex',
             fontSize: tokens.fontSizes.xsmall,
             gap: tokens.spacingNew.tiny,
+            justifyContent: 'flex-end',
+            minWidth: '65px',
           }}
         >
           {status.status === 'ready' ? (
@@ -139,6 +132,15 @@ export const ActionBar: React.FC<ActionBarProps> = ({
             ? 'Error'
             : 'Idle'}
         </span>
+        <Button
+          aria-label="Reset exercise"
+          disabled={isExecuting}
+          onClick={onReset}
+          size="small"
+          variant="plain"
+        >
+          Reset
+        </Button>
       </div>
     </div>
   );
