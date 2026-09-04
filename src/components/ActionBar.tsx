@@ -50,6 +50,27 @@ export const ActionBar: React.FC<ActionBarProps> = ({
 }) => {
   const disabled = isExecuting || status.status === 'busy' || status.status === 'starting';
 
+  const statusLabel =
+    status.status === 'ready'
+      ? 'Ready'
+      : status.status === 'busy'
+      ? 'Busy'
+      : status.status === 'starting'
+      ? 'Starting'
+      : status.status === 'broken'
+      ? 'Error'
+      : 'Idle';
+  const statusAriaLabel = `Session: ${statusLabel}`;
+
+  const statusColor =
+    status.status === 'ready'
+      ? theme.success.text
+      : status.status === 'busy' || status.status === 'starting'
+      ? theme.warning.text
+      : status.status === 'broken'
+      ? theme.error.text
+      : theme.text.subtle;
+
   return (
     <div
       css={{
@@ -81,15 +102,15 @@ export const ActionBar: React.FC<ActionBarProps> = ({
           '& .reset-button-icon': {
             display: 'inline-flex !important',
           },
+          '& .status-text': {
+            display: 'none',
+          },
         },
         '@container (max-width: 420px)': {
           '& .btn-suffix-run': {
             display: 'none',
           },
           '& .btn-suffix-submit': {
-            display: 'none',
-          },
-          '& .status-text': {
             display: 'none',
           },
         },
@@ -160,14 +181,12 @@ export const ActionBar: React.FC<ActionBarProps> = ({
         }}
       >
         <span
+          aria-label={statusAriaLabel}
+          title={statusAriaLabel}
           css={{
             alignItems: 'center',
-            color:
-              status.status === 'ready'
-                ? theme.success.text
-                : status.status === 'busy' || status.status === 'starting'
-                ? theme.warning.text
-                : theme.text.subtle,
+            color: statusColor,
+            cursor: 'default',
             display: 'flex',
             fontSize: tokens.fontSizes.xsmall,
             gap: tokens.spacingNew.tiny,
@@ -182,18 +201,19 @@ export const ActionBar: React.FC<ActionBarProps> = ({
             <Checkmark size="small" />
           ) : status.status === 'broken' ? (
             <Cross size="small" />
-          ) : null}
-          <span className="status-text">
-            {status.status === 'ready'
-              ? 'Ready'
-              : status.status === 'busy'
-              ? 'Busy'
-              : status.status === 'starting'
-              ? 'Starting'
-              : status.status === 'broken'
-              ? 'Error'
-              : 'Idle'}
-          </span>
+          ) : (
+            <span
+              aria-hidden="true"
+              css={{
+                backgroundColor: statusColor,
+                borderRadius: '50%',
+                display: 'inline-block',
+                height: '8px',
+                width: '8px',
+              }}
+            />
+          )}
+          <span className="status-text">{statusLabel}</span>
         </span>
         <Button
           aria-label={resetAriaLabel}

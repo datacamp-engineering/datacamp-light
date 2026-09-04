@@ -76,4 +76,19 @@ describe('ActionBar', () => {
     fireEvent.click(explainButton);
     expect(handleExplain).toHaveBeenCalledTimes(1);
   });
+
+  it('renders status badge with title and accessible aria-label', () => {
+    renderWithShell(
+      <ActionBar
+        isExecuting={false}
+        onReset={vi.fn()}
+        onSubmit={vi.fn()}
+        status={{ status: 'ready' }}
+      />,
+    );
+
+    const statusBadge = screen.getByLabelText('Session: Ready');
+    expect(statusBadge).toBeInTheDocument();
+    expect(statusBadge).toHaveAttribute('title', 'Session: Ready');
+  });
 });
