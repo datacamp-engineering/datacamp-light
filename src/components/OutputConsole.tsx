@@ -1,4 +1,6 @@
+import { Button } from '@datacamp/waffles/button';
 import { Chapeau } from '@datacamp/waffles/chapeau';
+import { Sparkles } from '@datacamp/waffles/icon';
 import { theme } from '@datacamp/waffles/theme';
 import { tokens } from '@datacamp/waffles/tokens';
 import React, { useEffect, useRef, useState } from 'react';
@@ -12,7 +14,10 @@ interface OutputConsoleProps {
   entries: ConsoleEntry[];
   prompt?: string;
   onExecuteCommand?: (command: string) => void;
+  onFixAndExplain?: () => void;
   isExecuting?: boolean;
+  isFixingAndExplaining?: boolean;
+  showAi?: boolean;
   height?: number | string;
 }
 
@@ -20,40 +25,53 @@ export const OutputConsole: React.FC<OutputConsoleProps> = ({
   entries,
   prompt = '>>> ',
   onExecuteCommand,
+  onFixAndExplain,
   isExecuting = false,
+  isFixingAndExplaining = false,
+  showAi = true,
   height = 140,
 }) => {
-  const containerRef = useRef<HTMLDivElement>(null);
-  const inputRef = useRef<HTMLInputElement>(null);
+  const containerReference = useRef<HTMLDivElement>(null);
+  const inputReference = useRef<HTMLInputElement>(null);
   const [currentInput, setCurrentInput] = useState('');
   const [historyIndex, setHistoryIndex] = useState<number | null>(null);
   const [commandHistory, setCommandHistory] = useState<string[]>([]);
+  const [isScrolled, setIsScrolled] = useState(false);
+
+  const hasErrorEntry = entries.some((entry) => entry.type === 'error');
 
   useEffect(() => {
-    if (containerRef.current) {
-      containerRef.current.scrollTop = containerRef.current.scrollHeight;
+    if (containerReference.current) {
+      containerReference.current.scrollTop = containerReference.current.scrollHeight;
     }
   }, [entries, currentInput]);
 
-  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === 'Enter') {
-      e.preventDefault();
+  const handleScroll = () => {
+    if (containerReference.current) {
+      const scrolled = containerReference.current.scrollTop > 0;
+      setIsScrolled(scrolled);
+    }
+  };
+
+  const handleKeyDown = (event: React.KeyboardEvent<HTMLInputElement>) => {
+    if (event.key === 'Enter') {
+      event.preventDefault();
       const trimmed = currentInput.trim();
       if (!trimmed || isExecuting) return;
 
-      setCommandHistory((prev) => [...prev, trimmed]);
+      setCommandHistory((previous) => [...previous, trimmed]);
       setHistoryIndex(null);
       setCurrentInput('');
       onExecuteCommand?.(trimmed);
-    } else if (e.key === 'ArrowUp') {
-      e.preventDefault();
+    } else if (event.key === 'ArrowUp') {
+      event.preventDefault();
       if (commandHistory.length === 0) return;
       const nextIndex =
         historyIndex === null ? commandHistory.length - 1 : Math.max(0, historyIndex - 1);
       setHistoryIndex(nextIndex);
       setCurrentInput(commandHistory[nextIndex] || '');
-    } else if (e.key === 'ArrowDown') {
-      e.preventDefault();
+    } else if (event.key === 'ArrowDown') {
+      event.preventDefault();
       if (historyIndex === null) return;
       const nextIndex = historyIndex + 1;
       if (nextIndex >= commandHistory.length) {
@@ -67,7 +85,7 @@ export const OutputConsole: React.FC<OutputConsoleProps> = ({
   };
 
   const handleContainerClick = () => {
-    inputRef.current?.focus();
+    inputReference.current?.focus();
   };
 
   return (
@@ -84,81 +102,102 @@ export const OutputConsole: React.FC<OutputConsoleProps> = ({
         cursor: onExecuteCommand ? 'text' : 'default',
         height: typeof height === 'number' ? `${height}px` : height,
         overflowY: 'auto',
-        padding: `${tokens.spacingNew.xsmall} ${tokens.spacingNew.medium}`,
+        position: 'relative',
       }}
       onClick={handleContainerClick}
-      ref={containerRef}
+      onScroll={handleScroll}
+      ref={containerReference}
     >
       <div
         css={{
           alignItems: 'center',
+          backgroundColor: theme.background.contrast,
+          boxShadow: isScrolled ? tokens.boxShadow.medium : 'none',
           display: 'flex',
           justifyContent: 'space-between',
-          marginBottom: tokens.spacingNew.tiny,
-          minHeight: tokens.sizing.small,
+          minHeight: '36px',
+          padding: `4px ${tokens.spacingNew.medium}`,
+          position: 'sticky',
+          top: 0,
+          transition: 'box-shadow 0.15s ease-in-out',
+          zIndex: tokens.zIndex.sticky,
         }}
       >
         <Chapeau css={{ fontSize: `${tokens.fontSizes.small} !important`, margin: 0 }}>
           Output
         </Chapeau>
+        {showAi && hasErrorEntry && onFixAndExplain && (
+          <Button
+            disabled={isExecuting}
+            iconLeft={<Sparkles size="small" />}
+            isLoading={isFixingAndExplaining}
+            onClick={onFixAndExplain}
+            size="small"
+            variant="plain"
+          >
+            Fix & Explain
+          </Button>
+        )}
       </div>
 
-      {entries.length === 0 && !onExecuteCommand && (
-        <div css={{ color: theme.text.inverseSubtle, fontStyle: 'italic' }}>
-          Console output will appear here.
-        </div>
-      )}
+      <div css={{ padding: `0 ${tokens.spacingNew.medium} ${tokens.spacingNew.xsmall} ${tokens.spacingNew.medium}` }}>
+        {entries.length === 0 && !onExecuteCommand && (
+          <div css={{ color: theme.text.inverseSubtle, fontStyle: 'italic' }}>
+            Console output will appear here.
+          </div>
+        )}
 
-      {entries.map((entry, idx) => (
-        <div
-          key={idx}
-          css={{
-            color:
-              entry.type === 'error'
-                ? theme.error.text
-                : entry.type === 'input'
-                ? theme.blue.text
-                : theme.text.main,
-            fontFamily: tokens.fontFamilies.mono,
-            fontSize: tokens.fontSizes.medium,
-            lineHeight: tokens.lineHeights.tight,
-            marginBottom: tokens.spacingNew.tiny,
-            whiteSpace: 'pre-wrap',
-            wordBreak: 'break-word',
-          }}
-        >
-          {entry.type === 'input' ? `${prompt}${entry.text}` : entry.text}
-        </div>
-      ))}
-
-      {onExecuteCommand && (
-        <div css={{ alignItems: 'center', display: 'flex', marginTop: tokens.spacingNew.tiny }}>
-          <span css={{ color: theme.blue.text, marginRight: tokens.spacingNew.xsmall, userSelect: 'none' }}>
-            {prompt}
-          </span>
-          <input
-            aria-label="Console command input"
+        {entries.map((entry, entryIndex) => (
+          <div
+            key={entryIndex}
             css={{
-              backgroundColor: 'transparent',
-              border: 'none',
-              color: theme.text.main,
-              flex: 1,
+              color:
+                entry.type === 'error'
+                  ? theme.error.text
+                  : entry.type === 'input'
+                  ? theme.blue.text
+                  : theme.text.main,
               fontFamily: tokens.fontFamilies.mono,
               fontSize: tokens.fontSizes.medium,
-              outline: 'none',
-              padding: 0,
-              margin: 0,
+              lineHeight: tokens.lineHeights.tight,
+              marginBottom: tokens.spacingNew.tiny,
+              whiteSpace: 'pre-wrap',
+              wordBreak: 'break-word',
             }}
-            disabled={isExecuting}
-            onChange={(e) => setCurrentInput(e.target.value)}
-            onKeyDown={handleKeyDown}
-            placeholder={isExecuting ? 'Executing…' : ''}
-            ref={inputRef}
-            type="text"
-            value={currentInput}
-          />
-        </div>
-      )}
+          >
+            {entry.type === 'input' ? `${prompt}${entry.text}` : entry.text}
+          </div>
+        ))}
+
+        {onExecuteCommand && (
+          <div css={{ alignItems: 'center', display: 'flex', marginTop: tokens.spacingNew.tiny }}>
+            <span css={{ color: theme.blue.text, marginRight: tokens.spacingNew.xsmall, userSelect: 'none' }}>
+              {prompt}
+            </span>
+            <input
+              aria-label="Console command input"
+              css={{
+                backgroundColor: 'transparent',
+                border: 'none',
+                color: theme.text.main,
+                flex: 1,
+                fontFamily: tokens.fontFamilies.mono,
+                fontSize: tokens.fontSizes.medium,
+                outline: 'none',
+                padding: 0,
+                margin: 0,
+              }}
+              disabled={isExecuting}
+              onChange={(event) => setCurrentInput(event.target.value)}
+              onKeyDown={handleKeyDown}
+              placeholder={isExecuting ? 'Executing…' : ''}
+              ref={inputReference}
+              type="text"
+              value={currentInput}
+            />
+          </div>
+        )}
+      </div>
     </div>
   );
 };
