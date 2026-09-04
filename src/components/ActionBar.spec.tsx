@@ -91,4 +91,42 @@ describe('ActionBar', () => {
     expect(statusBadge).toBeInTheDocument();
     expect(statusBadge).toHaveAttribute('title', 'Session: Ready');
   });
+
+  it('keeps Hint, Solution, and Explain Code enabled even when code execution is busy', () => {
+    const handleToggleHint = vi.fn();
+    const handleToggleSolution = vi.fn();
+    const handleExplain = vi.fn();
+
+    renderWithShell(
+      <ActionBar
+        hasHint={true}
+        hasSct={true}
+        hasSolution={true}
+        isExecuting={true}
+        executingAction="run"
+        onExplainCode={handleExplain}
+        onReset={vi.fn()}
+        onSubmit={vi.fn()}
+        onToggleHint={handleToggleHint}
+        onToggleSolution={handleToggleSolution}
+        showAi={true}
+        status={{ status: 'busy' }}
+      />,
+    );
+
+    const hintButton = screen.getByRole('button', { name: /hint/i });
+    expect(hintButton).not.toBeDisabled();
+    fireEvent.click(hintButton);
+    expect(handleToggleHint).toHaveBeenCalledTimes(1);
+
+    const solutionButton = screen.getByRole('button', { name: /solution/i });
+    expect(solutionButton).not.toBeDisabled();
+    fireEvent.click(solutionButton);
+    expect(handleToggleSolution).toHaveBeenCalledTimes(1);
+
+    const explainButton = screen.getByRole('button', { name: /explain/i });
+    expect(explainButton).not.toBeDisabled();
+    fireEvent.click(explainButton);
+    expect(handleExplain).toHaveBeenCalledTimes(1);
+  });
 });

@@ -48,7 +48,8 @@ export const ActionBar: React.FC<ActionBarProps> = ({
   borderTop = true,
   resetAriaLabel = 'Reset exercise',
 }) => {
-  const disabled = isExecuting || status.status === 'busy' || status.status === 'starting';
+  const executionDisabled =
+    isExecuting || status.status === 'busy' || status.status === 'starting';
 
   const statusLabel =
     status.status === 'ready'
@@ -118,7 +119,7 @@ export const ActionBar: React.FC<ActionBarProps> = ({
     >
       {showRunButton && onRun && (
         <Button
-          disabled={disabled}
+          disabled={executionDisabled}
           isLoading={isExecuting && executingAction === 'run'}
           onClick={onRun}
           size="small"
@@ -129,7 +130,7 @@ export const ActionBar: React.FC<ActionBarProps> = ({
       )}
       {hasSct && (
         <Button
-          disabled={disabled}
+          disabled={executionDisabled}
           isLoading={isExecuting && executingAction === 'submit'}
           onClick={onSubmit}
           size="small"
@@ -140,7 +141,6 @@ export const ActionBar: React.FC<ActionBarProps> = ({
       )}
       {hasHint && onToggleHint && (
         <Button
-          disabled={disabled}
           onClick={onToggleHint}
           size="small"
           variant="plain"
@@ -150,7 +150,6 @@ export const ActionBar: React.FC<ActionBarProps> = ({
       )}
       {hasSolution && onToggleSolution && (
         <Button
-          disabled={disabled}
           onClick={onToggleSolution}
           size="small"
           variant="plain"
@@ -160,7 +159,7 @@ export const ActionBar: React.FC<ActionBarProps> = ({
       )}
       {showAi && onExplainCode && (
         <Button
-          disabled={disabled}
+          disabled={isExplainingCode}
           iconLeft={<Sparkles size="small" />}
           isLoading={isExplainingCode}
           onClick={onExplainCode}
