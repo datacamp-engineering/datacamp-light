@@ -7,20 +7,17 @@ const STORAGE_KEY = 'datacamp-light-theme-override';
 let userOverrideTheme: ThemeMode | null = null;
 const subscribers = new Set<() => void>();
 
-function initializeThemeFromStorage(): void {
+function cleanupLegacyLocalStorage(): void {
   try {
     if (typeof window !== 'undefined' && window.localStorage) {
-      const storedTheme = window.localStorage.getItem(STORAGE_KEY);
-      if (storedTheme === 'light' || storedTheme === 'dark') {
-        userOverrideTheme = storedTheme;
-      }
+      window.localStorage.removeItem(STORAGE_KEY);
     }
   } catch {
-    // Ignore localStorage access failures (e.g. sandboxed iframes)
+    // Ignore storage errors in sandboxed iframes
   }
 }
 
-initializeThemeFromStorage();
+cleanupLegacyLocalStorage();
 
 export function getSystemTheme(): ThemeMode {
   if (typeof window !== 'undefined' && typeof window.matchMedia === 'function') {
@@ -55,13 +52,6 @@ function notifySubscribers(): void {
 
 export function setGlobalThemeOverride(newTheme: ThemeMode): void {
   userOverrideTheme = newTheme;
-  try {
-    if (typeof window !== 'undefined' && window.localStorage) {
-      window.localStorage.setItem(STORAGE_KEY, newTheme);
-    }
-  } catch {
-    // Ignore storage errors
-  }
   notifySubscribers();
   if (typeof window !== 'undefined' && typeof window.dispatchEvent === 'function') {
     window.dispatchEvent(
@@ -72,13 +62,6 @@ export function setGlobalThemeOverride(newTheme: ThemeMode): void {
 
 export function clearGlobalThemeOverride(): void {
   userOverrideTheme = null;
-  try {
-    if (typeof window !== 'undefined' && window.localStorage) {
-      window.localStorage.removeItem(STORAGE_KEY);
-    }
-  } catch {
-    // Ignore storage errors
-  }
   notifySubscribers();
 }
 
@@ -107,21 +90,6 @@ export function subscribeToThemeChanges(callback: () => void): () => void {
     }
   }
 
-  const handleStorageEvent = (event: StorageEvent) => {
-    if (event.key === STORAGE_KEY) {
-      if (event.newValue === 'light' || event.newValue === 'dark') {
-        userOverrideTheme = event.newValue;
-      } else if (event.newValue === null) {
-        userOverrideTheme = null;
-      }
-      callback();
-    }
-  };
-
-  if (typeof window !== 'undefined' && typeof window.addEventListener === 'function') {
-    window.addEventListener('storage', handleStorageEvent);
-  }
-
   return () => {
     subscribers.delete(callback);
     if (mediaQueryList) {
@@ -130,9 +98,6 @@ export function subscribeToThemeChanges(callback: () => void): () => void {
       } else if (typeof (mediaQueryList as any).removeListener === 'function') {
         (mediaQueryList as any).removeListener(handleMediaChange);
       }
-    }
-    if (typeof window !== 'undefined' && typeof window.removeEventListener === 'function') {
-      window.removeEventListener('storage', handleStorageEvent);
     }
   };
 }
