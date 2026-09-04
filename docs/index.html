@@ -271,6 +271,65 @@
   <code data-type="sct"></code>
   <div data-type="hint">Click "Run Code" to render the plot with webR.</div>
 </div>`
+        },
+        {
+          id: 'card-light-theme',
+          title: '6. Light Mode Theme with AI Disabled (data-theme="light" data-show-ai="false")',
+          lang: 'python',
+          html: `<div data-datacamp-exercise data-lang="python" data-theme="light" data-show-ai="false">
+  <code data-type="sample-code">
+    # Explicit Light Mode Theme with AI disabled
+    items = ["Python", "R", "Shell"]
+    for index, item in enumerate(items, start=1):
+        print(f"{index}. {item} in WebAssembly")
+  </code>
+  <code data-type="solution">
+    items = ["Python", "R", "Shell"]
+    for index, item in enumerate(items, start=1):
+        print(f"{index}. {item} in WebAssembly")
+  </code>
+  <code data-type="sct">
+    Ex().has_output(r'1\\. Python in WebAssembly')
+  </code>
+</div>`
+        },
+        {
+          id: 'card-ai-assistance',
+          title: '7. AI Code Assistance (Live Explain Code & Fix & Explain Demo)',
+          lang: 'python',
+          html: `<div data-datacamp-exercise data-lang="python" data-mock-ai="true">
+  <code data-type="sample-code">
+    # Click 'Explain Code' (✨) in the action bar to stream an explanation!
+    # Or click 'Run Code' to see an error, then click 'Fix & Explain' in the output console.
+    radius = 5
+    area = 3.14159 * (rad ** 2)
+    print(f"Area: {area}")
+  </code>
+  <code data-type="solution">
+    radius = 5
+    area = 3.14159 * (radius ** 2)
+    print(f"Area: {area}")
+  </code>
+  <code data-type="sct">
+    Ex().check_object('area').has_equal_value()
+  </code>
+  <div data-type="hint">
+    Notice the typo in <code>rad</code> - it should be <code>radius</code>.
+  </div>
+</div>`
+        },
+        {
+          id: 'card-shared-environment',
+          title: '8. Shared Execution Environment (Multi-Step Tutorial)',
+          lang: 'python',
+          html: `<div data-datacamp-exercise data-lang="python" data-shared-environment="stats-tutorial">
+  <code data-type="sample-code">
+    # Step 1: Define dataset in shared environment 'stats-tutorial'
+    import statistics
+    temperatures = [68, 72, 75, 71, 69, 74, 70]
+    print(f"Loaded {len(temperatures)} temperature readings.")
+  </code>
+</div>`
         }
       ];
 
