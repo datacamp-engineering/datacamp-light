@@ -61,74 +61,73 @@ export const ActionBar: React.FC<ActionBarProps> = ({
         display: 'flex',
         flexWrap: 'wrap',
         gap: tokens.spacingNew.xsmall,
-        justifyContent: 'space-between',
         padding: `${tokens.spacingNew.xsmall} ${tokens.spacingNew.medium}`,
       }}
     >
+      {showRunButton && onRun && (
+        <Button
+          disabled={disabled}
+          isLoading={isExecuting && executingAction === 'run'}
+          onClick={onRun}
+          size="small"
+          variant="regular"
+        >
+          Run Code
+        </Button>
+      )}
+      {hasSct && (
+        <Button
+          disabled={disabled}
+          isLoading={isExecuting && executingAction === 'submit'}
+          onClick={onSubmit}
+          size="small"
+          variant="regularOutline"
+        >
+          Submit Answer
+        </Button>
+      )}
+      {hasHint && onToggleHint && (
+        <Button
+          disabled={disabled}
+          onClick={onToggleHint}
+          size="small"
+          variant="plain"
+        >
+          {showingHint ? 'Hide Hint' : 'Show Hint'}
+        </Button>
+      )}
+      {hasSolution && onToggleSolution && (
+        <Button
+          disabled={disabled}
+          onClick={onToggleSolution}
+          size="small"
+          variant="plain"
+        >
+          {showingSolution ? 'Hide Solution' : 'Show Solution'}
+        </Button>
+      )}
+      {showAi && onExplainCode && (
+        <Button
+          disabled={disabled}
+          iconLeft={<Sparkles size="small" />}
+          isLoading={isExplainingCode}
+          onClick={onExplainCode}
+          size="small"
+          variant="plain"
+        >
+          Explain Code
+        </Button>
+      )}
+
       <div
         css={{
+          alignItems: 'center',
           display: 'flex',
-          flexWrap: 'wrap',
+          flexShrink: 0,
           gap: tokens.spacingNew.xsmall,
+          marginLeft: 'auto',
         }}
       >
-        {showRunButton && onRun && (
-          <Button
-            disabled={disabled}
-            isLoading={isExecuting && executingAction === 'run'}
-            onClick={onRun}
-            size="small"
-            variant="regular"
-          >
-            Run Code
-          </Button>
-        )}
-        {hasSct && (
-          <Button
-            disabled={disabled}
-            isLoading={isExecuting && executingAction === 'submit'}
-            onClick={onSubmit}
-            size="small"
-            variant="regularOutline"
-          >
-            Submit Answer
-          </Button>
-        )}
-        {hasHint && onToggleHint && (
-          <Button
-            disabled={disabled}
-            onClick={onToggleHint}
-            size="small"
-            variant="plain"
-          >
-            {showingHint ? 'Hide Hint' : 'Show Hint'}
-          </Button>
-        )}
-        {hasSolution && onToggleSolution && (
-          <Button
-            disabled={disabled}
-            onClick={onToggleSolution}
-            size="small"
-            variant="plain"
-          >
-            {showingSolution ? 'Hide Solution' : 'Show Solution'}
-          </Button>
-        )}
-        {showAi && onExplainCode && (
-          <Button
-            disabled={disabled}
-            iconLeft={<Sparkles size="small" />}
-            isLoading={isExplainingCode}
-            onClick={onExplainCode}
-            size="small"
-            variant="plain"
-          >
-            Explain Code
-          </Button>
-        )}
-      </div>
-
-      <div css={{ alignItems: 'center', display: 'flex', gap: tokens.spacingNew.small }}>
         <span
           css={{
             alignItems: 'center',
@@ -142,7 +141,15 @@ export const ActionBar: React.FC<ActionBarProps> = ({
             fontSize: tokens.fontSizes.xsmall,
             gap: tokens.spacingNew.tiny,
             justifyContent: 'flex-end',
-            minWidth: '65px',
+            minWidth: 'fit-content',
+            '@container (max-width: 480px)': {
+              fontSize: '11px',
+            },
+            '@container (max-width: 360px)': {
+              '& .status-text': {
+                display: 'none',
+              },
+            },
           }}
         >
           {status.status === 'ready' ? (
@@ -150,15 +157,17 @@ export const ActionBar: React.FC<ActionBarProps> = ({
           ) : status.status === 'broken' ? (
             <Cross size="small" />
           ) : null}
-          {status.status === 'ready'
-            ? 'Ready'
-            : status.status === 'busy'
-            ? 'Busy'
-            : status.status === 'starting'
-            ? 'Starting'
-            : status.status === 'broken'
-            ? 'Error'
-            : 'Idle'}
+          <span className="status-text">
+            {status.status === 'ready'
+              ? 'Ready'
+              : status.status === 'busy'
+              ? 'Busy'
+              : status.status === 'starting'
+              ? 'Starting'
+              : status.status === 'broken'
+              ? 'Error'
+              : 'Idle'}
+          </span>
         </span>
         <Button
           aria-label={resetAriaLabel}
@@ -166,6 +175,16 @@ export const ActionBar: React.FC<ActionBarProps> = ({
           onClick={onReset}
           size="small"
           variant="plain"
+          css={{
+            minWidth: 'auto',
+            paddingLeft: `${tokens.spacingNew.xsmall} !important`,
+            paddingRight: `${tokens.spacingNew.xsmall} !important`,
+            '@container (max-width: 420px)': {
+              fontSize: tokens.fontSizes.small,
+              paddingLeft: '6px !important',
+              paddingRight: '6px !important',
+            },
+          }}
         >
           Reset
         </Button>

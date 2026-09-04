@@ -36,6 +36,7 @@ export const DCLWidgetShell: React.FC<DCLWidgetShellProps> = ({
             border: `${tokens.borderWidth.thin} solid ${theme.border.main}`,
             borderRadius: tokens.borderRadius.medium,
             color: theme.text.main,
+            containerType: 'inline-size',
             fontFamily: tokens.fontFamilies.sansSerif,
             fontSize: tokens.fontSizes.medium,
             lineHeight: tokens.lineHeights.relaxed,
