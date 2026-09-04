@@ -1,11 +1,32 @@
+import dclIpythonSource from './python/dcl_ipython.py?raw';
+import dclPackageManagerSource from './python/dcl_package_manager.py?raw';
+import dclShellBridgeSource from './python/dcl_shell_bridge.py?raw';
+import dclShellwhatParserSource from './python/dcl_shellwhat_parser.py?raw';
+import {
+  createBusyboxRunner,
+  createEmscriptenVfs,
+  createMemoryVfs,
+  createShellInterpreter,
+} from './shellInterpreter';
 import { SHELLWHAT_PY_SOURCES } from './shellwhatSources';
 
 export const PYODIDE_WORKER_SCRIPT = `
+${createMemoryVfs.toString()}
+${createEmscriptenVfs.toString()}
+${createBusyboxRunner.toString()}
+${createShellInterpreter.toString()}
+
 let pyodide = null;
 let pyodideReadyPromise = null;
 let exercise = null;
+let activeShell = null;
 const loadedPackages = new Set();
 const SHELLWHAT_SOURCES = ${JSON.stringify(SHELLWHAT_PY_SOURCES)};
+
+const DCL_PACKAGE_MANAGER_SOURCE = ${JSON.stringify(dclPackageManagerSource)};
+const DCL_SHELLWHAT_PARSER_SOURCE = ${JSON.stringify(dclShellwhatParserSource)};
+const DCL_SHELL_BRIDGE_SOURCE = ${JSON.stringify(dclShellBridgeSource)};
+const DCL_IPYTHON_SOURCE = ${JSON.stringify(dclIpythonSource)};
 
 const PYODIDE_INDEX_URL = (typeof self !== "undefined" && self.DCL_PYODIDE_URL)
   ? self.DCL_PYODIDE_URL
@@ -13,7 +34,7 @@ const PYODIDE_INDEX_URL = (typeof self !== "undefined" && self.DCL_PYODIDE_URL)
 
 // Pure-Python packages already prebuilt in Pyodide's own package registry -
 // fast to load via pyodide.loadPackage(), no network round-trip to PyPI.
-const PYTHONWHAT_BUILTIN_DEPS = [
+const PYTHONWHAT_BUILTIN_DEPENDENCIES = [
   "jinja2",
   "markupsafe",
   "asttokens",
@@ -26,12 +47,7 @@ const PYTHONWHAT_BUILTIN_DEPS = [
 // Packages NOT bundled with Pyodide. Only the top-level package is listed
 // here - micropip resolves the full transitive dependency graph itself
 // (protowhat, dill, markdown2, jinja2, asttokens) from PyPI's metadata.
-// Do NOT hand-list transitive deps here: some of them are pinned exactly
-// by protowhat (e.g. markdown2==2.5.3), and separately requesting an
-// unpinned "markdown2" first causes micropip to grab the newest release
-// and then fail with a version conflict once protowhat's exact pin is
-// resolved. Let the resolver own the whole graph from one entry point.
-const PYTHONWHAT_MICROPIP_DEPS = ["pyodide_backend", "bashlex"];
+const PYTHONWHAT_MICROPIP_DEPENDENCIES = ["pyodide_backend", "bashlex"];
 
 async function initPyodide() {
   if (pyodideReadyPromise) {
@@ -39,77 +55,27 @@ async function initPyodide() {
   }
 
   pyodideReadyPromise = (async () => {
-    importScripts(PYODIDE_INDEX_URL + "pyodide.js");
-    pyodide = await loadPyodide({
+    if (typeof importScripts === "function") {
+      try {
+        importScripts(PYODIDE_INDEX_URL + "pyodide.js");
+      } catch (e) {}
+    }
+    const loadPyodideFunction = typeof globalThis.loadPyodide === "function" ? globalThis.loadPyodide : (typeof loadPyodide === "function" ? loadPyodide : null);
+    if (!loadPyodideFunction) {
+      throw new Error("Pyodide loader not available");
+    }
+    pyodide = await loadPyodideFunction({
       indexURL: PYODIDE_INDEX_URL,
       packages: ["micropip"]
     });
 
     // Install dcl_package_manager shim for legacy DataCamp Light v3 embeds
-    // that inject "from dcl_package_manager import install_packages, ..."
-    // into pre-exercise-code via getPackages(). Actual package loading
-    // happens on the JS side (loadExplicitPackages/loadPackagesForCode)
-    // before this Python code runs, so these are safe no-ops.
-    await pyodide.runPythonAsync(\`
-import sys
-import types
+    await pyodide.runPythonAsync(DCL_PACKAGE_MANAGER_SOURCE);
 
-dcl_pm = types.ModuleType("dcl_package_manager")
-
-def install_packages(packages):
-    pass
-
-def print_packages():
-    pass
-
-def get_packages(registry=None):
-    return []
-
-def get_registry():
-    return {"packages": {}}
-
-dcl_pm.install_packages = install_packages
-dcl_pm.print_packages = print_packages
-dcl_pm.get_packages = get_packages
-dcl_pm.get_registry = get_registry
-sys.modules["dcl_package_manager"] = dcl_pm
-\`);
-
-    await pyodide.loadPackage(PYTHONWHAT_BUILTIN_DEPS);
+    await pyodide.loadPackage(PYTHONWHAT_BUILTIN_DEPENDENCIES);
 
     const micropip = pyodide.pyimport("micropip");
-    await micropip.install(PYTHONWHAT_MICROPIP_DEPS);
-
-    await pyodide.runPythonAsync(\`
-import json
-import types
-import collections
-import collections.abc
-for attr in ["Mapping", "MutableMapping", "Sequence", "Iterable", "Callable"]:
-    if not hasattr(collections, attr):
-        setattr(collections, attr, getattr(collections.abc, attr))
-
-import markupsafe
-if not hasattr(markupsafe, "soft_unicode"):
-    markupsafe.soft_unicode = markupsafe.soft_str
-
-# Provide antlr_ast.ast.Speaker shim in sys.modules so shellwhat/parsers.py imports cleanly
-antlr_ast = types.ModuleType("antlr_ast")
-antlr_ast_ast = types.ModuleType("antlr_ast.ast")
-
-class Speaker:
-    def __init__(self, nodes=None):
-        self.nodes = nodes or {}
-    def describe(self, node, fmt=None, field=None, **kwargs):
-        if fmt:
-            return fmt
-        return getattr(node, "name", type(node).__name__)
-
-antlr_ast_ast.Speaker = Speaker
-antlr_ast.ast = antlr_ast_ast
-sys.modules["antlr_ast"] = antlr_ast
-sys.modules["antlr_ast.ast"] = antlr_ast_ast
-\`);
+    await micropip.install(PYTHONWHAT_MICROPIP_DEPENDENCIES);
 
     // Mount real shellwhat package sources into Pyodide virtual filesystem
     try { pyodide.FS.mkdirTree("/lib/python3.12/site-packages/shellwhat/checks"); } catch (e) {}
@@ -117,120 +83,78 @@ sys.modules["antlr_ast.ast"] = antlr_ast_ast
       pyodide.FS.writeFile("/lib/python3.12/site-packages/shellwhat/" + filePath, content);
     }
 
-    await pyodide.runPythonAsync(\`
-import bashlex
-import shellwhat
-import shellwhat.parsers
-import shellwhat.State
-import shellwhat.test_exercise
-from protowhat.utils_ast import AstNode, AstModule
+    try { pyodide.FS.mkdir("/home"); } catch (e) {}
+    try { pyodide.FS.mkdir("/home/pyodide"); } catch (e) {}
+    try { pyodide.FS.mkdir("/tmp"); } catch (e) {}
+    try { pyodide.FS.chdir("/home/pyodide"); } catch (e) {}
 
-class BashNode(AstNode):
-    position = ((1, 0), (1, 0))
-    text = ""
-    _fields = ("child", "words", "parts", "children", "token")
-    @property
-    def name(self):
-        return type(self).__name__
-    def get_text(self, full_text=None):
-        return getattr(self, "text", "") or getattr(self, "val", "")
-    def get_position(self):
-        return getattr(self, "position", ((1, 0), (1, 0)))
+    const wasmVirtualFileSystem = createEmscriptenVfs(pyodide);
+    activeShell = createShellInterpreter({ vfs: wasmVirtualFileSystem });
 
-class BashParser(AstModule):
-    AstNode = BashNode
-    speaker = Speaker(nodes={})
+    (async () => {
+      try {
+        if (typeof importScripts === "function") {
+          const resolveAssetUrl = (file) => {
+            if (typeof self !== "undefined" && self.DCL_ASSET_BASE_URL) {
+              return String(self.DCL_ASSET_BASE_URL).replace(/\\/+$/, "") + "/" + file;
+            }
+            const origin = (typeof location !== "undefined" && location.origin) ? location.origin : "";
+            return (origin ? origin + "/" : "/") + file;
+          };
+          const scriptUrl = resolveAssetUrl("busybox.js");
+          try {
+            importScripts(scriptUrl);
+          } catch (e) {}
 
-    @classmethod
-    def load(cls, node):
-        obj = super().load(node)
-        if isinstance(obj, cls.AstNode):
-            obj.text = node.get("text", "")
-            obj.position = node.get("position", ((1, 0), (1, 0)))
-        return obj
+          if (typeof globalThis.EmscrJSR_busybox === "function") {
+            let stdoutBuffer = "";
+            let stderrBuffer = "";
 
-    @classmethod
-    def parse(cls, code, strict=True):
-        if not code or not code.strip():
-            return cls.load({"type": "Sentence", "data": {"child": None}})
-        try:
-            nodes = bashlex.parse(code)
-        except Exception as e:
-            raise cls.ParseError(str(e))
+            const mod = await globalThis.EmscrJSR_busybox({
+              locateFile: (p) => resolveAssetUrl(p),
+              thisProgram: "busybox",
+              noInitialRun: true,
+              noExitRuntime: true,
+              print: (text) => {
+                stdoutBuffer += (stdoutBuffer ? "\\n" : "") + text;
+              },
+              printErr: (text) => {
+                stderrBuffer += (stderrBuffer ? "\\n" : "") + text;
+              },
+            });
 
-        def convert_node(n):
-            kind = getattr(n, "kind", None)
-            pos = getattr(n, "pos", (0, 0))
-            if kind == "command":
-                words = [convert_node(p) for p in getattr(n, "parts", []) if p.kind == "word"]
-                return {"type": "SimpleCommand", "text": code[pos[0]:pos[1]], "position": pos, "data": {"words": words}}
-            elif kind == "word":
-                parts = []
-                for sp in getattr(n, "parts", []):
-                    if sp.kind == "parameter":
-                        raw = code[sp.pos[0]:sp.pos[1]]
-                        is_braced = raw.startswith("\\\${")
-                        parts.append({
-                            "type": "BracedVarSub" if is_braced else "SimpleVarSub",
-                            "text": raw,
-                            "position": sp.pos,
-                            "data": {"token": {"type": "Token", "data": {"val": "$" + sp.value if not is_braced else sp.value}}}
-                        })
-                if not parts:
-                    parts.append({"type": "Literal", "text": n.word, "position": pos, "data": {"token": {"type": "Token", "data": {"val": n.word}}}})
-                return {"type": "CompoundWord", "text": n.word, "position": pos, "data": {"parts": parts}}
-            elif kind == "pipeline":
-                children = [convert_node(p) for p in getattr(n, "parts", []) if p.kind != "pipe"]
-                return {"type": "Pipeline", "text": code[pos[0]:pos[1]], "position": pos, "data": {"children": children}}
-            elif kind == "list":
-                children = [convert_node(p) for p in getattr(n, "parts", []) if p.kind != "operator"]
-                return {"type": "CommandList", "text": code[pos[0]:pos[1]], "position": pos, "data": {"children": children}}
-            return {"type": "Literal", "text": str(n), "position": pos, "data": {"token": {"type": "Token", "data": {"val": str(n)}}}}
+            mod.__resetBuffers = () => {
+              stdoutBuffer = "";
+              stderrBuffer = "";
+            };
+            mod.__getStdout = () => stdoutBuffer;
+            mod.__getStderr = () => stderrBuffer;
 
-        converted = [convert_node(n) for n in nodes]
-        child = converted[0] if len(converted) == 1 else {"type": "CommandList", "text": code, "position": (0, len(code)), "data": {"children": converted}}
-        return cls.load({"type": "Sentence", "text": code, "position": (0, len(code)), "data": {"child": child}})
+            const wasmRunner = createBusyboxRunner(mod, wasmVirtualFileSystem);
+            activeShell = createShellInterpreter({
+              vfs: wasmVirtualFileSystem,
+              wasmRunner,
+              preferWasmOverBuiltins: true,
+            });
+          }
+        }
+      } catch (e) {}
+    })();
 
-# Plug in the external BashParser on pristine shellwhat
-shellwhat.State.DEFAULT_PARSER = BashParser
+    globalThis.dcl_execute_shell = (commandString) => {
+      if (!activeShell) return JSON.stringify({ output: "", error: "Shell not initialized", exitCode: 1 });
+      const commandResult = activeShell.runCommand(commandString || "");
+      return JSON.stringify(commandResult);
+    };
 
-class PyodideShellConnection:
-    def __init__(self, execute_fn=None):
-        self.execute_fn = execute_fn
-    def run_command(self, cmd):
-        if not self.execute_fn:
-            return ""
-        try:
-            res = self.execute_fn(cmd)
-            return getattr(res, "output", "") or ""
-        except Exception:
-            return ""
+    // Load ShellWhat parser and shims
+    await pyodide.runPythonAsync(DCL_SHELLWHAT_PARSER_SOURCE);
 
-def evaluate_shellwhat(sct, student_code, student_result, pec="", solution=""):
-    conn = PyodideShellConnection()
-    try:
-        result = shellwhat.test_exercise.test_exercise(
-            sct=sct,
-            student_code=student_code or "",
-            student_result=student_result or "",
-            student_conn=conn,
-            solution_code=solution or "",
-            solution_result="",
-            solution_conn=conn,
-            pre_exercise_code=pec or "",
-            ex_type="ShellExercise",
-            error=[],
-        )
-        return json.dumps({
-            "correct": bool(result.get("correct", False)),
-            "message": result.get("message", "Submission evaluated.")
-        })
-    except Exception as err:
-        return json.dumps({
-            "correct": False,
-            "message": str(err)
-        })
-\`);
+    // Load POSIX Shell bridge hooking os.system and subprocess
+    await pyodide.runPythonAsync(DCL_SHELL_BRIDGE_SOURCE);
+
+    // Load IPython transformer and magics
+    await pyodide.runPythonAsync(DCL_IPYTHON_SOURCE);
 
     return pyodide;
   })();
@@ -238,20 +162,34 @@ def evaluate_shellwhat(sct, student_code, student_result, pec="", solution=""):
   return pyodideReadyPromise;
 }
 
+function transformCode(code) {
+  if (!pyodide || !code) return code || "";
+  try {
+    const transformPythonFunction = pyodide.globals.get("dcl_transform_ipython");
+    if (transformPythonFunction) {
+      return transformPythonFunction(code);
+    }
+  } catch (error) {
+    console.warn("IPython transform warning:", error);
+  }
+  return code || "";
+}
+
 async function loadPackagesForCode(code) {
   if (!pyodide || !code) return;
   try {
-    await pyodide.loadPackagesFromImports(code);
-  } catch (err) {
-    console.warn("Could not auto-load packages from imports:", err);
+    const transformed = transformCode(code);
+    await pyodide.loadPackagesFromImports(transformed);
+  } catch (error) {
+    console.warn("Could not auto-load packages from imports:", error);
   }
 }
 
 async function loadExplicitPackages(packages) {
   if (!pyodide || !packages || packages.length === 0) return;
   const packagesToLoad = [];
-  for (const pkg of packages) {
-    const normalizedPackageName = pkg.split("==")[0].trim();
+  for (const packageName of packages) {
+    const normalizedPackageName = packageName.split("==")[0].trim();
     if (normalizedPackageName && !loadedPackages.has(normalizedPackageName)) {
       packagesToLoad.push(normalizedPackageName);
       loadedPackages.add(normalizedPackageName);
@@ -260,12 +198,12 @@ async function loadExplicitPackages(packages) {
   if (packagesToLoad.length > 0) {
     try {
       await pyodide.loadPackage(packagesToLoad);
-    } catch (err) {
-      console.warn("Falling back to micropip for packages:", packagesToLoad, err);
+    } catch (error) {
+      console.warn("Falling back to micropip for packages:", packagesToLoad, error);
       try {
         const micropip = pyodide.pyimport("micropip");
-        for (const pkg of packagesToLoad) {
-          await micropip.install(pkg);
+        for (const packageName of packagesToLoad) {
+          await micropip.install(packageName);
         }
       } catch (micropipError) {
         console.error("Failed to install package via micropip:", micropipError);
@@ -274,19 +212,11 @@ async function loadExplicitPackages(packages) {
   }
 }
 
-// pyodide_backend's WasmProcess unconditionally runs
-// "matplotlib.use('module://pyodide_backend.matplotlib_custom_backend')" on
-// every process creation. That call is caught and swallowed internally if
-// matplotlib isn't installed (InteractiveShell.run_cell never raises), so
-// it's safe to only load matplotlib when the student's code actually
-// references it - detected the same way as any other on-demand package.
-
 function graphPayloadToDataUrl(base64Svg) {
   return "data:image/svg+xml;base64," + base64Svg;
 }
 
-// Maps pyodide_backend's raw output entries (see exercise.py/task.py) into
-// this worker's session_output notification shape.
+// Maps pyodide_backend's raw output entries into session_output notification shape.
 function emitOutputEntries(entries) {
   const outputs = [];
   const errors = [];
@@ -316,7 +246,6 @@ function emitOutputEntries(entries) {
         params: { type: "output", payload: String(entry.payload) },
       });
     } else if (entry.type === "script-output") {
-      // run_submit() maps plain "output" entries into this shape.
       const text = entry.payload && entry.payload.output;
       if (text) {
         outputs.push(text);
@@ -369,17 +298,21 @@ self.onmessage = async function (e) {
     }
 
     if (method === "runCode") {
-      const { code, height, width } = params || {};
-      await loadPackagesForCode(code);
+      const { code, height, width, stdin } = params || {};
+      const transformedCode = transformCode(code);
+      await loadPackagesForCode(transformedCode);
+
+      try {
+        const setStandardInputPythonFunction = pyodide.globals.get("_dcl_set_stdin");
+        if (setStandardInputPythonFunction) setStandardInputPythonFunction(stdin || null);
+      } catch (e) {}
 
       if (!exercise) {
-        // No pre-exercise-code/solution/sct configured; still allow ad-hoc
-        // execution via a bare exercise instance.
         const PyodideExercise = pyodide.pyimport("pyodide_backend").PyodideExercise;
         exercise = PyodideExercise("", "", "");
       }
 
-      const resultJson = exercise.run_code(code || "", height || 320, width || 320);
+      const resultJson = exercise.run_code(transformedCode || "", height || 320, width || 320);
       const entries = JSON.parse(resultJson);
       const aggregated = emitOutputEntries(entries);
 
@@ -392,8 +325,14 @@ self.onmessage = async function (e) {
     }
 
     if (method === "submitCode") {
-      const { code, height, width } = params || {};
-      await loadPackagesForCode(code);
+      const { code, height, width, stdin } = params || {};
+      const transformedCode = transformCode(code);
+      await loadPackagesForCode(transformedCode);
+
+      try {
+        const setStandardInputPythonFunction = pyodide.globals.get("_dcl_set_stdin");
+        if (setStandardInputPythonFunction) setStandardInputPythonFunction(stdin || null);
+      } catch (e) {}
 
       if (!exercise) {
         self.postMessage({
@@ -406,7 +345,7 @@ self.onmessage = async function (e) {
 
       let resultJson;
       try {
-        resultJson = exercise.run_submit(code || "", height || 320, width || 320);
+        resultJson = exercise.run_submit(transformedCode || "", height || 320, width || 320);
       } catch (submitError) {
         console.error("[DataCamp Light SCT Exception]", submitError);
         const rawErrorString = String(submitError && submitError.message ? submitError.message : submitError);
@@ -447,7 +386,6 @@ self.onmessage = async function (e) {
 
       const entries = JSON.parse(resultJson);
 
-      // The SCT result is the last entry; everything before it is output.
       const sctEntry = entries.find((entry) => entry.type === "sct");
       const outputEntries = entries.filter((entry) => entry.type !== "sct");
       const aggregated = emitOutputEntries(outputEntries);
@@ -497,17 +435,16 @@ self.onmessage = async function (e) {
       return;
     }
 
-    // Method not found
     self.postMessage({
       jsonrpc: "2.0",
       id,
       error: { code: -32601, message: "Method not found: " + method }
     });
-  } catch (err) {
+  } catch (error) {
     self.postMessage({
       jsonrpc: "2.0",
       id,
-      error: { code: -32603, message: (err && err.message) || String(err) }
+      error: { code: -32603, message: (error && error.message) || String(error) }
     });
   }
 };
