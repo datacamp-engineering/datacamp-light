@@ -2,21 +2,7 @@ import { describe, expect, it } from 'vitest';
 import type { JsonRpcMessage } from '../jsonrpc/types';
 import { SHELL_WORKER_SCRIPT } from './shellWorkerSource';
 
-/**
- * Regression tests for the shell worker's JSON-RPC contract.
- *
- * These execute the exact worker body that ships to browsers (SHELL_WORKER_SCRIPT,
- * which embeds the unit-tested interpreter via .toString()) inside a lightweight
- * `self` shim, so the tested message handling is byte-identical to production -
- * no Worker global is required.
- *
- * The regression under test: `ls`/`cd` were invisible because their results are
- * (correctly) empty strings, which every layer from runScript to the terminal
- * rendered as "nothing happened". runCommand must execute exactly one line
- * while reporting the session cwd, so silent success is visible and shared
- * shell state persists across keystrokes.
- */
-function createWorkerHarness() {
+function createWorkerHarness(options?: { mockWasmModule?: any }) {
   const outbound: JsonRpcMessage[] = [];
   const shim: {
     postMessage: (message: JsonRpcMessage) => void;
@@ -27,6 +13,10 @@ function createWorkerHarness() {
     },
     onmessage: null,
   };
+
+  if (options?.mockWasmModule) {
+    (globalThis as any).EmscrJSR_busybox = options.mockWasmModule;
+  }
 
   const workerFactory = new Function('self', SHELL_WORKER_SCRIPT) as (
     self: unknown,

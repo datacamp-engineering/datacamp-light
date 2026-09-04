@@ -162,6 +162,9 @@ describe('createEmscriptenVfs and createBusyboxRunner', () => {
       '/tmp': { type: 'dir', content: '' },
     };
 
+    let stdoutBuffer = '';
+    let stderrBuffer = '';
+
     return {
       FS: {
         cwd: () => cwd,
@@ -192,11 +195,15 @@ describe('createEmscriptenVfs and createBusyboxRunner', () => {
             .filter(Boolean);
         },
       },
-      print: (_t: string) => {},
-      printErr: (_t: string) => {},
+      __resetBuffers: () => {
+        stdoutBuffer = '';
+        stderrBuffer = '';
+      },
+      __getStdout: () => stdoutBuffer,
+      __getStderr: () => stderrBuffer,
       callMain: (args: string[]) => {
-        if (args[0] === 'busybox_grep') {
-          // Mock applet execution
+        if (args[0] === 'ls') {
+          stdoutBuffer = 'my_folder  test.txt';
         }
       },
     };
@@ -216,5 +223,6 @@ describe('createEmscriptenVfs and createBusyboxRunner', () => {
     shell.runCommand('touch test.txt');
     expect(vfs.exists('/home/repl/test.txt')).toBe(true);
     expect(shell.getCwd()).toBe('/home/repl');
+    expect(shell.runCommand('ls').output).toBe('my_folder  test.txt');
   });
 });

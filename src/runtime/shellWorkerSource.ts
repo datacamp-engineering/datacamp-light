@@ -52,12 +52,28 @@ async function getWasmModule() {
         }
 
         if (typeof globalThis.EmscrJSR_busybox === "function") {
+          let stdoutBuffer = "";
+          let stderrBuffer = "";
+
           const mod = await globalThis.EmscrJSR_busybox({
             locateFile: (p) => resolveAssetUrl(p),
             thisProgram: "busybox",
             noInitialRun: true,
             noExitRuntime: true,
+            print: (text) => {
+              stdoutBuffer += (stdoutBuffer ? "\\n" : "") + text;
+            },
+            printErr: (text) => {
+              stderrBuffer += (stderrBuffer ? "\\n" : "") + text;
+            },
           });
+
+          mod.__resetBuffers = () => {
+            stdoutBuffer = "";
+            stderrBuffer = "";
+          };
+          mod.__getStdout = () => stdoutBuffer;
+          mod.__getStderr = () => stderrBuffer;
 
           try { mod.FS.mkdir("/home"); } catch (e) {}
           try { mod.FS.mkdir("/home/repl"); } catch (e) {}

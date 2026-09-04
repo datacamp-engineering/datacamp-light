@@ -64,13 +64,13 @@ export function createMemoryVfs(): IShellVfs {
         cwd = target;
         return;
       }
-      throw new Error(`no such file or directory: ${path}`);
+      throw new Error('no such file or directory: ' + path);
     },
     readFile: (path: string) => {
       const target = resolvePath(path);
       const entry = files[target];
       if (!entry || entry.type !== 'file') {
-        throw new Error(`${path}: No such file or directory`);
+        throw new Error(path + ': No such file or directory');
       }
       return entry.content || '';
     },
@@ -85,14 +85,14 @@ export function createMemoryVfs(): IShellVfs {
     rmdir: (path: string) => {
       const target = resolvePath(path);
       if (!files[target] || files[target].type !== 'dir') {
-        throw new Error(`${path}: No such file or directory`);
+        throw new Error(path + ': No such file or directory');
       }
       delete files[target];
     },
     unlink: (path: string) => {
       const target = resolvePath(path);
       if (!files[target]) {
-        throw new Error(`${path}: No such file or directory`);
+        throw new Error(path + ': No such file or directory');
       }
       delete files[target];
     },
@@ -197,25 +197,18 @@ export function createEmscriptenVfs(mod: any): IShellVfs {
 export function createBusyboxRunner(mod: any, vfs: IShellVfs): WasmAppletRunner {
   let pipeCounter = 0;
   return (applet: string, args: string[], input?: string) => {
-    let outputBuffer = '';
-    let errorBuffer = '';
-    const originalPrint = mod.print;
-    const originalPrintErr = mod.printErr;
-    mod.print = (text: string) => {
-      outputBuffer += (outputBuffer ? '\n' : '') + text;
-    };
-    mod.printErr = (text: string) => {
-      errorBuffer += (errorBuffer ? '\n' : '') + text;
-    };
+    if (typeof mod.__resetBuffers === 'function') {
+      mod.__resetBuffers();
+    }
 
     let temporaryInputFile: string | null = null;
     const effectiveArgs = [...args];
     if (input !== undefined && input !== '') {
-      temporaryInputFile = `/tmp/.dcl_input_${++pipeCounter}`;
+      temporaryInputFile = '/tmp/.dcl_input_' + (++pipeCounter);
       try {
         vfs.writeFile(temporaryInputFile, input);
         effectiveArgs.push(temporaryInputFile);
-      } catch (e) {
+      } catch (writeError) {
         // Fallback
       }
     }
@@ -223,22 +216,26 @@ export function createBusyboxRunner(mod: any, vfs: IShellVfs): WasmAppletRunner 
     let exitCode = 0;
     try {
       mod.callMain([applet, ...effectiveArgs]);
-    } catch (e: any) {
-      if (typeof e === 'number') exitCode = e;
-      else if (e && typeof e.status === 'number') exitCode = e.status;
+    } catch (executionError: any) {
+      if (typeof executionError === 'number') exitCode = executionError;
+      else if (executionError && typeof executionError.status === 'number')
+        exitCode = executionError.status;
     } finally {
-      mod.print = originalPrint;
-      mod.printErr = originalPrintErr;
       if (temporaryInputFile) {
         try {
           vfs.unlink(temporaryInputFile);
-        } catch (e) {}
+        } catch (unlinkError) {}
       }
     }
 
+    const output =
+      typeof mod.__getStdout === 'function' ? mod.__getStdout() : '';
+    const error =
+      typeof mod.__getStderr === 'function' ? mod.__getStderr() : '';
+
     return {
-      output: outputBuffer || undefined,
-      error: errorBuffer || undefined,
+      output: output || undefined,
+      error: error || undefined,
       exitCode,
     };
   };
@@ -368,7 +365,7 @@ export function createShellInterpreter(options?: CreateShellInterpreterOptions) 
         vfs.chdir(target);
         return { output: '', exitCode: 0 };
       } catch (err: any) {
-        return { error: `cd: ${args[0] || ''}: no such file or directory`, exitCode: 1 };
+        return { error: 'cd: ' + (args[0] || '') + ': no such file or directory', exitCode: 1 };
       }
     },
     ls: (args) => {
@@ -378,7 +375,7 @@ export function createShellInterpreter(options?: CreateShellInterpreterOptions) 
       const target = positionalArguments[0] || vfs.cwd();
       try {
         if (!vfs.exists(target)) {
-          return { error: `ls: cannot access '${target}': No such file or directory`, exitCode: 1 };
+          return { error: "ls: cannot access '" + target + "': No such file or directory", exitCode: 1 };
         }
         if (!vfs.isDir(target)) {
           return { output: target, exitCode: 0 };
@@ -392,7 +389,7 @@ export function createShellInterpreter(options?: CreateShellInterpreterOptions) 
         }
         return { output: entries.join('  '), exitCode: 0 };
       } catch (readDirectoryError: any) {
-        return { error: `ls: ${readDirectoryError.message}`, exitCode: 1 };
+        return { error: 'ls: ' + readDirectoryError.message, exitCode: 1 };
       }
     },
     mkdir: (args) => {
@@ -416,7 +413,7 @@ export function createShellInterpreter(options?: CreateShellInterpreterOptions) 
             vfs.mkdir(directoryPath);
           }
         } catch (directoryError: any) {
-          return { error: `mkdir: cannot create directory '${directoryPath}': File exists`, exitCode: 1 };
+          return { error: "mkdir: cannot create directory '" + directoryPath + "': File exists", exitCode: 1 };
         }
       }
       return { output: '', exitCode: 0 };
@@ -439,7 +436,7 @@ export function createShellInterpreter(options?: CreateShellInterpreterOptions) 
         try {
           contents.push(vfs.readFile(path));
         } catch (readError) {
-          return { error: `cat: ${path}: No such file or directory`, exitCode: 1 };
+          return { error: 'cat: ' + path + ': No such file or directory', exitCode: 1 };
         }
       }
       return { output: contents.join('\n'), exitCode: 0 };
@@ -456,7 +453,7 @@ export function createShellInterpreter(options?: CreateShellInterpreterOptions) 
             vfs.unlink(path);
           }
         } catch (removeError) {
-          return { error: `rm: cannot remove '${path}': No such file or directory`, exitCode: 1 };
+          return { error: "rm: cannot remove '" + path + "': No such file or directory", exitCode: 1 };
         }
       }
       return { output: '', exitCode: 0 };
@@ -469,7 +466,7 @@ export function createShellInterpreter(options?: CreateShellInterpreterOptions) 
         vfs.writeFile(positionalArguments[1], content);
         return { output: '', exitCode: 0 };
       } catch (copyError) {
-        return { error: `cp: cannot stat '${positionalArguments[0]}': No such file or directory`, exitCode: 1 };
+        return { error: "cp: cannot stat '" + positionalArguments[0] + "': No such file or directory", exitCode: 1 };
       }
     },
     mv: (args) => {
@@ -481,7 +478,7 @@ export function createShellInterpreter(options?: CreateShellInterpreterOptions) 
         vfs.writeFile(positionalArguments[1], content);
         return { output: '', exitCode: 0 };
       } catch (moveError) {
-        return { error: `mv: cannot stat '${positionalArguments[0]}': No such file or directory`, exitCode: 1 };
+        return { error: "mv: cannot stat '" + positionalArguments[0] + "': No such file or directory", exitCode: 1 };
       }
     },
     wc: (args, input = '') => {
@@ -495,14 +492,14 @@ export function createShellInterpreter(options?: CreateShellInterpreterOptions) 
         try {
           text = vfs.readFile(targetFiles[0]);
         } catch (readError) {
-          return { error: `wc: ${targetFiles[0]}: No such file or directory`, exitCode: 1 };
+          return { error: 'wc: ' + targetFiles[0] + ': No such file or directory', exitCode: 1 };
         }
       }
       const lines = text ? text.split('\n').length : 0;
       const words = text ? text.split(/\s+/).filter(Boolean).length : 0;
-      if (countLinesOnly) return { output: `${lines}${label}`, exitCode: 0 };
-      if (countWordsOnly) return { output: `${words}${label}`, exitCode: 0 };
-      return { output: `${lines} ${words} ${text.length}${label}`, exitCode: 0 };
+      if (countLinesOnly) return { output: String(lines) + label, exitCode: 0 };
+      if (countWordsOnly) return { output: String(words) + label, exitCode: 0 };
+      return { output: String(lines) + ' ' + String(words) + ' ' + String(text.length) + label, exitCode: 0 };
     },
     grep: (args, input = '') => {
       const caseInsensitive = args.includes('-i');
@@ -516,7 +513,7 @@ export function createShellInterpreter(options?: CreateShellInterpreterOptions) 
         try {
           sourceText = vfs.readFile(file);
         } catch (readError) {
-          return { error: `grep: ${file}: No such file or directory`, exitCode: 1 };
+          return { error: 'grep: ' + file + ': No such file or directory', exitCode: 1 };
         }
       }
       const regex = new RegExp(pattern, caseInsensitive ? 'i' : '');
@@ -533,7 +530,7 @@ export function createShellInterpreter(options?: CreateShellInterpreterOptions) 
         try {
           text = vfs.readFile(positionalArguments[0]);
         } catch (readError) {
-          return { error: `head: ${positionalArguments[0]}: No such file or directory`, exitCode: 1 };
+          return { error: 'head: ' + positionalArguments[0] + ': No such file or directory', exitCode: 1 };
         }
       }
       return { output: text.split('\n').slice(0, count).join('\n'), exitCode: 0 };
@@ -547,7 +544,7 @@ export function createShellInterpreter(options?: CreateShellInterpreterOptions) 
         try {
           text = vfs.readFile(positionalArguments[0]);
         } catch (readError) {
-          return { error: `tail: ${positionalArguments[0]}: No such file or directory`, exitCode: 1 };
+          return { error: 'tail: ' + positionalArguments[0] + ': No such file or directory', exitCode: 1 };
         }
       }
       const lines = text.split('\n');
@@ -562,7 +559,7 @@ export function createShellInterpreter(options?: CreateShellInterpreterOptions) 
         try {
           text = vfs.readFile(positionalArguments[0]);
         } catch (readError) {
-          return { error: `sort: ${positionalArguments[0]}: No such file or directory`, exitCode: 1 };
+          return { error: 'sort: ' + positionalArguments[0] + ': No such file or directory', exitCode: 1 };
         }
       }
       let lines = text.split('\n').filter(Boolean).sort();
@@ -578,7 +575,7 @@ export function createShellInterpreter(options?: CreateShellInterpreterOptions) 
         try {
           text = vfs.readFile(positionalArguments[0]);
         } catch (readError) {
-          return { error: `uniq: ${positionalArguments[0]}: No such file or directory`, exitCode: 1 };
+          return { error: 'uniq: ' + positionalArguments[0] + ': No such file or directory', exitCode: 1 };
         }
       }
       const lines = text.split('\n');
@@ -589,12 +586,12 @@ export function createShellInterpreter(options?: CreateShellInterpreterOptions) 
         if (line === previousLine) {
           count++;
         } else {
-          if (previousLine) result.push(countPrefix ? `${count} ${previousLine}` : previousLine);
+          if (previousLine) result.push(countPrefix ? count + ' ' + previousLine : previousLine);
           previousLine = line;
           count = 1;
         }
       }
-      if (previousLine) result.push(countPrefix ? `${count} ${previousLine}` : previousLine);
+      if (previousLine) result.push(countPrefix ? count + ' ' + previousLine : previousLine);
       return { output: result.join('\n'), exitCode: 0 };
     },
     true: () => ({ output: '', exitCode: 0 }),
@@ -667,7 +664,7 @@ export function createShellInterpreter(options?: CreateShellInterpreterOptions) 
         exitCode: wasmResult.exitCode,
       };
     } else {
-      return { error: `${command}: command not found`, exitCode: 127 };
+      return { error: command + ': command not found', exitCode: 127 };
     }
 
     if (stdoutFile) {
@@ -676,7 +673,7 @@ export function createShellInterpreter(options?: CreateShellInterpreterOptions) 
         vfs.writeFile(stdoutFile, existing + (commandResult.output || '') + '\n');
         return { output: '', error: commandResult.error, exitCode: commandResult.exitCode };
       } catch (writeError: any) {
-        return { error: `sh: cannot write ${stdoutFile}: ${writeError.message}`, exitCode: 1 };
+        return { error: 'sh: cannot write ' + stdoutFile + ': ' + writeError.message, exitCode: 1 };
       }
     }
 
