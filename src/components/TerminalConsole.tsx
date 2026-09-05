@@ -24,12 +24,6 @@ function findLongestCommonPrefix(strings: string[]): string {
   return prefix;
 }
 
-function formatTerminalCompletions(
-  completions: Array<{ label: string; category?: string }>,
-): string {
-  return completions.map((completion) => completion.label).join('  ');
-}
-
 /**
  * Builds the prompt rendered before each input line. When the session reports
  * a current working directory (shell runCommand), the prompt reflects it so a
@@ -110,6 +104,13 @@ interface TerminalConsoleProps {
   theme?: 'light' | 'dark';
 }
 
+interface ActiveTabCompletion {
+  items: Array<{ label: string; category?: string }>;
+  selectedIndex: number;
+  wordStartIndex: number;
+  originalText: string;
+}
+
 export const TerminalConsole: React.FC<TerminalConsoleProps> = ({
   onExecuteCommand,
   onIntrospect,
@@ -127,6 +128,7 @@ export const TerminalConsole: React.FC<TerminalConsoleProps> = ({
   const historyIndexReference = useRef<number | null>(null);
   const isExecutingReference = useRef(false);
   const currentWorkingDirectoryReference = useRef<string | null>(null);
+  const activeTabCompletionReference = useRef<ActiveTabCompletion | null>(null);
 
   const onExecuteCommandReference = useRef(onExecuteCommand);
   useEffect(() => {
@@ -239,6 +241,31 @@ export const TerminalConsole: React.FC<TerminalConsoleProps> = ({
 
       terminalInstance.write(
         '\r\x1b[K' + promptText + text + moveBackSequence,
+      );
+    };
+
+    const rewriteLineWithMenu = (
+      items: Array<{ label: string; category?: string }>,
+      selectedIndex: number,
+    ) => {
+      const promptText = buildPrompt(
+        currentWorkingDirectoryReference.current,
+        promptReference.current,
+      );
+      const text = lineBufferReference.current;
+      const cursorPosition = cursorPositionReference.current;
+
+      const menuText = items
+        .map((item, index) => {
+          if (index === selectedIndex) {
+            return `\x1b[30;46m ${item.label} \x1b[0m`;
+          }
+          return `\x1b[90m ${item.label} \x1b[0m`;
+        })
+        .join(' ');
+
+      terminalInstance.write(
+        `\r\x1b[K${promptText}${text}\r\n\x1b[K${menuText}\x1b[1A\r\x1b[${promptText.length + cursorPosition}C`,
       );
     };
 
@@ -488,10 +515,33 @@ export const TerminalConsole: React.FC<TerminalConsoleProps> = ({
         return;
       }
 
-      // Tab: Readline autocomplete
+      // Escape / Cancel menu completion
+      if (data === '\x1b' && activeTabCompletionReference.current) {
+        lineBufferReference.current = activeTabCompletionReference.current.originalText;
+        cursorPositionReference.current = activeTabCompletionReference.current.originalText.length;
+        activeTabCompletionReference.current = null;
+        terminalInstance.write('\r\n\x1b[K\x1b[1A');
+        rewriteLine();
+        return;
+      }
+
+      // Tab: Readline autocomplete / cycling
       if (data === '\t') {
         const onIntrospectCallback = onIntrospectReference.current;
         if (!onIntrospectCallback) return;
+
+        if (activeTabCompletionReference.current) {
+          const state = activeTabCompletionReference.current;
+          state.selectedIndex = (state.selectedIndex + 1) % state.items.length;
+          const selected = state.items[state.selectedIndex];
+          const suffix =
+            selected.category === 'directory' || selected.label.endsWith('/') ? '' : ' ';
+          lineBufferReference.current =
+            state.originalText.slice(0, state.wordStartIndex) + selected.label + suffix;
+          cursorPositionReference.current = lineBufferReference.current.length;
+          rewriteLineWithMenu(state.items, state.selectedIndex);
+          return;
+        }
 
         const currentLine = lineBufferReference.current;
         const cursorPosition = cursorPositionReference.current;
@@ -528,19 +578,30 @@ export const TerminalConsole: React.FC<TerminalConsoleProps> = ({
             cursorPositionReference.current = wordStartIndex + commonPrefix.length;
             rewriteLine();
           } else {
-            terminalInstance.write('\r\n' + formatTerminalCompletions(completions) + '\r\n');
-            const promptText = buildPrompt(
-              currentWorkingDirectoryReference.current,
-              promptReference.current,
-            );
-            const moveBackCount = currentLine.length - cursorPosition;
-            const moveBackSequence = moveBackCount > 0 ? `\x1b[${moveBackCount}D` : '';
-            terminalInstance.write(promptText + currentLine + moveBackSequence);
+            activeTabCompletionReference.current = {
+              items: completions,
+              selectedIndex: 0,
+              wordStartIndex,
+              originalText: currentLine,
+            };
+            const selected = completions[0];
+            const suffix =
+              selected.category === 'directory' || selected.label.endsWith('/') ? '' : ' ';
+            lineBufferReference.current =
+              currentLine.slice(0, wordStartIndex) + selected.label + suffix;
+            cursorPositionReference.current = lineBufferReference.current.length;
+            rewriteLineWithMenu(completions, 0);
           }
         } catch (error) {
           // ignore autocomplete error
         }
         return;
+      }
+
+      // If menu was active and any other key is pressed, clear the menu line
+      if (activeTabCompletionReference.current) {
+        activeTabCompletionReference.current = null;
+        terminalInstance.write('\r\n\x1b[K\x1b[1A');
       }
 
       // Normal character input
