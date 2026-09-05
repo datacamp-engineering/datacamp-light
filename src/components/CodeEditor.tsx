@@ -104,6 +104,7 @@ interface CodeEditorProps {
   readOnly?: boolean;
   language?: string;
   session?: IJsonRpcSession | null;
+  autocomplete?: boolean;
 }
 
 const getLanguageExtension = (language?: string) => {
@@ -124,6 +125,7 @@ export const CodeEditor: React.FC<CodeEditorProps> = ({
   readOnly = false,
   language = 'python',
   session = null,
+  autocomplete = true,
 }) => {
   const containerReference = useRef<HTMLDivElement>(null);
   const viewReference = useRef<EditorView | null>(null);
@@ -136,29 +138,35 @@ export const CodeEditor: React.FC<CodeEditorProps> = ({
   useEffect(() => {
     if (!containerReference.current) return;
 
+    const editorExtensions = [
+      basicSetup,
+      getLanguageExtension(language),
+      ...(autocomplete
+        ? [
+            createAutocompleteExtension(language, session),
+            Prec.highest(
+              keymap.of([
+                { key: 'Tab', run: acceptCompletion },
+                ...completionKeymap,
+              ]),
+            ),
+          ]
+        : []),
+      dcEditorTheme,
+      dcHighlightStyle,
+      EditorView.lineWrapping,
+      Prec.highest(keymap.of([indentWithTab])),
+      EditorState.readOnly.of(readOnly),
+      EditorView.updateListener.of((update: ViewUpdate) => {
+        if (update.docChanged) {
+          onChangeReference.current(update.state.doc.toString());
+        }
+      }),
+    ];
+
     const startState = EditorState.create({
       doc: code,
-      extensions: [
-        basicSetup,
-        getLanguageExtension(language),
-        createAutocompleteExtension(language, session),
-        dcEditorTheme,
-        dcHighlightStyle,
-        EditorView.lineWrapping,
-        Prec.highest(
-          keymap.of([
-            { key: 'Tab', run: acceptCompletion },
-            ...completionKeymap,
-            indentWithTab,
-          ]),
-        ),
-        EditorState.readOnly.of(readOnly),
-        EditorView.updateListener.of((update: ViewUpdate) => {
-          if (update.docChanged) {
-            onChangeReference.current(update.state.doc.toString());
-          }
-        }),
-      ],
+      extensions: editorExtensions,
     });
 
     const view = new EditorView({

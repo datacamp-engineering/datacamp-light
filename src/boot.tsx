@@ -107,6 +107,12 @@ export function getSettings(element: HTMLElement): DataCampExerciseProps {
       ? false
       : rawSharedEnv;
 
+  const rawAutocomplete = element.getAttribute('data-autocomplete');
+  const autocomplete =
+    rawAutocomplete === null
+      ? true
+      : rawAutocomplete.toLowerCase() !== 'false';
+
   return {
     id,
     hint: getHint(),
@@ -121,6 +127,7 @@ export function getSettings(element: HTMLElement): DataCampExerciseProps {
     showRunButton,
     showAi,
     mockAi,
+    autocomplete,
     sharedEnvironment,
     utmSource: element.getAttribute('data-utm-source') || undefined,
     utmCampaign: element.getAttribute('data-utm-campaign') || undefined,

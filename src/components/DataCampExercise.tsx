@@ -41,6 +41,7 @@ export interface DataCampExerciseProps {
   showRunButton?: boolean;
   showAi?: boolean;
   mockAi?: boolean | string;
+  autocomplete?: boolean;
   sharedEnvironment?: boolean | string;
   utmSource?: string;
   utmCampaign?: string;
@@ -253,6 +254,7 @@ const CodeExercise: React.FC<DataCampExerciseProps> = ({
   showRunButton = true,
   showAi = true,
   mockAi = false,
+  autocomplete = true,
   sharedEnvironment,
   utmSource,
   utmCampaign,
@@ -588,6 +590,7 @@ const CodeExercise: React.FC<DataCampExerciseProps> = ({
         height={editorHeight}
         language={language}
         session={session}
+        autocomplete={autocomplete}
       />
 
       <ResizeHandle

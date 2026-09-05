@@ -28,4 +28,19 @@ describe('CodeEditor', () => {
     expect(cmEditor).toBeInTheDocument();
     expect(container.textContent).toContain('radius <- 5');
   });
+
+  it('renders without error when autocomplete is explicitly disabled', () => {
+    const handleChange = vi.fn();
+    const { container } = render(
+      <CodeEditor
+        code="x = 10"
+        language="python"
+        onChange={handleChange}
+        autocomplete={false}
+      />,
+    );
+
+    const cmEditor = container.querySelector('.cm-editor');
+    expect(cmEditor).toBeInTheDocument();
+  });
 });

@@ -249,8 +249,18 @@ const autocompleteTheme = EditorView.theme({
   '.cm-tooltip-autocomplete ul': {
     maxHeight: '260px',
   },
+  '.cm-tooltip-autocomplete ul li': {
+    color: `${theme.text.main} !important`,
+  },
   '.cm-tooltip-autocomplete ul li[aria-selected="true"]': {
-    backgroundColor: hexToRgba(theme.blue.main, 0.15),
+    backgroundColor: `${hexToRgba(theme.blue.main, 0.15)} !important`,
+    color: `${theme.text.main} !important`,
+  },
+  '.cm-tooltip-autocomplete ul li[aria-selected="true"] .cm-completionDetail': {
+    color: `${theme.text.subtle} !important`,
+  },
+  '.cm-tooltip-autocomplete ul li[aria-selected="true"] .cm-completionMatchedText': {
+    color: `${theme.blue.text} !important`,
   },
   '.cm-completionDetail': {
     color: theme.text.subtle,

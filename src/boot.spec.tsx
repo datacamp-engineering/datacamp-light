@@ -139,4 +139,14 @@ describe('getSettings', () => {
     element.setAttribute('data-environment', 'custom-group');
     expect(getSettings(element).sharedEnvironment).toBe('custom-group');
   });
+
+  it('should parse data-autocomplete attribute correctly', () => {
+    element.setAttribute('data-autocomplete', 'false');
+    const disabledSettings = getSettings(element);
+    expect(disabledSettings.autocomplete).toBe(false);
+
+    element.setAttribute('data-autocomplete', 'true');
+    const enabledSettings = getSettings(element);
+    expect(enabledSettings.autocomplete).toBe(true);
+  });
 });
