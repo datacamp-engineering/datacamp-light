@@ -12,6 +12,7 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
+    "test:runtime": "node scripts/test-wasm-runtime.mjs",
     "test:external": "node scripts/audit-external-tutorials.mjs",
     "typecheck": "tsc --noEmit",
     "update:shellwhat": "node scripts/update-shellwhat.js",
