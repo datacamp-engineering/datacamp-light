@@ -28,9 +28,19 @@ export function getShellVfsCompletions(
   const lines = (code || '').split('\n');
   const currentLine = lines[line] || '';
   const textBeforeCursor = currentLine.slice(0, column);
-  const words = textBeforeCursor.split(/\s+/).filter(Boolean);
-  const isCommandPosition = words.length <= 1 && !triggerCharacter;
-  const currentToken = words[words.length - 1] || '';
+  const trimmedLeft = textBeforeCursor.trimStart();
+  const hasSpace = /\s/.test(trimmedLeft);
+  const isCommandPosition = !hasSpace && !triggerCharacter;
+
+  let currentToken = '';
+  if (isCommandPosition) {
+    currentToken = trimmedLeft;
+  } else {
+    const match = textBeforeCursor.match(/[\w./~-]*$/);
+    currentToken = match ? match[0] : '';
+  }
+
+  const commandName = trimmedLeft.split(/\s+/)[0] || '';
   const completions: CompletionSnippetTemplate[] = [];
 
   if (isCommandPosition && !currentToken.includes('/')) {
@@ -57,13 +67,14 @@ export function getShellVfsCompletions(
 
   const lastSlashIndex = currentToken.lastIndexOf('/');
   let targetDirectory = cwd;
-
   let partialName = currentToken;
 
   if (lastSlashIndex !== -1) {
     const rawDirectory = lastSlashIndex === 0 ? '/' : currentToken.slice(0, lastSlashIndex);
     partialName = currentToken.slice(lastSlashIndex + 1);
-    targetDirectory = rawDirectory.startsWith('/') ? rawDirectory : `${cwd}/${rawDirectory}`.replace(/\/+/g, '/');
+    targetDirectory = rawDirectory.startsWith('/')
+      ? rawDirectory
+      : `${cwd}/${rawDirectory}`.replace(/\/+/g, '/');
   }
 
   let entries: string[] = [];
@@ -78,6 +89,11 @@ export function getShellVfsCompletions(
     if (!entry.startsWith(partialName)) continue;
     const fullPath = `${targetDirectory}/${entry}`.replace(/\/+/g, '/');
     const isDirectory = vfs.isDir(fullPath);
+
+    if (commandName === 'cd' && !isDirectory) {
+      continue;
+    }
+
     completions.push({
       label: isDirectory ? `${entry}/` : entry,
       detail: isDirectory ? 'directory' : 'file',

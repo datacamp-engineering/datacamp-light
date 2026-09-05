@@ -104,6 +104,22 @@ describe('shellWorker JSON-RPC contract', () => {
     expect(commandLabels).toContain('mkdir');
 
     await call('runCommand', { command: 'mkdir my_project' });
+    await call('runCommand', { command: 'touch file1.txt' });
+
+    // cd <space> should only return directories (not files like file1.txt)
+    const cdSpaceResult = await call('introspect', { code: 'cd ', line: 0, column: 3, prefix: '' });
+    const cdSpaceLabels = (cdSpaceResult?.completions || []).map((c: any) => c.label);
+    expect(cdSpaceLabels).toContain('my_project/');
+    expect(cdSpaceLabels).not.toContain('file1.txt');
+    expect(cdSpaceLabels).not.toContain('cd');
+
+    // ls <space> should return both files and directories
+    const lsSpaceResult = await call('introspect', { code: 'ls ', line: 0, column: 3, prefix: '' });
+    const lsSpaceLabels = (lsSpaceResult?.completions || []).map((c: any) => c.label);
+    expect(lsSpaceLabels).toContain('my_project/');
+    expect(lsSpaceLabels).toContain('file1.txt');
+    expect(lsSpaceLabels).not.toContain('ls');
+
     const pathResult = await call('introspect', { code: 'cd my_', line: 0, column: 6, prefix: 'my_' });
     const pathLabels = (pathResult?.completions || []).map((c: any) => c.label);
     expect(pathLabels).toContain('my_project/');

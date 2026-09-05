@@ -27,22 +27,7 @@ function findLongestCommonPrefix(strings: string[]): string {
 function formatTerminalCompletions(
   completions: Array<{ label: string; category?: string }>,
 ): string {
-  return completions
-    .map((completion) => {
-      const isDirectory =
-        completion.category === 'directory' || completion.label.endsWith('/');
-      const isCommand = completion.category === 'function';
-      const label = completion.label;
-
-      if (isDirectory) {
-        return `\x1b[1;36m${label}\x1b[0m`;
-      }
-      if (isCommand) {
-        return `\x1b[1;32m${label}\x1b[0m`;
-      }
-      return `\x1b[37m${label}\x1b[0m`;
-    })
-    .join('  ');
+  return completions.map((completion) => completion.label).join('  ');
 }
 
 /**
