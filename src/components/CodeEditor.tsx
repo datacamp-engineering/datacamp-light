@@ -6,7 +6,6 @@ import { r } from '@codemirror/legacy-modes/mode/r';
 import { shell } from '@codemirror/legacy-modes/mode/shell';
 import { EditorState, Prec } from '@codemirror/state';
 import { EditorView, ViewUpdate, keymap } from '@codemirror/view';
-import { hexToRgba } from '@datacamp/waffles/helpers';
 import { theme } from '@datacamp/waffles/theme';
 import { tokens } from '@datacamp/waffles/tokens';
 import { tags as t } from '@lezer/highlight';
@@ -29,7 +28,7 @@ const dcEditorTheme = EditorView.theme({
     outline: 'none',
   },
   '&.cm-focused .cm-activeLine': {
-    backgroundColor: `${hexToRgba(theme.blue.main, 0.05)} !important`,
+    backgroundColor: `${theme.background.hover} !important`,
   },
   '&.cm-focused .cm-cursor': {
     borderLeftColor: theme.text.main,
@@ -126,7 +125,7 @@ const dcEditorTheme = EditorView.theme({
     lineHeight: '22px',
     padding: '0 4px',
     '&:hover': {
-      backgroundColor: hexToRgba(theme.red.main, 0.1),
+      backgroundColor: theme.red.transparent,
       color: theme.red.text,
     },
   },
@@ -144,15 +143,15 @@ const dcEditorTheme = EditorView.theme({
     cursor: 'pointer',
   },
   '.cm-searchMatch': {
-    backgroundColor: hexToRgba(theme.yellow.main, 0.35),
+    backgroundColor: `${theme.yellow.transparent} !important`,
     borderRadius: '2px',
   },
   '.cm-searchMatch.cm-searchMatch-selected': {
-    backgroundColor: hexToRgba(theme.orange.main, 0.5),
-    outline: `1px solid ${theme.orange.main}`,
+    backgroundColor: `${theme.orange.transparent} !important`,
+    outline: `${tokens.borderWidth.thin} solid ${theme.orange.main}`,
   },
   '.cm-selectionMatch': {
-    backgroundColor: hexToRgba(theme.blue.main, 0.15),
+    backgroundColor: `${theme.blue.transparent} !important`,
   },
 });
 

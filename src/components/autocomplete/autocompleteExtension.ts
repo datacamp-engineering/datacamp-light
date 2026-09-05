@@ -7,7 +7,6 @@ import {
 } from '@codemirror/autocomplete';
 import type { Extension } from '@codemirror/state';
 import { EditorView } from '@codemirror/view';
-import { hexToRgba } from '@datacamp/waffles/helpers';
 import { theme } from '@datacamp/waffles/theme';
 import { tokens } from '@datacamp/waffles/tokens';
 import type { IJsonRpcSession } from '../../jsonrpc/session';
@@ -266,7 +265,7 @@ const autocompleteTheme = EditorView.theme({
     color: `${theme.text.main} !important`,
   },
   '.cm-tooltip-autocomplete ul li[aria-selected="true"]': {
-    backgroundColor: `${hexToRgba(theme.blue.main, 0.15)} !important`,
+    backgroundColor: `${theme.blue.transparent} !important`,
     color: `${theme.text.main} !important`,
   },
   '.cm-tooltip-autocomplete ul li[aria-selected="true"] .cm-completionDetail': {
