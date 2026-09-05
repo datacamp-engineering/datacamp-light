@@ -61,7 +61,7 @@ const darkAnsiPalette = {
   red: '#FF5C5C',
   green: '#00D06C',
   yellow: '#FFD15C',
-  blue: '#58A6FF',
+  blue: '#0578FF',
   magenta: '#E06CFF',
   cyan: '#39C5BB',
   white: '#FFFFFF',
@@ -69,7 +69,7 @@ const darkAnsiPalette = {
   brightRed: '#FF7B7B',
   brightGreen: '#2EE58B',
   brightYellow: '#FFE08A',
-  brightBlue: '#79B8FF',
+  brightBlue: '#58A6FF',
   brightMagenta: '#EB8CFF',
   brightCyan: '#56D4CB',
   brightWhite: '#FFFFFF',
@@ -80,17 +80,17 @@ const lightAnsiPalette = {
   red: '#D91E18',
   green: '#0E7C3B',
   yellow: '#B78103',
-  blue: '#0052CC',
+  blue: '#0578FF',
   magenta: '#7B1FA2',
-  cyan: '#006D75',
+  cyan: '#00A3A6',
   white: '#F0F4F8',
   brightBlack: '#8FA6B2',
   brightRed: '#E83E38',
   brightGreen: '#1A9E4E',
   brightYellow: '#D49605',
-  brightBlue: '#0747A6',
+  brightBlue: '#0052CC',
   brightMagenta: '#9C27B0',
-  brightCyan: '#00838F',
+  brightCyan: '#0578FF',
   brightWhite: '#FFFFFF',
 };
 
@@ -258,11 +258,14 @@ export const TerminalConsole: React.FC<TerminalConsoleProps> = ({
       const menuText = items
         .map((item, index) => {
           if (index === selectedIndex) {
-            return `\x1b[30;46m ${item.label} \x1b[0m`;
+            return `\x1b[1;97;44m ${item.label} \x1b[0m`;
           }
-          return `\x1b[90m ${item.label} \x1b[0m`;
+          if (item.category === 'directory' || item.label.endsWith('/')) {
+            return `\x1b[1;34m${item.label}\x1b[0m`;
+          }
+          return `${item.label}`;
         })
-        .join(' ');
+        .join('  ');
 
       terminalInstance.write(
         `\r\x1b[K${promptText}${text}\r\n\x1b[K${menuText}\x1b[1A\r\x1b[${promptText.length + cursorPosition}C`,
