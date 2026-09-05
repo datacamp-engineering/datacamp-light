@@ -742,12 +742,21 @@ export function createShellInterpreter(options?: CreateShellInterpreterOptions) 
     return { output: outputs.join('\n'), error: errors.join('\n') || undefined };
   }
 
-return {
+  return {
     runCommand,
     runScript,
     getCwd: () => vfs.cwd(),
     getVfs: () => vfs,
     writeFile: (p: string, c: string) => vfs.writeFile(p, c),
     readFile: (p: string) => vfs.readFile(p),
+    getAvailableCommands: () => {
+      const builtinNames = Object.keys(builtins);
+      const vfsBinaries: string[] = [];
+      try {
+        if (vfs.exists('/bin')) vfsBinaries.push(...vfs.readdir('/bin'));
+        if (vfs.exists('/usr/bin')) vfsBinaries.push(...vfs.readdir('/usr/bin'));
+      } catch {}
+      return Array.from(new Set([...builtinNames, ...vfsBinaries])).filter(Boolean).sort();
+    },
   };
 }

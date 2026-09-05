@@ -166,6 +166,10 @@ self.onmessage = async (event: MessageEvent<JsonRpcMessage>) => {
     if (method === 'introspect') {
       const { code, line, column, prefix, triggerCharacter } = (params as any) || {};
       await getWasmModule();
+      const availableCommands =
+        typeof activeShell.getAvailableCommands === 'function'
+          ? activeShell.getAvailableCommands()
+          : undefined;
       const completions = getShellVfsCompletions(
         activeShell.getVfs(),
         activeShell.getCwd(),
@@ -174,6 +178,7 @@ self.onmessage = async (event: MessageEvent<JsonRpcMessage>) => {
         column || 0,
         prefix || '',
         triggerCharacter || '',
+        availableCommands,
       );
       self.postMessage({
         jsonrpc: '2.0',

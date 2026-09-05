@@ -15,31 +15,6 @@ interface PendingDebounce {
 
 const pendingDebounces = new Map<string, PendingDebounce>();
 
-const extraShellCommands = [
-  'sh',
-  'bash',
-  'python',
-  'node',
-  'git',
-  'diff',
-  'date',
-  'sleep',
-  'whoami',
-  'uname',
-  'printf',
-  'cut',
-  'tr',
-  'gzip',
-  'gunzip',
-  'zip',
-  'unzip',
-  'df',
-  'du',
-  'man',
-  'dirname',
-  'basename',
-];
-
 export function getShellVfsCompletions(
   vfs: IShellVfs,
   cwd: string,
@@ -48,6 +23,7 @@ export function getShellVfsCompletions(
   column: number,
   _prefix: string,
   triggerCharacter: string,
+  availableCommands?: string[],
 ): CompletionSnippetTemplate[] {
   const lines = (code || '').split('\n');
   const currentLine = lines[line] || '';
@@ -58,25 +34,21 @@ export function getShellVfsCompletions(
   const completions: CompletionSnippetTemplate[] = [];
 
   if (isCommandPosition && !currentToken.includes('/')) {
-    for (const template of shellCatalog.templates) {
-      if (template.label.startsWith(currentToken)) {
-        completions.push({
-          label: template.label,
-          detail: template.detail || 'shell command',
-          category: template.category || 'function',
-          snippet: template.label,
-          boost: template.boost || 90,
-        });
-      }
-    }
-    for (const command of extraShellCommands) {
-      if (command.startsWith(currentToken) && !completions.some((c) => c.label === command)) {
+    const commandsToSearch =
+      availableCommands && availableCommands.length > 0
+        ? availableCommands
+        : shellCatalog.templates.map((template) => template.label);
+
+    const seenCommands = new Set<string>();
+    for (const command of commandsToSearch) {
+      if (command.startsWith(currentToken) && !seenCommands.has(command)) {
+        seenCommands.add(command);
         completions.push({
           label: command,
           detail: 'shell command',
           category: 'function',
           snippet: command,
-          boost: 85,
+          boost: 90,
         });
       }
     }

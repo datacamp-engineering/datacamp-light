@@ -24,6 +24,27 @@ function findLongestCommonPrefix(strings: string[]): string {
   return prefix;
 }
 
+function formatTerminalCompletions(
+  completions: Array<{ label: string; category?: string }>,
+): string {
+  return completions
+    .map((completion) => {
+      const isDirectory =
+        completion.category === 'directory' || completion.label.endsWith('/');
+      const isCommand = completion.category === 'function';
+      const label = completion.label;
+
+      if (isDirectory) {
+        return `\x1b[1;36m${label}\x1b[0m`;
+      }
+      if (isCommand) {
+        return `\x1b[1;32m${label}\x1b[0m`;
+      }
+      return `\x1b[37m${label}\x1b[0m`;
+    })
+    .join('  ');
+}
+
 /**
  * Builds the prompt rendered before each input line. When the session reports
  * a current working directory (shell runCommand), the prompt reflects it so a
@@ -522,7 +543,7 @@ export const TerminalConsole: React.FC<TerminalConsoleProps> = ({
             cursorPositionReference.current = wordStartIndex + commonPrefix.length;
             rewriteLine();
           } else {
-            terminalInstance.write('\r\n' + labels.join('  ') + '\r\n');
+            terminalInstance.write('\r\n' + formatTerminalCompletions(completions) + '\r\n');
             const promptText = buildPrompt(
               currentWorkingDirectoryReference.current,
               promptReference.current,
