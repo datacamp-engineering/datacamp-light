@@ -188,6 +188,23 @@ const ShellExercise: React.FC<{
       });
   };
 
+  const handleIntrospect = useCallback(
+    async (code: string, column: number) => {
+      try {
+        const result: any = await session.request('introspect', {
+          code,
+          line: 0,
+          column,
+          language: 'shell',
+        });
+        return result?.completions || [];
+      } catch {
+        return [];
+      }
+    },
+    [session],
+  );
+
   return (
     <DCLWidgetShell theme={activeTheme}>
       <ActionBar
@@ -217,6 +234,7 @@ const ShellExercise: React.FC<{
 
       <TerminalConsole
         onExecuteCommand={handleExecuteShellCommand}
+        onIntrospect={handleIntrospect}
         prompt="$ "
         height={terminalHeight}
         resetKey={resetCounter}

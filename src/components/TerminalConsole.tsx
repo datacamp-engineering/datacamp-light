@@ -12,6 +12,18 @@ export interface TerminalCommandResult {
   cwd?: string;
 }
 
+function findLongestCommonPrefix(strings: string[]): string {
+  if (strings.length === 0) return '';
+  let prefix = strings[0];
+  for (let i = 1; i < strings.length; i++) {
+    while (!strings[i].startsWith(prefix)) {
+      prefix = prefix.slice(0, prefix.length - 1);
+      if (!prefix) return '';
+    }
+  }
+  return prefix;
+}
+
 /**
  * Builds the prompt rendered before each input line. When the session reports
  * a current working directory (shell runCommand), the prompt reflects it so a
@@ -84,6 +96,7 @@ const lightAnsiPalette = {
 
 interface TerminalConsoleProps {
   onExecuteCommand: (command: string) => Promise<TerminalCommandResult>;
+  onIntrospect?: (code: string, column: number) => Promise<Array<{ label: string; category?: string }>>;
   prompt?: string;
   height?: number | string;
   welcomeMessage?: string;
@@ -93,6 +106,7 @@ interface TerminalConsoleProps {
 
 export const TerminalConsole: React.FC<TerminalConsoleProps> = ({
   onExecuteCommand,
+  onIntrospect,
   prompt = '$ ',
   height = 260,
   welcomeMessage = 'Welcome to the DataCamp Light shell (WebAssembly).\r\n',
@@ -108,11 +122,15 @@ export const TerminalConsole: React.FC<TerminalConsoleProps> = ({
   const isExecutingReference = useRef(false);
   const currentWorkingDirectoryReference = useRef<string | null>(null);
 
-  // Keep a stable callback reference so parent re-renders never destroy the xterm instance
   const onExecuteCommandReference = useRef(onExecuteCommand);
   useEffect(() => {
     onExecuteCommandReference.current = onExecuteCommand;
   }, [onExecuteCommand]);
+
+  const onIntrospectReference = useRef(onIntrospect);
+  useEffect(() => {
+    onIntrospectReference.current = onIntrospect;
+  }, [onIntrospect]);
 
   const promptReference = useRef(prompt);
   useEffect(() => {
@@ -464,8 +482,63 @@ export const TerminalConsole: React.FC<TerminalConsoleProps> = ({
         return;
       }
 
+      // Tab: Readline autocomplete
+      if (data === '\t') {
+        const onIntrospectCallback = onIntrospectReference.current;
+        if (!onIntrospectCallback) return;
+
+        const currentLine = lineBufferReference.current;
+        const cursorPosition = cursorPositionReference.current;
+        const textBeforeCursor = currentLine.slice(0, cursorPosition);
+        const match = textBeforeCursor.match(/[\w./~-]*$/);
+        const wordPrefix = match ? match[0] : '';
+        const wordStartIndex = cursorPosition - wordPrefix.length;
+
+        try {
+          const completions = await onIntrospectCallback(currentLine, cursorPosition);
+          if (!completions || completions.length === 0) {
+            terminalInstance.write('\x07');
+            return;
+          }
+
+          if (completions.length === 1) {
+            const completion = completions[0];
+            const insertText = completion.label;
+            const suffix =
+              completion.category === 'directory' || insertText.endsWith('/') ? '' : ' ';
+            lineBufferReference.current =
+              currentLine.slice(0, wordStartIndex) + insertText + suffix + currentLine.slice(cursorPosition);
+            cursorPositionReference.current = wordStartIndex + insertText.length + suffix.length;
+            rewriteLine();
+            return;
+          }
+
+          const labels = completions.map((c) => c.label);
+          const commonPrefix = findLongestCommonPrefix(labels);
+
+          if (commonPrefix && commonPrefix.length > wordPrefix.length) {
+            lineBufferReference.current =
+              currentLine.slice(0, wordStartIndex) + commonPrefix + currentLine.slice(cursorPosition);
+            cursorPositionReference.current = wordStartIndex + commonPrefix.length;
+            rewriteLine();
+          } else {
+            terminalInstance.write('\r\n' + labels.join('  ') + '\r\n');
+            const promptText = buildPrompt(
+              currentWorkingDirectoryReference.current,
+              promptReference.current,
+            );
+            const moveBackCount = currentLine.length - cursorPosition;
+            const moveBackSequence = moveBackCount > 0 ? `\x1b[${moveBackCount}D` : '';
+            terminalInstance.write(promptText + currentLine + moveBackSequence);
+          }
+        } catch (error) {
+          // ignore autocomplete error
+        }
+        return;
+      }
+
       // Normal character input
-      if (data >= ' ' || data === '\t') {
+      if (data >= ' ') {
         const position = cursorPositionReference.current;
         const currentBuffer = lineBufferReference.current;
         lineBufferReference.current =
