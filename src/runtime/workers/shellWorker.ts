@@ -33,7 +33,10 @@ async function loadScriptInWorker(scriptUrl: string): Promise<void> {
     const response = await fetch(scriptUrl);
     if (!response.ok) return;
     const scriptCode = await response.text();
-    const evaluator = new Function(scriptCode);
+    const evaluator = new Function(
+      scriptCode +
+        '\nif (typeof EmscrJSR_busybox !== "undefined") { globalThis.EmscrJSR_busybox = EmscrJSR_busybox; }',
+    );
     evaluator.call(globalThis);
   } catch (error) {}
 }

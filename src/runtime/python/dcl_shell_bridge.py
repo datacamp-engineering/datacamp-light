@@ -66,7 +66,7 @@ def custom_subprocess_run(
     output_string = result.get("output", "") or ""
     error_string = result.get("error", "") or ""
 
-    is_text = bool(text or universal_newlines or encoding or capture_output)
+    is_text = bool(text or universal_newlines or encoding)
 
     stdout_value = (
         output_string
@@ -101,9 +101,8 @@ def custom_subprocess_run(
 def custom_subprocess_check_output(args, **kwargs):
     kwargs["capture_output"] = True
     kwargs["check"] = True
-    kwargs["text"] = True
     completed_process = custom_subprocess_run(args, **kwargs)
-    return completed_process.stdout or ""
+    return completed_process.stdout
 
 
 def custom_subprocess_getoutput(command_string):
