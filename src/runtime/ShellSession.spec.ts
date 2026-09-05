@@ -56,11 +56,11 @@ describe('createShellSession', () => {
     vi.unstubAllGlobals();
   });
 
-  it('should create a worker from a Blob URL and wire message passing', () => {
+  it('should create a worker from a constructor and wire message passing', () => {
     const session = createShellSession();
 
     expect(createdWorkers).toHaveLength(1);
-    expect(createdWorkers[0].url).toBe('blob:mock-url');
+    expect(createdWorkers[0].url).toContain('shellWorker.ts');
 
     session.runCode({ code: 'pwd' });
 
@@ -81,14 +81,13 @@ describe('createShellSession', () => {
     expect(result).toEqual({ output: '/home/repl' });
   });
 
-  it('should terminate the worker and revoke the object URL on destroy', () => {
+  it('should terminate the worker on destroy', () => {
     const session = createShellSession();
     const worker = createdWorkers[0];
 
     session.destroy();
 
     expect(worker.terminated).toBe(true);
-    expect(revokedUrls).toContain('blob:mock-url');
   });
 
   it('should evaluate regex and basic SCTs directly via worker submitCode', async () => {

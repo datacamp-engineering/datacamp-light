@@ -1,33 +1,34 @@
-import { describe, expect, it } from 'vitest';
-import type { JsonRpcMessage } from '../jsonrpc/types';
-import { SHELL_WORKER_SCRIPT } from './shellWorkerSource';
+import { beforeAll, describe, expect, it } from 'vitest';
+import type { JsonRpcMessage } from '../../jsonrpc/types';
+
+let workerInitialized = false;
+
+async function ensureWorkerLoaded() {
+  if (!workerInitialized) {
+    await import('./shellWorker');
+    workerInitialized = true;
+  }
+}
 
 function createWorkerHarness(options?: { mockWasmModule?: any }) {
   const outbound: JsonRpcMessage[] = [];
-  const shim: {
-    postMessage: (message: JsonRpcMessage) => void;
-    onmessage: ((event: { data: JsonRpcMessage }) => Promise<void> | void) | null;
-  } = {
-    postMessage: (message) => {
-      outbound.push(message);
-    },
-    onmessage: null,
+
+  (self as any).postMessage = (message: any) => {
+    outbound.push(message);
   };
 
   if (options?.mockWasmModule) {
     (globalThis as any).EmscrJSR_busybox = options.mockWasmModule;
   }
 
-  const workerFactory = new Function('self', SHELL_WORKER_SCRIPT) as (
-    self: unknown,
-  ) => void;
-  workerFactory(shim);
-
   let nextId = 0;
   const call = async (method: string, params: Record<string, unknown>): Promise<any> => {
     nextId += 1;
     const id = nextId;
-    await shim.onmessage?.({ data: { jsonrpc: '2.0', id, method, params } });
+    const handler = (self as any).onmessage;
+    if (typeof handler === 'function') {
+      await handler({ data: { jsonrpc: '2.0', id, method, params } } as MessageEvent);
+    }
     const response = outbound
       .filter((message) => (message as any).id === id)
       .pop() as any;
@@ -38,7 +39,11 @@ function createWorkerHarness(options?: { mockWasmModule?: any }) {
   return { call, outbound };
 }
 
-describe('SHELL_WORKER_SCRIPT shell JSON-RPC contract', () => {
+describe('shellWorker JSON-RPC contract', () => {
+  beforeAll(async () => {
+    await ensureWorkerLoaded();
+  });
+
   it('runCommand executes a single command and always reports the cwd', async () => {
     const { call } = createWorkerHarness();
     expect(await call('runCommand', { command: 'pwd' })).toEqual({

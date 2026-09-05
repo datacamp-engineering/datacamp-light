@@ -1,12 +1,10 @@
 import type { IJsonRpcSession } from '../jsonrpc/session';
-import dclConfig from '../config';
-import { PYODIDE_WORKER_SCRIPT } from './pyodideWorkerSource';
+import PyodideWorkerConstructor from './workers/pyodideWorker?worker&inline';
 import { createWorkerJsonRpcSession } from './workerSession';
 
 export function createWasmSession(): IJsonRpcSession {
-  const { client } = createWorkerJsonRpcSession(PYODIDE_WORKER_SCRIPT, {
+  const { client } = createWorkerJsonRpcSession(PyodideWorkerConstructor, {
     name: 'Pyodide Worker',
-    preamble: `self.DCL_PYODIDE_URL = ${JSON.stringify(dclConfig.pyodideUrl)};`,
   });
 
   return client;

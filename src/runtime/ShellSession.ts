@@ -1,8 +1,7 @@
 import type { IRunCommandSession } from '../jsonrpc/session';
 import type { ISubmitCodeParams, ISubmitCodeResult } from '../jsonrpc/types';
-import dclConfig from '../config';
 import { getSharedPyodideSession } from './pyodideEvaluator';
-import { SHELL_WORKER_SCRIPT } from './shellWorkerSource';
+import ShellWorkerConstructor from './workers/shellWorker?worker&inline';
 import { createWorkerJsonRpcSession } from './workerSession';
 
 /**
@@ -13,9 +12,8 @@ import { createWorkerJsonRpcSession } from './workerSession';
  * routes grading through the shared in-browser Pyodide worker running shellwhat.
  */
 export function createShellSession(): IRunCommandSession {
-  const { client } = createWorkerJsonRpcSession(SHELL_WORKER_SCRIPT, {
+  const { client } = createWorkerJsonRpcSession(ShellWorkerConstructor, {
     name: 'Shell Worker',
-    preamble: `self.DCL_ASSET_BASE_URL = ${JSON.stringify(dclConfig.assetBaseUrl)};`,
   });
 
   const originalSubmitCode = client.submitCode.bind(client);
