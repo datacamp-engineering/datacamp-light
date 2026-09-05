@@ -121,12 +121,22 @@ def dcl_introspect(code, line, column, prefix, trigger):
         if target is None:
             if target_name in sys.modules:
                 target = sys.modules[target_name]
-            elif target_name == "np" and "numpy" in sys.modules:
-                target = sys.modules["numpy"]
-            elif target_name == "pd" and "pandas" in sys.modules:
-                target = sys.modules["pandas"]
-            elif target_name == "plt" and "matplotlib.pyplot" in sys.modules:
-                target = sys.modules["matplotlib.pyplot"]
+            else:
+                try:
+                    import importlib
+
+                    alias_map = {
+                        "plt": "matplotlib.pyplot",
+                        "np": "numpy",
+                        "pd": "pandas",
+                        "sns": "seaborn",
+                        "sk": "sklearn",
+                        "sp": "scipy",
+                    }
+                    module_name = alias_map.get(target_name, target_name)
+                    target = importlib.import_module(module_name)
+                except Exception:
+                    pass
 
         if target is not None:
             for attribute in dir(target):
