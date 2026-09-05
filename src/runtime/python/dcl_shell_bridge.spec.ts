@@ -21,4 +21,11 @@ describe('dcl_shell_bridge Python module', () => {
     expect(dclShellBridgeSource).toContain('builtins.input = safe_input');
     expect(dclShellBridgeSource).toContain('builtins._dcl_set_stdin = set_standard_input');
   });
+
+  it('preserves bytes vs string standard library return types for subprocess', () => {
+    // Verifies text is not implicitly forced on check_output/run preventing matplotlib TypeError
+    expect(dclShellBridgeSource).toContain('is_text = bool(text or universal_newlines or encoding)');
+    expect(dclShellBridgeSource).not.toContain('kwargs["text"] = True');
+    expect(dclShellBridgeSource).toContain('return completed_process.stdout');
+  });
 });

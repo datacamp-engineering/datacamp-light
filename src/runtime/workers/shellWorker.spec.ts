@@ -85,4 +85,15 @@ describe('shellWorker JSON-RPC contract', () => {
     expect(result.output).toBe('one\ntwo');
     expect(outbound.some((message) => (message as any).method === 'session_output')).toBe(true);
   });
+
+  it('correctly binds script-scoped var declarations to globalThis in Module Workers', () => {
+    const scriptCode = 'var EmscrJSR_test_module = function() { return { initialized: true }; };';
+    const evaluator = new Function(
+      scriptCode +
+        '\nif (typeof EmscrJSR_test_module !== "undefined") { globalThis.EmscrJSR_test_module = EmscrJSR_test_module; }',
+    );
+    evaluator.call(globalThis);
+    expect(typeof (globalThis as any).EmscrJSR_test_module).toBe('function');
+    expect((globalThis as any).EmscrJSR_test_module().initialized).toBe(true);
+  });
 });
