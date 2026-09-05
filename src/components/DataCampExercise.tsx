@@ -412,6 +412,17 @@ const CodeExercise: React.FC<DataCampExerciseProps> = ({
     setPlots([]);
     setFeedback(null);
     setAiState((previous) => ({ ...previous, visible: false }));
+    session
+      .initialize({
+        pec: preExerciseCode,
+        solution,
+        sct,
+        packages,
+        language,
+      })
+      .catch((initializationError: any) => {
+        console.warn('DataCamp Light reset warning:', initializationError);
+      });
   };
 
   const handleToggleSolution = () => {
