@@ -1,6 +1,7 @@
 import type { IJsonRpcSession } from '../../jsonrpc/session';
 import type { IIntrospectCompletion, IIntrospectResult } from '../../jsonrpc/types';
 import type { IShellVfs } from '../../runtime/shellInterpreter';
+import { shellCatalog } from './staticCatalogs';
 import type { CompletionCategory, CompletionSnippetTemplate, IntrospectionRequest } from './types';
 
 const DEBOUNCE_DELAY_MS = 80;
@@ -13,6 +14,31 @@ interface PendingDebounce {
 }
 
 const pendingDebounces = new Map<string, PendingDebounce>();
+
+const extraShellCommands = [
+  'sh',
+  'bash',
+  'python',
+  'node',
+  'git',
+  'diff',
+  'date',
+  'sleep',
+  'whoami',
+  'uname',
+  'printf',
+  'cut',
+  'tr',
+  'gzip',
+  'gunzip',
+  'zip',
+  'unzip',
+  'df',
+  'du',
+  'man',
+  'dirname',
+  'basename',
+];
 
 export function getShellVfsCompletions(
   vfs: IShellVfs,
@@ -32,10 +58,26 @@ export function getShellVfsCompletions(
   const completions: CompletionSnippetTemplate[] = [];
 
   if (isCommandPosition && !currentToken.includes('/')) {
-    const builtins = ['cd', 'pwd', 'export', 'source', 'alias', 'history', 'exit', 'echo', 'clear', 'env', 'which'];
-    for (const command of builtins) {
-      if (command.startsWith(currentToken)) {
-        completions.push({ label: command, detail: 'shell builtin', category: 'function', snippet: command, boost: 90 });
+    for (const template of shellCatalog.templates) {
+      if (template.label.startsWith(currentToken)) {
+        completions.push({
+          label: template.label,
+          detail: template.detail || 'shell command',
+          category: template.category || 'function',
+          snippet: template.label,
+          boost: template.boost || 90,
+        });
+      }
+    }
+    for (const command of extraShellCommands) {
+      if (command.startsWith(currentToken) && !completions.some((c) => c.label === command)) {
+        completions.push({
+          label: command,
+          detail: 'shell command',
+          category: 'function',
+          snippet: command,
+          boost: 85,
+        });
       }
     }
     return completions;

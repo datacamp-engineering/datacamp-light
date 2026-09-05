@@ -96,4 +96,16 @@ describe('shellWorker JSON-RPC contract', () => {
     expect(typeof (globalThis as any).EmscrJSR_test_module).toBe('function');
     expect((globalThis as any).EmscrJSR_test_module().initialized).toBe(true);
   });
+
+  it('introspect suggests shell commands including mkdir and path completions', async () => {
+    const { call } = createWorkerHarness();
+    const commandResult = await call('introspect', { code: 'mk', line: 0, column: 2, prefix: 'mk' });
+    const commandLabels = (commandResult?.completions || []).map((c: any) => c.label);
+    expect(commandLabels).toContain('mkdir');
+
+    await call('runCommand', { command: 'mkdir my_project' });
+    const pathResult = await call('introspect', { code: 'cd my_', line: 0, column: 6, prefix: 'my_' });
+    const pathLabels = (pathResult?.completions || []).map((c: any) => c.label);
+    expect(pathLabels).toContain('my_project/');
+  });
 });
