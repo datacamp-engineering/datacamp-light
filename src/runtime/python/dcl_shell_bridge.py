@@ -125,8 +125,11 @@ def set_standard_input(lines=None):
     global standard_input_queue
     if isinstance(lines, str):
         standard_input_queue = [line for line in lines.split("\n") if line]
-    elif isinstance(lines, (list, tuple)):
-        standard_input_queue = [str(line) for line in lines]
+    elif lines is not None:
+        try:
+            standard_input_queue = [str(line) for line in list(lines)]
+        except Exception:
+            standard_input_queue = []
     else:
         standard_input_queue = []
 

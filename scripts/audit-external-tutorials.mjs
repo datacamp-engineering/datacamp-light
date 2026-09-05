@@ -198,22 +198,14 @@ async function initializePyodideRunner() {
   const pyodide = await loadPyodide();
   await pyodide.loadPackage('micropip');
 
-  // Install dcl_package_manager shim
-  await pyodide.runPythonAsync(`
-import sys
-import types
+  const pythonDirectory = path.join(rootDirectory, 'src', 'runtime', 'python');
+  const packageManagerSource = fs.readFileSync(path.join(pythonDirectory, 'dcl_package_manager.py'), 'utf8');
+  const shellwhatParserSource = fs.readFileSync(path.join(pythonDirectory, 'dcl_shellwhat_parser.py'), 'utf8');
+  const shellBridgeSource = fs.readFileSync(path.join(pythonDirectory, 'dcl_shell_bridge.py'), 'utf8');
+  const ipythonSource = fs.readFileSync(path.join(pythonDirectory, 'dcl_ipython.py'), 'utf8');
 
-dcl_pm = types.ModuleType("dcl_package_manager")
-def install_packages(packages): pass
-def print_packages(): pass
-def get_packages(registry=None): return []
-def get_registry(): return {"packages": {}}
-dcl_pm.install_packages = install_packages
-dcl_pm.print_packages = print_packages
-dcl_pm.get_packages = get_packages
-dcl_pm.get_registry = get_registry
-sys.modules["dcl_package_manager"] = dcl_pm
-`);
+  // Install dcl_package_manager shim
+  await pyodide.runPythonAsync(packageManagerSource);
 
   await pyodide.loadPackage([
     'jinja2',
@@ -227,37 +219,6 @@ sys.modules["dcl_package_manager"] = dcl_pm
 
   const micropip = pyodide.pyimport('micropip');
   await micropip.install(['pyodide_backend', 'bashlex']);
-
-  await pyodide.runPythonAsync(`
-import json
-import types
-import collections
-import collections.abc
-for attr in ["Mapping", "MutableMapping", "Sequence", "Iterable", "Callable"]:
-    if not hasattr(collections, attr):
-        setattr(collections, attr, getattr(collections.abc, attr))
-
-import markupsafe
-if not hasattr(markupsafe, "soft_unicode"):
-    markupsafe.soft_unicode = markupsafe.soft_str
-
-# Provide antlr_ast.ast.Speaker shim in sys.modules so shellwhat/parsers.py imports cleanly
-antlr_ast = types.ModuleType("antlr_ast")
-antlr_ast_ast = types.ModuleType("antlr_ast.ast")
-
-class Speaker:
-    def __init__(self, nodes=None):
-        self.nodes = nodes or {}
-    def describe(self, node, fmt=None, field=None, **kwargs):
-        if fmt:
-            return fmt
-        return getattr(node, "name", type(node).__name__)
-
-antlr_ast_ast.Speaker = Speaker
-antlr_ast.ast = antlr_ast_ast
-sys.modules["antlr_ast"] = antlr_ast
-sys.modules["antlr_ast.ast"] = antlr_ast_ast
-`);
 
   // Mount real shellwhat package sources into Pyodide virtual filesystem
   try { pyodide.FS.mkdirTree('/lib/python3.12/site-packages/shellwhat/checks'); } catch (e) {}
@@ -282,190 +243,9 @@ sys.modules["antlr_ast.ast"] = antlr_ast_ast
     return JSON.stringify(res);
   };
 
-  await pyodide.runPythonAsync(`
-import bashlex
-import shellwhat
-import shellwhat.parsers
-import shellwhat.State
-import shellwhat.test_exercise
-from protowhat.utils_ast import AstNode, AstModule
-
-class BashNode(AstNode):
-    position = ((1, 0), (1, 0))
-    text = ""
-    _fields = ("child", "words", "parts", "children", "token")
-    @property
-    def name(self):
-        return type(self).__name__
-    def get_text(self, full_text=None):
-        return getattr(self, "text", "") or getattr(self, "val", "")
-    def get_position(self):
-        return getattr(self, "position", ((1, 0), (1, 0)))
-
-class BashlexParser(AstModule):
-    AstNode = BashNode
-    @classmethod
-    def parse(cls, code, strict=True):
-        if not code or not str(code).strip():
-            return BashNode()
-        try:
-            parts = bashlex.parse(str(code))
-            root = BashNode()
-            root.children = [cls._wrap_node(p, str(code)) for p in parts]
-            return root
-        except Exception:
-            return BashNode()
-
-    @classmethod
-    def _wrap_node(cls, node, src):
-        wrapped = BashNode()
-        node_kind = getattr(node, "kind", "node")
-        wrapped.__class__ = type(node_kind.capitalize() + "Node", (BashNode,), {})
-        if hasattr(node, "pos"):
-            start, end = node.pos
-            wrapped.text = src[start:end]
-        if hasattr(node, "word"):
-            wrapped.text = node.word
-        if hasattr(node, "parts"):
-            wrapped.parts = [cls._wrap_node(p, src) for p in node.parts]
-        if hasattr(node, "list"):
-            wrapped.children = [cls._wrap_node(p, src) for p in node.list]
-        return wrapped
-
-shellwhat.parsers.DEFAULT_PARSER = BashlexParser
-
-class PyodideShellConnection:
-    def __init__(self, execute_fn=None):
-        self.execute_fn = execute_fn
-    def run_command(self, cmd):
-        return ""
-
-def evaluate_shellwhat(sct, student_code, student_result, pec="", solution=""):
-    conn = PyodideShellConnection()
-    try:
-        result = shellwhat.test_exercise.test_exercise(
-            sct=sct,
-            student_code=student_code or "",
-            student_result=student_result or "",
-            student_conn=conn,
-            solution_code=solution or "",
-            solution_result="",
-            solution_conn=conn,
-            pre_exercise_code=pec or "",
-            ex_type="ShellExercise",
-            error=[],
-        )
-        return json.dumps({
-            "correct": bool(result.get("correct", False)),
-            "message": result.get("message", "Submission evaluated.")
-        })
-    except Exception as err:
-        return json.dumps({
-            "correct": False,
-            "message": str(err)
-        })
-
-import os
-import subprocess
-import js
-import json
-import inspect
-import pydoc
-import time
-import re
-import builtins
-
-def _dcl_execute_shell(cmd):
-    res_str = js.dcl_execute_shell(cmd)
-    return json.loads(res_str)
-
-def _os_system(cmd):
-    res = _dcl_execute_shell(cmd)
-    if res.get("output"):
-        sys.stdout.write(res["output"] + "\\n")
-    if res.get("error"):
-        sys.stderr.write(res["error"] + "\\n")
-    return res.get("exitCode", 0)
-
-os.system = _os_system
-
-class CompletedProcess:
-    def __init__(self, args, returncode, stdout=None, stderr=None):
-        self.args = args
-        self.returncode = returncode
-        self.stdout = stdout
-        self.stderr = stderr
-    def check_returncode(self):
-        if self.returncode != 0:
-            raise subprocess.CalledProcessError(self.returncode, self.args, self.stdout, self.stderr)
-    def __repr__(self):
-        return f"CompletedProcess(args={self.args!r}, returncode={self.returncode!r})"
-
-def _subprocess_run(args, *, stdin=None, input=None, capture_output=False, timeout=None, check=False, encoding=None, errors=None, text=None, env=None, universal_newlines=None, shell=False, **kwargs):
-    if isinstance(args, (list, tuple)):
-        cmd_str = " ".join(str(a) for a in args)
-    else:
-        cmd_str = str(args)
-    
-    res = _dcl_execute_shell(cmd_str)
-    returncode = res.get("exitCode", 0)
-    out_str = res.get("output", "") or ""
-    err_str = res.get("error", "") or ""
-    
-    is_text = bool(text or universal_newlines or encoding or capture_output)
-    
-    stdout_val = out_str if is_text else (out_str.encode("utf-8") if out_str else b"")
-    stderr_val = err_str if is_text else (err_str.encode("utf-8") if err_str else b"")
-    
-    if not capture_output:
-        if out_str:
-            sys.stdout.write(out_str + "\\n")
-        if err_str:
-            sys.stderr.write(err_str + "\\n")
-            
-    cp = CompletedProcess(args, returncode, stdout_val if capture_output else None, stderr_val if capture_output else None)
-    if check and returncode != 0:
-        raise subprocess.CalledProcessError(returncode, args, stdout_val, stderr_val)
-    return cp
-
-def _subprocess_check_output(args, **kwargs):
-    kwargs["capture_output"] = True
-    kwargs["check"] = True
-    kwargs["text"] = True
-    cp = _subprocess_run(args, **kwargs)
-    return cp.stdout or ""
-
-def _subprocess_getoutput(cmd):
-    cp = _subprocess_run(cmd, shell=True, capture_output=True, text=True)
-    return cp.stdout or cp.stderr or ""
-
-subprocess.run = _subprocess_run
-subprocess.check_output = _subprocess_check_output
-subprocess.getoutput = _subprocess_getoutput
-subprocess.CompletedProcess = CompletedProcess
-
-_dcl_stdin_queue = []
-
-def _dcl_set_stdin(lines=None):
-    global _dcl_stdin_queue
-    if isinstance(lines, str):
-        _dcl_stdin_queue = [l for l in lines.split("\\n") if l]
-    elif isinstance(lines, (list, tuple)):
-        _dcl_stdin_queue = [str(l) for l in lines]
-    else:
-        _dcl_stdin_queue = []
-
-def _dcl_safe_input(prompt=""):
-    global _dcl_stdin_queue
-    if _dcl_stdin_queue:
-        return _dcl_stdin_queue.pop(0)
-    return "1 2 3"
-
-builtins.input = _dcl_safe_input
-builtins._dcl_set_stdin = _dcl_set_stdin
-builtins.os = os
-builtins.subprocess = subprocess
-`);
+  await pyodide.runPythonAsync(shellwhatParserSource);
+  await pyodide.runPythonAsync(shellBridgeSource);
+  await pyodide.runPythonAsync(ipythonSource);
 
   // Load common data science packages used by tutorials
   console.log(`[Pyodide] Preloading pandas and numpy packages...`);

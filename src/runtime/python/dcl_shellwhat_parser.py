@@ -3,17 +3,12 @@ import collections.abc
 import json
 import sys
 import types
-import bashlex
-import markupsafe
-from protowhat.utils_ast import AstModule, AstNode
-import shellwhat
-import shellwhat.parsers
-import shellwhat.State
-import shellwhat.test_exercise
 
 for attribute_name in ["Mapping", "MutableMapping", "Sequence", "Iterable", "Callable"]:
     if not hasattr(collections, attribute_name):
         setattr(collections, attribute_name, getattr(collections.abc, attribute_name))
+
+import markupsafe
 
 if not hasattr(markupsafe, "soft_unicode"):
     markupsafe.soft_unicode = markupsafe.soft_str
@@ -36,6 +31,13 @@ antlr_ast_ast.Speaker = Speaker
 antlr_ast.ast = antlr_ast_ast
 sys.modules["antlr_ast"] = antlr_ast
 sys.modules["antlr_ast.ast"] = antlr_ast_ast
+
+import bashlex
+from protowhat.utils_ast import AstModule, AstNode
+import shellwhat
+import shellwhat.parsers
+import shellwhat.State
+import shellwhat.test_exercise
 
 
 class BashNode(AstNode):
