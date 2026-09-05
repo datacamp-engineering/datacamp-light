@@ -38,27 +38,65 @@ const PYTHONWHAT_BUILTIN_DEPENDENCIES = [
 
 const PYTHONWHAT_MICROPIP_DEPENDENCIES = ['pyodide_backend', 'bashlex'];
 
+async function loadScriptInWorker(scriptUrl: string): Promise<void> {
+  if (typeof importScripts === 'function') {
+    try {
+      importScripts(scriptUrl);
+      return;
+    } catch (error) {}
+  }
+  try {
+    const response = await fetch(scriptUrl);
+    if (!response.ok) return;
+    const scriptCode = await response.text();
+    const evaluator = new Function(scriptCode);
+    evaluator.call(globalThis);
+  } catch (error) {}
+}
+
+async function loadPyodideRuntime(): Promise<any> {
+  if (typeof (globalThis as any).loadPyodide === 'function') {
+    return (globalThis as any).loadPyodide;
+  }
+  if (typeof importScripts === 'function') {
+    try {
+      importScripts(PYODIDE_INDEX_URL + 'pyodide.js');
+      if (typeof (globalThis as any).loadPyodide === 'function') {
+        return (globalThis as any).loadPyodide;
+      }
+    } catch (error) {}
+  }
+
+  // Module worker / ESM fallback: dynamic import of pyodide.mjs
+  try {
+    const pyodideModule = await import(/* @vite-ignore */ PYODIDE_INDEX_URL + 'pyodide.mjs');
+    if (pyodideModule && typeof pyodideModule.loadPyodide === 'function') {
+      return pyodideModule.loadPyodide;
+    }
+  } catch (esmError) {
+    try {
+      const response = await fetch(PYODIDE_INDEX_URL + 'pyodide.js');
+      if (response.ok) {
+        const scriptCode = await response.text();
+        const evaluator = new Function(scriptCode);
+        evaluator.call(globalThis);
+        if (typeof (globalThis as any).loadPyodide === 'function') {
+          return (globalThis as any).loadPyodide;
+        }
+      }
+    } catch (fetchError) {}
+  }
+
+  throw new Error('Pyodide loader not available');
+}
+
 async function initPyodide(): Promise<any> {
   if (pyodideReadyPromise) {
     return pyodideReadyPromise;
   }
 
   pyodideReadyPromise = (async () => {
-    if (typeof importScripts === 'function') {
-      try {
-        importScripts(PYODIDE_INDEX_URL + 'pyodide.js');
-      } catch (error) {}
-    }
-    const loadPyodideFunction =
-      typeof (globalThis as any).loadPyodide === 'function'
-        ? (globalThis as any).loadPyodide
-        : typeof loadPyodide === 'function'
-        ? loadPyodide
-        : null;
-
-    if (!loadPyodideFunction) {
-      throw new Error('Pyodide loader not available');
-    }
+    const loadPyodideFunction = await loadPyodideRuntime();
 
     pyodide = await loadPyodideFunction({
       indexURL: PYODIDE_INDEX_URL,
@@ -92,59 +130,55 @@ async function initPyodide(): Promise<any> {
 
     (async () => {
       try {
-        if (typeof importScripts === 'function') {
-          const resolveAssetUrl = (fileName: string) => {
-            const globalScope = self as any;
-            if (globalScope.DCL_ASSET_BASE_URL) {
-              return String(globalScope.DCL_ASSET_BASE_URL).replace(/\/+$/, '') + '/' + fileName;
-            }
-            if (dclConfig.assetBaseUrl) {
-              return dclConfig.assetBaseUrl.replace(/\/+$/, '') + '/' + fileName;
-            }
-            const origin = typeof location !== 'undefined' && location.origin ? location.origin : '';
-            return (origin ? origin + '/' : '/') + fileName;
-          };
-
-          const scriptUrl = resolveAssetUrl('busybox.js');
-          try {
-            importScripts(scriptUrl);
-          } catch (error) {}
-
-          const globalScope = globalThis as any;
-          if (typeof globalScope.EmscrJSR_busybox === 'function') {
-            let stdoutBuffer = '';
-            let stderrBuffer = '';
-
-            const emscriptenModule = await globalScope.EmscrJSR_busybox({
-              locateFile: (path: string) => resolveAssetUrl(path),
-              thisProgram: 'busybox',
-              noInitialRun: true,
-              noExitRuntime: true,
-              print: (text: string) => {
-                stdoutBuffer += (stdoutBuffer ? '\n' : '') + text;
-              },
-              printErr: (text: string) => {
-                stderrBuffer += (stderrBuffer ? '\n' : '') + text;
-              },
-            });
-
-            emscriptenModule.__resetBuffers = () => {
-              stdoutBuffer = '';
-              stderrBuffer = '';
-            };
-            emscriptenModule.__getStdout = () => stdoutBuffer;
-            emscriptenModule.__getStderr = () => stderrBuffer;
-
-            const wasmRunner: WasmAppletRunner = createBusyboxRunner(
-              emscriptenModule,
-              wasmVirtualFileSystem,
-            );
-            activeShell = createShellInterpreter({
-              vfs: wasmVirtualFileSystem,
-              wasmRunner,
-              preferWasmOverBuiltins: true,
-            });
+        const resolveAssetUrl = (fileName: string) => {
+          const globalScope = self as any;
+          if (globalScope.DCL_ASSET_BASE_URL) {
+            return String(globalScope.DCL_ASSET_BASE_URL).replace(/\/+$/, '') + '/' + fileName;
           }
+          if (dclConfig.assetBaseUrl) {
+            return dclConfig.assetBaseUrl.replace(/\/+$/, '') + '/' + fileName;
+          }
+          const origin = typeof location !== 'undefined' && location.origin ? location.origin : '';
+          return (origin ? origin + '/' : '/') + fileName;
+        };
+
+        const scriptUrl = resolveAssetUrl('busybox.js');
+        await loadScriptInWorker(scriptUrl);
+
+        const globalScope = globalThis as any;
+        if (typeof globalScope.EmscrJSR_busybox === 'function') {
+          let stdoutBuffer = '';
+          let stderrBuffer = '';
+
+          const emscriptenModule = await globalScope.EmscrJSR_busybox({
+            locateFile: (path: string) => resolveAssetUrl(path),
+            thisProgram: 'busybox',
+            noInitialRun: true,
+            noExitRuntime: true,
+            print: (text: string) => {
+              stdoutBuffer += (stdoutBuffer ? '\n' : '') + text;
+            },
+            printErr: (text: string) => {
+              stderrBuffer += (stderrBuffer ? '\n' : '') + text;
+            },
+          });
+
+          emscriptenModule.__resetBuffers = () => {
+            stdoutBuffer = '';
+            stderrBuffer = '';
+          };
+          emscriptenModule.__getStdout = () => stdoutBuffer;
+          emscriptenModule.__getStderr = () => stderrBuffer;
+
+          const wasmRunner: WasmAppletRunner = createBusyboxRunner(
+            emscriptenModule,
+            wasmVirtualFileSystem,
+          );
+          activeShell = createShellInterpreter({
+            vfs: wasmVirtualFileSystem,
+            wasmRunner,
+            preferWasmOverBuiltins: true,
+          });
         }
       } catch (error) {}
     })();

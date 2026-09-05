@@ -22,58 +22,68 @@ function resolveAssetUrl(fileName: string): string {
   return (origin ? origin + '/' : '/') + fileName;
 }
 
+async function loadScriptInWorker(scriptUrl: string): Promise<void> {
+  if (typeof importScripts === 'function') {
+    try {
+      importScripts(scriptUrl);
+      return;
+    } catch (error) {}
+  }
+  try {
+    const response = await fetch(scriptUrl);
+    if (!response.ok) return;
+    const scriptCode = await response.text();
+    const evaluator = new Function(scriptCode);
+    evaluator.call(globalThis);
+  } catch (error) {}
+}
+
 async function getWasmModule(): Promise<any> {
   if (wasmReadyPromise) return wasmReadyPromise;
 
   wasmReadyPromise = (async () => {
     try {
-      if (typeof importScripts === 'function') {
-        const scriptUrl = resolveAssetUrl('busybox.js');
-        try {
-          importScripts(scriptUrl);
-        } catch (error) {
-          // Fallback if importScripts failed
-        }
+      const scriptUrl = resolveAssetUrl('busybox.js');
+      await loadScriptInWorker(scriptUrl);
 
-        const globalScope = globalThis as any;
-        if (typeof globalScope.EmscrJSR_busybox === 'function') {
-          let stdoutBuffer = '';
-          let stderrBuffer = '';
+      const globalScope = globalThis as any;
+      if (typeof globalScope.EmscrJSR_busybox === 'function') {
+        let stdoutBuffer = '';
+        let stderrBuffer = '';
 
-          const emscriptenModule = await globalScope.EmscrJSR_busybox({
-            locateFile: (path: string) => resolveAssetUrl(path),
-            thisProgram: 'busybox',
-            noInitialRun: true,
-            noExitRuntime: true,
-            print: (text: string) => {
-              stdoutBuffer += (stdoutBuffer ? '\n' : '') + text;
-            },
-            printErr: (text: string) => {
-              stderrBuffer += (stderrBuffer ? '\n' : '') + text;
-            },
-          });
+        const emscriptenModule = await globalScope.EmscrJSR_busybox({
+          locateFile: (path: string) => resolveAssetUrl(path),
+          thisProgram: 'busybox',
+          noInitialRun: true,
+          noExitRuntime: true,
+          print: (text: string) => {
+            stdoutBuffer += (stdoutBuffer ? '\n' : '') + text;
+          },
+          printErr: (text: string) => {
+            stderrBuffer += (stderrBuffer ? '\n' : '') + text;
+          },
+        });
 
-          emscriptenModule.__resetBuffers = () => {
-            stdoutBuffer = '';
-            stderrBuffer = '';
-          };
-          emscriptenModule.__getStdout = () => stdoutBuffer;
-          emscriptenModule.__getStderr = () => stderrBuffer;
+        emscriptenModule.__resetBuffers = () => {
+          stdoutBuffer = '';
+          stderrBuffer = '';
+        };
+        emscriptenModule.__getStdout = () => stdoutBuffer;
+        emscriptenModule.__getStderr = () => stderrBuffer;
 
-          try { emscriptenModule.FS.mkdir('/home'); } catch (error) {}
-          try { emscriptenModule.FS.mkdir('/home/repl'); } catch (error) {}
-          try { emscriptenModule.FS.mkdir('/tmp'); } catch (error) {}
-          emscriptenModule.FS.chdir('/home/repl');
+        try { emscriptenModule.FS.mkdir('/home'); } catch (error) {}
+        try { emscriptenModule.FS.mkdir('/home/repl'); } catch (error) {}
+        try { emscriptenModule.FS.mkdir('/tmp'); } catch (error) {}
+        emscriptenModule.FS.chdir('/home/repl');
 
-          const wasmVirtualFileSystem: IShellVfs = createEmscriptenVfs(emscriptenModule);
-          const wasmRunner: WasmAppletRunner = createBusyboxRunner(emscriptenModule, wasmVirtualFileSystem);
-          activeShell = createShellInterpreter({
-            vfs: wasmVirtualFileSystem,
-            wasmRunner,
-            preferWasmOverBuiltins: true,
-          });
-          return emscriptenModule;
-        }
+        const wasmVirtualFileSystem: IShellVfs = createEmscriptenVfs(emscriptenModule);
+        const wasmRunner: WasmAppletRunner = createBusyboxRunner(emscriptenModule, wasmVirtualFileSystem);
+        activeShell = createShellInterpreter({
+          vfs: wasmVirtualFileSystem,
+          wasmRunner,
+          preferWasmOverBuiltins: true,
+        });
+        return emscriptenModule;
       }
     } catch (error) {
       console.warn('BusyBox WASM initialization warning (using fallback):', error);
