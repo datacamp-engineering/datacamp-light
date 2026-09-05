@@ -4,7 +4,7 @@ import { python } from '@codemirror/lang-python';
 import { HighlightStyle, StreamLanguage, syntaxHighlighting } from '@codemirror/language';
 import { r } from '@codemirror/legacy-modes/mode/r';
 import { shell } from '@codemirror/legacy-modes/mode/shell';
-import { EditorState } from '@codemirror/state';
+import { EditorState, Prec } from '@codemirror/state';
 import { EditorView, ViewUpdate, keymap } from '@codemirror/view';
 import { hexToRgba } from '@datacamp/waffles/helpers';
 import { theme } from '@datacamp/waffles/theme';
@@ -145,11 +145,13 @@ export const CodeEditor: React.FC<CodeEditorProps> = ({
         dcEditorTheme,
         dcHighlightStyle,
         EditorView.lineWrapping,
-        keymap.of([
-          { key: 'Tab', run: acceptCompletion },
-          ...completionKeymap,
-          indentWithTab,
-        ]),
+        Prec.highest(
+          keymap.of([
+            { key: 'Tab', run: acceptCompletion },
+            ...completionKeymap,
+            indentWithTab,
+          ]),
+        ),
         EditorState.readOnly.of(readOnly),
         EditorView.updateListener.of((update: ViewUpdate) => {
           if (update.docChanged) {

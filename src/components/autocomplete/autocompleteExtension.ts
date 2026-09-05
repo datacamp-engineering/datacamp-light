@@ -182,7 +182,7 @@ export function createAutocompleteExtension(
       activateOnTyping: true,
       activateOnTypingDelay: 60,
       updateSyncTime: 80,
-      defaultKeymap: false,
+      defaultKeymap: true,
       maxRenderedOptions: 50,
       selectOnOpen: true,
       closeOnBlur: true,
