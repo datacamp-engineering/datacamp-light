@@ -482,3 +482,131 @@ export function extractDocumentSymbols(code: string, language: string): Completi
 
   return templates;
 }
+
+const pythonStaticMembers: Record<string, CompletionSnippetTemplate[]> = {
+  plt: [
+    template('plot', 'Plot lines or markers', 'function', 'plot(${1:x}, ${2:y})', 95, documentation('matplotlib.pyplot.plot: plot lines and/or markers.', { signature: 'plt.plot(x, y, [fmt], **kwargs)' })),
+    template('scatter', 'Scatter plot', 'function', 'scatter(${1:x}, ${2:y})', 95, documentation('matplotlib.pyplot.scatter: scatter plot.', { signature: 'plt.scatter(x, y, s=None, c=None, marker=None)' })),
+    template('hist', 'Histogram of values', 'function', 'hist(${1:x}, bins=${2:10})', 95, documentation('matplotlib.pyplot.hist: compute and draw histogram.', { signature: 'plt.hist(x, bins=None, range=None, density=False)' })),
+    template('bar', 'Vertical bar plot', 'function', 'bar(${1:x}, ${2:height})', 94, documentation('matplotlib.pyplot.bar: make a bar plot.', { signature: 'plt.bar(x, height, width=0.8, bottom=None)' })),
+    template('barh', 'Horizontal bar plot', 'function', 'barh(${1:y}, ${2:width})', 94),
+    template('boxplot', 'Box and whisker plot', 'function', 'boxplot(${1:x})', 94),
+    template('title', 'Set plot title', 'function', 'title(${1:label})', 95, documentation('matplotlib.pyplot.title: set a title for the axes.', { signature: 'plt.title(label, fontdict=None, loc=None)' })),
+    template('xlabel', 'Set x-axis label', 'function', 'xlabel(${1:xlabel})', 95, documentation('matplotlib.pyplot.xlabel: set the label for the x-axis.', { signature: 'plt.xlabel(xlabel, fontdict=None, labelpad=None)' })),
+    template('ylabel', 'Set y-axis label', 'function', 'ylabel(${1:ylabel})', 95, documentation('matplotlib.pyplot.ylabel: set the label for the y-axis.', { signature: 'plt.ylabel(ylabel, fontdict=None, labelpad=None)' })),
+    template('legend', 'Place a legend on the axes', 'function', 'legend()', 95, documentation('matplotlib.pyplot.legend: place a legend on the axes.', { signature: 'plt.legend(*args, **kwargs)' })),
+    template('show', 'Display all open figures', 'function', 'show()', 96, documentation('matplotlib.pyplot.show: display all open figures.', { signature: 'plt.show()' })),
+    template('figure', 'Create a new figure', 'function', 'figure(figsize=(${1:8}, ${2:6}))', 95, documentation('matplotlib.pyplot.figure: create a new figure.', { signature: 'plt.figure(num=None, figsize=None, dpi=None)' })),
+    template('subplot', 'Add a subplot to the figure', 'function', 'subplot(${1:nrows}, ${2:ncols}, ${3:index})', 94),
+    template('subplots', 'Create a figure and grid of subplots', 'function', 'subplots(${1:nrows}=1, ${2:ncols}=1)', 95),
+    template('grid', 'Configure grid lines', 'function', 'grid(${1:visible}=True)', 93),
+    template('xlim', 'Get or set x-limits of current axes', 'function', 'xlim(${1:left}, ${2:right})', 92),
+    template('ylim', 'Get or set y-limits of current axes', 'function', 'ylim(${1:bottom}, ${2:top})', 92),
+    template('savefig', 'Save the current figure', 'function', 'savefig(${1:filename})', 93),
+    template('clf', 'Clear current figure', 'function', 'clf()', 91),
+    template('close', 'Close figure window', 'function', 'close()', 91),
+    template('tight_layout', 'Adjust padding between subplots', 'function', 'tight_layout()', 93),
+    template('xticks', 'Get or set current tick locations on x-axis', 'function', 'xticks(${1:ticks}=None, ${2:labels}=None)', 92),
+    template('yticks', 'Get or set current tick locations on y-axis', 'function', 'yticks(${1:ticks}=None, ${2:labels}=None)', 92),
+    template('axhline', 'Add a horizontal line across the axis', 'function', 'axhline(y=${1:0}, color=${2:"r"})', 91),
+    template('axvline', 'Add a vertical line across the axis', 'function', 'axvline(x=${1:0}, color=${2:"r"})', 91),
+  ],
+  np: [
+    template('array', 'Create a NumPy array', 'function', 'array(${1:object})', 96, documentation('numpy.array: create an array.', { signature: 'np.array(object, dtype=None, copy=True)' })),
+    template('zeros', 'Return a new array filled with zeros', 'function', 'zeros(${1:shape})', 95, documentation('numpy.zeros: return a new array of given shape and type, filled with zeros.', { signature: 'np.zeros(shape, dtype=float)' })),
+    template('ones', 'Return a new array filled with ones', 'function', 'ones(${1:shape})', 95, documentation('numpy.ones: return a new array of given shape and type, filled with ones.', { signature: 'np.ones(shape, dtype=float)' })),
+    template('empty', 'Return a new array without initializing entries', 'function', 'empty(${1:shape})', 93),
+    template('arange', 'Return evenly spaced values within a given interval', 'function', 'arange(${1:start}, ${2:stop}, ${3:step})', 95, documentation('numpy.arange: return evenly spaced values within a given interval.', { signature: 'np.arange([start, ]stop[, step, ])' })),
+    template('linspace', 'Return evenly spaced numbers over a specified interval', 'function', 'linspace(${1:start}, ${2:stop}, ${3:num}=50)', 95, documentation('numpy.linspace: return evenly spaced numbers over a specified interval.', { signature: 'np.linspace(start, stop, num=50)' })),
+    template('mean', 'Compute the arithmetic mean along the specified axis', 'function', 'mean(${1:a})', 95),
+    template('std', 'Compute the standard deviation along the specified axis', 'function', 'std(${1:a})', 95),
+    template('var', 'Compute the variance along the specified axis', 'function', 'var(${1:a})', 94),
+    template('median', 'Compute the median along the specified axis', 'function', 'median(${1:a})', 94),
+    template('sum', 'Sum of array elements over a given axis', 'function', 'sum(${1:a})', 95),
+    template('min', 'Return the minimum of an array or minimum along an axis', 'function', 'min(${1:a})', 95),
+    template('max', 'Return the maximum of an array or maximum along an axis', 'function', 'max(${1:a})', 95),
+    template('dot', 'Dot product of two arrays', 'function', 'dot(${1:a}, ${2:b})', 95),
+    template('matmul', 'Matrix product of two arrays', 'function', 'matmul(${1:x1}, ${2:x2})', 94),
+    template('where', 'Return elements chosen from x or y depending on condition', 'function', 'where(${1:condition}, ${2:x}, ${3:y})', 95),
+    template('concatenate', 'Join a sequence of arrays along an existing axis', 'function', 'concatenate((${1:arrays}), axis=${2:0})', 94),
+    template('vstack', 'Stack arrays in sequence vertically (row wise)', 'function', 'vstack((${1:tup}))', 93),
+    template('hstack', 'Stack arrays in sequence horizontally (column wise)', 'function', 'hstack((${1:tup}))', 93),
+    template('reshape', 'Gives a new shape to an array without changing its data', 'function', 'reshape(${1:a}, ${2:newshape})', 94),
+    template('transpose', 'Reverse or permute the axes of an array', 'function', 'transpose(${1:a})', 93),
+    template('random', 'Random sampling sub-module', 'module', 'random', 94),
+    template('linalg', 'Linear algebra sub-module', 'module', 'linalg', 93),
+    template('unique', 'Find the unique elements of an array', 'function', 'unique(${1:ar})', 93),
+    template('isnan', 'Test element-wise for NaN and return result as a boolean array', 'function', 'isnan(${1:x})', 93),
+  ],
+  pd: [
+    template('DataFrame', 'Two-dimensional tabular data structure', 'class', 'DataFrame(${1:data})', 96, documentation('pandas.DataFrame: two-dimensional, size-mutable, potentially heterogeneous tabular data.', { signature: 'pd.DataFrame(data=None, index=None, columns=None)' })),
+    template('Series', 'One-dimensional labeled array', 'class', 'Series(${1:data})', 95, documentation('pandas.Series: one-dimensional ndarray with axis labels.', { signature: 'pd.Series(data=None, index=None, dtype=None)' })),
+    template('read_csv', 'Read a comma-separated values (csv) file into DataFrame', 'function', 'read_csv(${1:filepath_or_buffer})', 96, documentation('pandas.read_csv: read a CSV file into DataFrame.', { signature: "pd.read_csv(filepath_or_buffer, sep=',')" })),
+    template('read_parquet', 'Load a parquet object from the file path, returning a DataFrame', 'function', 'read_parquet(${1:path})', 95),
+    template('read_excel', 'Read an Excel file into a pandas DataFrame', 'function', 'read_excel(${1:io})', 94),
+    template('read_json', 'Convert a JSON string to pandas object', 'function', 'read_json(${1:path_or_buf})', 94),
+    template('concat', 'Concatenate pandas objects along a particular axis', 'function', 'concat([${1:objs}], axis=${2:0})', 95),
+    template('merge', 'Merge DataFrame or named Series objects with a database-style join', 'function', 'merge(${1:left}, ${2:right}, on=${3:None}, how=${4:"inner"})', 95),
+    template('to_datetime', 'Convert argument to datetime', 'function', 'to_datetime(${1:arg})', 95),
+    template('isna', 'Detect missing values for an array-like object', 'function', 'isna(${1:obj})', 94),
+    template('notna', 'Detect non-missing values for an array-like object', 'function', 'notna(${1:obj})', 94),
+    template('get_dummies', 'Convert categorical variable into dummy/indicator variables', 'function', 'get_dummies(${1:data})', 94),
+    template('date_range', 'Return a fixed frequency DatetimeIndex', 'function', 'date_range(start=${1:start}, end=${2:end}, freq=${3:"D"})', 93),
+  ],
+  df: [
+    template('head', 'Return the first n rows', 'function', 'head(${1:n}=5)', 96, documentation('DataFrame.head: return the first n rows.', { signature: 'df.head(n=5)' })),
+    template('tail', 'Return the last n rows', 'function', 'tail(${1:n}=5)', 96, documentation('DataFrame.tail: return the last n rows.', { signature: 'df.tail(n=5)' })),
+    template('describe', 'Generate descriptive statistics', 'function', 'describe()', 95),
+    template('info', 'Print a concise summary of a DataFrame', 'function', 'info()', 95),
+    template('shape', 'Return a tuple representing the dimensionality of the DataFrame', 'property', 'shape', 95),
+    template('columns', 'The column labels of the DataFrame', 'property', 'columns', 95),
+    template('index', 'The index (row labels) of the DataFrame', 'property', 'index', 94),
+    template('dtypes', 'Return the dtypes in the DataFrame', 'property', 'dtypes', 94),
+    template('values', 'Return a Numpy representation of the DataFrame', 'property', 'values', 93),
+    template('groupby', 'Group DataFrame using a mapper or by a Series of columns', 'function', 'groupby(${1:by})', 95),
+    template('dropna', 'Remove missing values', 'function', 'dropna(axis=${1:0})', 95),
+    template('fillna', 'Fill NA/NaN values using the specified method', 'function', 'fillna(${1:value})', 95),
+    template('drop', 'Drop specified labels from rows or columns', 'function', 'drop(columns=[${1:cols}])', 94),
+    template('rename', 'Alter axes labels', 'function', 'rename(columns={${1:mapping}})', 94),
+    template('reset_index', 'Reset the index of the DataFrame', 'function', 'reset_index(drop=${1:False})', 94),
+    template('set_index', 'Set the DataFrame index using existing columns', 'function', 'set_index(${1:keys})', 94),
+    template('sort_values', 'Sort by the values along either axis', 'function', 'sort_values(by=${1:by}, ascending=${2:True})', 95),
+    template('apply', 'Apply a function along an axis of the DataFrame', 'function', 'apply(${1:func})', 94),
+    template('value_counts', 'Return a Series containing counts of unique rows in the DataFrame', 'function', 'value_counts()', 94),
+    template('copy', 'Make a copy of this object indices and data', 'function', 'copy()', 93),
+    template('to_csv', 'Write object to a comma-separated values (csv) file', 'function', 'to_csv(${1:path_or_buf})', 94),
+    template('plot', 'Make plots of Series or DataFrame', 'function', 'plot(kind=${1:"line"})', 94),
+    template('corr', 'Compute pairwise correlation of columns', 'function', 'corr()', 93),
+  ],
+  sns: [
+    template('lineplot', 'Draw a line plot with possibility of several semantic groupings', 'function', 'lineplot(data=${1:data}, x=${2:x}, y=${3:y})', 95),
+    template('barplot', 'Show point estimates and errors as rectangular bars', 'function', 'barplot(data=${1:data}, x=${2:x}, y=${3:y})', 95),
+    template('scatterplot', 'Draw a scatter plot with possibility of several semantic groupings', 'function', 'scatterplot(data=${1:data}, x=${2:x}, y=${3:y})', 95),
+    template('histplot', 'Plot univariate or bivariate histograms', 'function', 'histplot(data=${1:data}, x=${2:x})', 95),
+    template('boxplot', 'Draw a box plot to show distributions with respect to categories', 'function', 'boxplot(data=${1:data}, x=${2:x}, y=${3:y})', 95),
+    template('heatmap', 'Plot rectangular data as a color-encoded matrix', 'function', 'heatmap(${1:data}, annot=${2:True})', 95),
+    template('pairplot', 'Plot pairwise relationships in a dataset', 'function', 'pairplot(${1:data})', 94),
+    template('set_theme', 'Set the visual theme for matplotlib and seaborn plots', 'function', 'set_theme()', 94),
+    template('despine', 'Remove the top and right spines from plot(s)', 'function', 'despine()', 93),
+  ],
+};
+
+pythonStaticMembers.pyplot = pythonStaticMembers.plt;
+pythonStaticMembers.numpy = pythonStaticMembers.np;
+pythonStaticMembers.pandas = pythonStaticMembers.pd;
+pythonStaticMembers.data = pythonStaticMembers.df;
+
+export function getStaticMemberCompletions(
+  targetObject: string,
+  language: string,
+): CompletionSnippetTemplate[] {
+  if (!targetObject) return [];
+  const normalizedLanguage = (language || 'python').toLowerCase();
+  const normalizedTarget = targetObject.toLowerCase();
+
+  if (normalizedLanguage === 'python') {
+    return pythonStaticMembers[normalizedTarget] || [];
+  }
+  return [];
+}
+

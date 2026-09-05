@@ -32,13 +32,19 @@ describe('autocomplete extension', () => {
     expect(labels).toContain('print');
   });
 
-  it('starts member completions after the dot trigger', async () => {
+  it('starts member completions after the dot trigger and excludes top-level keywords/templates', async () => {
     const source = createLanguageCompletionSource('python');
-    const state = createState('pd.');
-    const result = await resolveSource(source, state, 3);
-    expect(result?.from).toBe(3);
+    const state = createState('plt.');
+    const result = await resolveSource(source, state, 4);
+    expect(result?.from).toBe(4);
     const labels = result?.options.map((option) => option.label) ?? [];
-    expect(labels).toContain('head');
+    expect(labels).toContain('plot');
+    expect(labels).toContain('show');
+    expect(labels).toContain('title');
+    expect(labels).not.toContain('def');
+    expect(labels).not.toContain('class');
+    expect(labels).not.toContain('import');
+    expect(labels).not.toContain('while');
   });
 
   it('returns static variables defined in document before or without execution', async () => {

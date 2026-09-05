@@ -15,6 +15,7 @@ import { getDynamicCompletions } from './dynamicIntrospection';
 import {
   extractDocumentSymbols,
   getStaticCompletionCatalog,
+  getStaticMemberCompletions,
   staticCatalogToCompletions,
   templateToCompletion,
 } from './staticCatalogs';
@@ -38,6 +39,7 @@ interface MatchRange {
   from: number;
   text: string;
   triggerCharacter: string;
+  targetObject: string;
 }
 
 export function normalizeLanguage(language?: string): string {
@@ -62,18 +64,19 @@ function computeMatchRange(
   context: CompletionContext,
   tokenMatch: { from: number; to: number; text: string } | null,
 ): MatchRange {
-  if (!tokenMatch) return { from: context.pos, text: '', triggerCharacter: '' };
+  if (!tokenMatch) return { from: context.pos, text: '', triggerCharacter: '', targetObject: '' };
   let from = tokenMatch.from;
   if (language === 'shell') {
     const lastSlashIndex = tokenMatch.text.lastIndexOf('/');
     if (lastSlashIndex !== -1) {
       return {
         from: from + lastSlashIndex + 1,
-        text: tokenMatch.text,
+        text: tokenMatch.text.slice(lastSlashIndex + 1),
         triggerCharacter: '/',
+        targetObject: tokenMatch.text.slice(0, lastSlashIndex),
       };
     }
-    return { from, text: tokenMatch.text, triggerCharacter: '' };
+    return { from, text: tokenMatch.text, triggerCharacter: '', targetObject: '' };
   }
   const triggers = memberTriggerCharactersByLanguage[language] || [];
   let lastTriggerIndex = -1;
@@ -86,13 +89,15 @@ function computeMatchRange(
     }
   }
   if (lastTriggerIndex !== -1) {
+    const targetObject = tokenMatch.text.slice(0, lastTriggerIndex).split('.').pop() || '';
     return {
       from: from + lastTriggerIndex + 1,
       text: tokenMatch.text.slice(lastTriggerIndex + 1),
       triggerCharacter,
+      targetObject,
     };
   }
-  return { from, text: tokenMatch.text, triggerCharacter: '' };
+  return { from, text: tokenMatch.text, triggerCharacter: '', targetObject: '' };
 }
 
 function mergeCompletionsByLabel(
@@ -128,9 +133,17 @@ export function createLanguageCompletionSource(
     const matchRange = computeMatchRange(normalizedLanguage, context, tokenMatch);
     const lineObject = context.state.doc.lineAt(context.pos);
     const docCode = context.state.doc.toString();
-    const documentStaticTemplates = extractDocumentSymbols(docCode, normalizedLanguage);
-    const documentStaticCompletions = documentStaticTemplates.map(templateToCompletion);
-    const baseOptions = mergeCompletionsByLabel(staticCompletions, documentStaticCompletions);
+    const isMemberAccess = Boolean(matchRange.triggerCharacter);
+
+    let baseOptions: Completion[] = [];
+    if (isMemberAccess) {
+      const memberTemplates = getStaticMemberCompletions(matchRange.targetObject, normalizedLanguage);
+      baseOptions = memberTemplates.map(templateToCompletion);
+    } else {
+      const documentStaticTemplates = extractDocumentSymbols(docCode, normalizedLanguage);
+      const documentStaticCompletions = documentStaticTemplates.map(templateToCompletion);
+      baseOptions = mergeCompletionsByLabel(staticCompletions, documentStaticCompletions);
+    }
 
     const request: IntrospectionRequest = {
       language: normalizedLanguage,
