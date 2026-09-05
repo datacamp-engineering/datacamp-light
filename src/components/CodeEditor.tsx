@@ -1,3 +1,4 @@
+import { acceptCompletion, completionKeymap } from '@codemirror/autocomplete';
 import { indentWithTab } from '@codemirror/commands';
 import { python } from '@codemirror/lang-python';
 import { HighlightStyle, StreamLanguage, syntaxHighlighting } from '@codemirror/language';
@@ -11,6 +12,8 @@ import { tokens } from '@datacamp/waffles/tokens';
 import { tags as t } from '@lezer/highlight';
 import { basicSetup } from 'codemirror';
 import React, { useEffect, useRef } from 'react';
+import type { IJsonRpcSession } from '../jsonrpc/session';
+import { createAutocompleteExtension } from './autocomplete/autocompleteExtension';
 
 const dcEditorTheme = EditorView.theme({
   '&': {
@@ -100,6 +103,7 @@ interface CodeEditorProps {
   height?: number | string;
   readOnly?: boolean;
   language?: string;
+  session?: IJsonRpcSession | null;
 }
 
 const getLanguageExtension = (language?: string) => {
@@ -119,6 +123,7 @@ export const CodeEditor: React.FC<CodeEditorProps> = ({
   height = 240,
   readOnly = false,
   language = 'python',
+  session = null,
 }) => {
   const containerReference = useRef<HTMLDivElement>(null);
   const viewReference = useRef<EditorView | null>(null);
@@ -136,10 +141,15 @@ export const CodeEditor: React.FC<CodeEditorProps> = ({
       extensions: [
         basicSetup,
         getLanguageExtension(language),
+        createAutocompleteExtension(language, session),
         dcEditorTheme,
         dcHighlightStyle,
         EditorView.lineWrapping,
-        keymap.of([indentWithTab]),
+        keymap.of([
+          { key: 'Tab', run: acceptCompletion },
+          ...completionKeymap,
+          indentWithTab,
+        ]),
         EditorState.readOnly.of(readOnly),
         EditorView.updateListener.of((update: ViewUpdate) => {
           if (update.docChanged) {

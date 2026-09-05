@@ -101,3 +101,25 @@ export interface ISessionOutputNotification {
   type: 'output' | 'graph' | 'error' | 'sct';
   payload: unknown;
 }
+
+export interface IIntrospectParams {
+  language: string;
+  code: string;
+  line: number;
+  column: number;
+  prefix: string;
+  triggerCharacter?: string;
+}
+
+export interface IIntrospectCompletion {
+  label: string;
+  type: string;
+  detail?: string;
+  info?: string;
+  boost?: number;
+  apply?: string;
+}
+
+export interface IIntrospectResult {
+  completions: IIntrospectCompletion[];
+}

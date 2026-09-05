@@ -70,14 +70,16 @@ async function runIntegrationTest() {
   };
 
   // 5. Load native Python modules
-  console.log('[Modules] Loading dcl_shellwhat_parser, dcl_shell_bridge, dcl_ipython...');
+  console.log('[Modules] Loading dcl_shellwhat_parser, dcl_shell_bridge, dcl_ipython, dcl_introspection...');
   const shellwhatParserSource = fs.readFileSync(path.join(pythonDirectory, 'dcl_shellwhat_parser.py'), 'utf8');
   const shellBridgeSource = fs.readFileSync(path.join(pythonDirectory, 'dcl_shell_bridge.py'), 'utf8');
   const ipythonSource = fs.readFileSync(path.join(pythonDirectory, 'dcl_ipython.py'), 'utf8');
+  const introspectionSource = fs.readFileSync(path.join(pythonDirectory, 'dcl_introspection.py'), 'utf8');
 
   await pyodide.runPythonAsync(shellwhatParserSource);
   await pyodide.runPythonAsync(shellBridgeSource);
   await pyodide.runPythonAsync(ipythonSource);
+  await pyodide.runPythonAsync(introspectionSource);
 
   // 6. Load data science libraries
   console.log('[Packages] Preloading numpy and matplotlib...');
@@ -148,6 +150,20 @@ _get_fontconfig_fonts()
     throw new Error(`%whos magic output failed: ${JSON.stringify(whosEntries)}`);
   }
   console.log('  ✅ PASS: %whos magic formatted variables table successfully.');
+
+  // Test Case 5: Dynamic introspection via dcl_introspect
+  console.log('\n[Test 5] Verifying runtime dynamic autocompletion introspection (dcl_introspect)...');
+  const introspectPythonFunction = pyodide.globals.get('dcl_introspect');
+  const introspectionResultJson = introspectPythonFunction('import numpy as np\nnp.', 2, 3, 'np.', '.');
+  const introspectionSuggestions = JSON.parse(introspectionResultJson);
+  if (!Array.isArray(introspectionSuggestions) || introspectionSuggestions.length === 0) {
+    throw new Error('dcl_introspect returned empty suggestions for np.');
+  }
+  const hasLinspace = introspectionSuggestions.some((item) => item.label === 'linspace');
+  if (!hasLinspace) {
+    throw new Error('dcl_introspect did not find linspace on np');
+  }
+  console.log(`  ✅ PASS: dcl_introspect returned ${introspectionSuggestions.length} attributes on np (including linspace).`);
 
   console.log(`\n======================================================================`);
   console.log(` All WASM & Python Integration Tests PASSED (4/4)`);

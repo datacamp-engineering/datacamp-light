@@ -1,5 +1,8 @@
 import type {
   IInitializeParams,
+  IIntrospectCompletion,
+  IIntrospectParams,
+  IIntrospectResult,
   IRunCodeParams,
   IRunCodeResult,
   ISessionStatus,
@@ -437,6 +440,91 @@ export class RWebRSession {
     }
   }
 
+  public async introspect(params: IIntrospectParams): Promise<IIntrospectResult> {
+    try {
+      const webR = await this.getWebR();
+      const escapeRString = (text: string) => JSON.stringify(text);
+      const prefix = params.prefix || '';
+      const triggerCharacter = params.triggerCharacter || '';
+
+      const introspectionCode = `
+        local({
+          r_prefix <- ${escapeRString(prefix)}
+          r_trigger <- ${escapeRString(triggerCharacter)}
+          r_escape_json <- function(value) {
+            value <- as.character(value)
+            value <- gsub("\\\\", "\\\\\\\\", value, fixed = TRUE)
+            value <- gsub('"', '\\\\"', value)
+            value <- gsub("\\n", "\\\\n", value, fixed = TRUE)
+            value <- gsub("\\r", "\\\\r", value, fixed = TRUE)
+            value <- gsub("\\t", "\\\\t", value, fixed = TRUE)
+            value
+          }
+          r_results <- list()
+          if (nchar(r_trigger) > 0 && (r_trigger == "$" || grepl("$", r_prefix, fixed = TRUE))) {
+            r_parts <- strsplit(r_prefix, "$", fixed = TRUE)[[1]]
+            r_object_name <- r_parts[1]
+            r_member_prefix <- if (length(r_parts) > 1) r_parts[2] else ""
+            if (exists(r_object_name, envir = .GlobalEnv, inherits = FALSE)) {
+              r_object_value <- get(r_object_name, envir = .GlobalEnv, inherits = FALSE)
+              r_member_names <- names(r_object_value)
+              if (is.null(r_member_names) && is.list(r_object_value)) r_member_names <- names(r_object_value)
+              if (length(r_member_names) > 0) {
+                for (r_member_name in r_member_names) {
+                  if (nchar(r_member_prefix) == 0 || startsWith(tolower(r_member_name), tolower(r_member_prefix))) {
+                    r_member_value <- r_object_value[[r_member_name]]
+                    r_is_function <- is.function(r_member_value) || is.primitive(r_member_value)
+                    r_member_type <- if (r_is_function) "function" else "property"
+                    r_member_detail <- if (r_is_function) "function" else paste(class(r_member_value), collapse = ", ")
+                    r_results[[length(r_results) + 1]] <- list(label = r_member_name, type = r_member_type, detail = r_member_detail, boost = 90)
+                  }
+                }
+              }
+            }
+          } else {
+            r_globals <- ls(envir = .GlobalEnv)
+            for (r_global in r_globals) {
+              if (nchar(r_prefix) > 0 && !startsWith(tolower(r_global), tolower(r_prefix))) next
+              r_global_value <- tryCatch(get(r_global, envir = .GlobalEnv, inherits = FALSE), error = function(error) NULL)
+              if (is.null(r_global_value)) next
+              r_global_type <- "variable"
+              if (is.function(r_global_value) || is.primitive(r_global_value)) r_global_type <- "function"
+              r_global_detail <- ""
+              if (is.function(r_global_value)) {
+                r_global_detail <- tryCatch(paste(names(formals(r_global_value)), collapse = ","), error = function(error) "")
+              } else {
+                r_global_detail <- paste(class(r_global_value), collapse = ",")
+              }
+              r_results[[length(r_results) + 1]] <- list(label = r_global, type = r_global_type, detail = r_global_detail, boost = 95)
+            }
+          }
+          r_serialized <- lapply(r_results, function(r_item) {
+            r_label <- r_escape_json(if (is.null(r_item$label)) "" else r_item$label)
+            r_type_value <- r_escape_json(if (is.null(r_item$type)) "variable" else r_item$type)
+            r_detail_value <- r_escape_json(if (is.null(r_item$detail)) "" else r_item$detail)
+            r_boost <- if (is.null(r_item$boost)) 80 else as.numeric(r_item$boost)
+            paste0('{"label":"', r_label, '","type":"', r_type_value, '","detail":"', r_detail_value, '","boost":', r_boost, '}')
+          })
+          paste0('[', paste(r_serialized, collapse = ","), ']')
+        })
+      `;
+
+      const rawResult = await webR.evalR(introspectionCode);
+      const jsResult: any = await rawResult.toJs();
+      const outputString = String(jsResult || '');
+      let completions: IIntrospectCompletion[] = [];
+      try {
+        const parsed = JSON.parse(outputString);
+        if (Array.isArray(parsed)) completions = parsed;
+      } catch {
+        completions = [];
+      }
+      return { completions };
+    } catch (error) {
+      return { completions: [] };
+    }
+  }
+
   public async request<TResult = unknown, TParams = Record<string, unknown>>(
     method: string,
     params?: TParams,
@@ -450,6 +538,9 @@ export class RWebRSession {
     }
     if (method === 'submitCode') {
       return (await this.submitCode(params as any)) as TResult;
+    }
+    if (method === 'introspect') {
+      return (await this.introspect(params as IIntrospectParams)) as unknown as TResult;
     }
     throw new Error(`Method not implemented in RWebRSession: ${method}`);
   }

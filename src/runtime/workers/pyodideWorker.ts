@@ -1,5 +1,6 @@
 import dclConfig from '../../config';
 import type { JsonRpcMessage, JsonRpcRequest } from '../../jsonrpc/types';
+import dclIntrospectionSource from '../python/dcl_introspection.py?raw';
 import dclIpythonSource from '../python/dcl_ipython.py?raw';
 import dclPackageManagerSource from '../python/dcl_package_manager.py?raw';
 import dclShellBridgeSource from '../python/dcl_shell_bridge.py?raw';
@@ -202,6 +203,9 @@ async function initPyodide(): Promise<any> {
 
     // Load IPython transformer and magics
     await pyodide.runPythonAsync(dclIpythonSource);
+
+    // Load runtime introspection helpers for autocompletion
+    await pyodide.runPythonAsync(dclIntrospectionSource);
 
     return pyodide;
   })();
@@ -460,6 +464,29 @@ self.onmessage = async (event: MessageEvent<JsonRpcMessage>) => {
           output: aggregated.output,
           graph: aggregated.graph,
         },
+      });
+      return;
+    }
+
+    if (method === 'introspect') {
+      const { code, line, column, prefix, triggerCharacter } = (params as any) || {};
+      await initPyodide();
+      const introspectFunction = pyodide.globals.get('dcl_introspect');
+      if (typeof introspectFunction !== 'function') {
+        throw new Error('Introspection function is not available in Pyodide');
+      }
+      const rawResult = introspectFunction(
+        code || '',
+        line || 0,
+        column || 0,
+        prefix || '',
+        triggerCharacter || '',
+      );
+      const completions = JSON.parse(rawResult);
+      self.postMessage({
+        jsonrpc: '2.0',
+        id,
+        result: { completions },
       });
       return;
     }

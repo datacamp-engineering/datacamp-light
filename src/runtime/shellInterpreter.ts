@@ -742,10 +742,11 @@ export function createShellInterpreter(options?: CreateShellInterpreterOptions) 
     return { output: outputs.join('\n'), error: errors.join('\n') || undefined };
   }
 
-  return {
+return {
     runCommand,
     runScript,
     getCwd: () => vfs.cwd(),
+    getVfs: () => vfs,
     writeFile: (p: string, c: string) => vfs.writeFile(p, c),
     readFile: (p: string) => vfs.readFile(p),
   };

@@ -6,6 +6,7 @@ import {
   createShellInterpreter,
 } from '../shellInterpreter';
 import type { IShellVfs, WasmAppletRunner } from '../shellInterpreter';
+import { getShellVfsCompletions } from '../../components/autocomplete/dynamicIntrospection';
 
 let activeShell = createShellInterpreter();
 let wasmReadyPromise: Promise<any> | null = null;
@@ -158,6 +159,26 @@ self.onmessage = async (event: MessageEvent<JsonRpcMessage>) => {
         jsonrpc: '2.0',
         id,
         result: { output: executionResult.output, error: executionResult.error || undefined },
+      });
+      return;
+    }
+
+    if (method === 'introspect') {
+      const { code, line, column, prefix, triggerCharacter } = (params as any) || {};
+      await getWasmModule();
+      const completions = getShellVfsCompletions(
+        activeShell.getVfs(),
+        activeShell.getCwd(),
+        code || '',
+        line || 0,
+        column || 0,
+        prefix || '',
+        triggerCharacter || '',
+      );
+      self.postMessage({
+        jsonrpc: '2.0',
+        id,
+        result: { completions },
       });
       return;
     }

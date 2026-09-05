@@ -203,6 +203,7 @@ async function initializePyodideRunner() {
   const shellwhatParserSource = fs.readFileSync(path.join(pythonDirectory, 'dcl_shellwhat_parser.py'), 'utf8');
   const shellBridgeSource = fs.readFileSync(path.join(pythonDirectory, 'dcl_shell_bridge.py'), 'utf8');
   const ipythonSource = fs.readFileSync(path.join(pythonDirectory, 'dcl_ipython.py'), 'utf8');
+  const introspectionSource = fs.readFileSync(path.join(pythonDirectory, 'dcl_introspection.py'), 'utf8');
 
   // Install dcl_package_manager shim
   await pyodide.runPythonAsync(packageManagerSource);
@@ -226,10 +227,10 @@ async function initializePyodideRunner() {
     pyodide.FS.writeFile('/lib/python3.12/site-packages/shellwhat/' + filePath, content);
   }
 
-  try { pyodide.FS.mkdir('/home'); } catch (e) {}
-  try { pyodide.FS.mkdir('/home/pyodide'); } catch (e) {}
-  try { pyodide.FS.mkdir('/tmp'); } catch (e) {}
-  try { pyodide.FS.chdir('/home/pyodide'); } catch (e) {}
+  try { pyodide.FS.mkdir('/home'); } catch (error) {}
+  try { pyodide.FS.mkdir('/home/pyodide'); } catch (error) {}
+  try { pyodide.FS.mkdir('/tmp'); } catch (error) {}
+  try { pyodide.FS.chdir('/home/pyodide'); } catch (error) {}
 
   // Populate sample CSV files for Parsing CSV Files exercises
   pyodide.FS.writeFile('/home/pyodide/inputfile.csv', 'val,name\n55,Alice\n30,Bob\n72,Charlie\n');
@@ -246,6 +247,7 @@ async function initializePyodideRunner() {
   await pyodide.runPythonAsync(shellwhatParserSource);
   await pyodide.runPythonAsync(shellBridgeSource);
   await pyodide.runPythonAsync(ipythonSource);
+  await pyodide.runPythonAsync(introspectionSource);
 
   // Load common data science packages used by tutorials
   console.log(`[Pyodide] Preloading pandas and numpy packages...`);

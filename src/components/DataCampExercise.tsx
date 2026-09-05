@@ -587,6 +587,7 @@ const CodeExercise: React.FC<DataCampExerciseProps> = ({
         onChange={setCode}
         height={editorHeight}
         language={language}
+        session={session}
       />
 
       <ResizeHandle
