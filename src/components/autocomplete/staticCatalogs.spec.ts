@@ -1,6 +1,7 @@
 import type { Completion } from '@codemirror/autocomplete';
 import { describe, expect, it } from 'vitest';
 import {
+  extractDocumentSymbols,
   getStaticCompletionCatalog,
   pythonCatalog,
   rCatalog,
@@ -62,5 +63,57 @@ describe('static completion catalogs', () => {
     expect(defCompletion.boost).toBeDefined();
     expect(defCompletion.detail).toContain('Function');
     expect(typeof defCompletion.info).toBe('function');
+  });
+
+  it('statically extracts variables and functions from document code without execution', () => {
+    const pythonCode = `
+total_sales = 1500
+user_names = ['Alice', 'Bob']
+def calculate_tax(subtotal, rate=0.2):
+    pass
+class CustomerAccount:
+    pass
+import math as m
+from datetime import date, time as t
+`;
+    const symbols = extractDocumentSymbols(pythonCode, 'python');
+    const labels = symbols.map((s) => s.label);
+    expect(labels).toContain('total_sales');
+    expect(labels).toContain('user_names');
+    expect(labels).toContain('calculate_tax');
+    expect(labels).toContain('CustomerAccount');
+    expect(labels).toContain('m');
+    expect(labels).toContain('date');
+    expect(labels).toContain('t');
+
+    const taxSymbol = symbols.find((s) => s.label === 'calculate_tax');
+    expect(taxSymbol?.category).toBe('function');
+    expect(taxSymbol?.detail).toBe('(subtotal, rate=0.2)');
+  });
+
+  it('statically extracts R, Shell, and SQL symbols from document code', () => {
+    const rCode = `
+my_data <- data.frame(a = 1:5)
+calculate_mean <- function(x) { mean(x) }
+`;
+    const rSymbols = extractDocumentSymbols(rCode, 'r');
+    expect(rSymbols.map((s) => s.label)).toContain('my_data');
+    expect(rSymbols.map((s) => s.label)).toContain('calculate_mean');
+
+    const shellCode = `
+APP_ENV=production
+deploy_app() { echo "deploying"; }
+`;
+    const shellSymbols = extractDocumentSymbols(shellCode, 'shell');
+    expect(shellSymbols.map((s) => s.label)).toContain('APP_ENV');
+    expect(shellSymbols.map((s) => s.label)).toContain('deploy_app');
+
+    const sqlCode = `
+CREATE TABLE customers (id INT);
+WITH quarterly_revenue AS (SELECT 1) SELECT * FROM quarterly_revenue;
+`;
+    const sqlSymbols = extractDocumentSymbols(sqlCode, 'sql');
+    expect(sqlSymbols.map((s) => s.label)).toContain('customers');
+    expect(sqlSymbols.map((s) => s.label)).toContain('quarterly_revenue');
   });
 });

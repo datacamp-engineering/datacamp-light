@@ -165,8 +165,47 @@ _get_fontconfig_fonts()
   }
   console.log(`  ✅ PASS: dcl_introspect returned ${introspectionSuggestions.length} attributes on np (including linspace).`);
 
+  // Test Case 6: Post-execution live variables in dcl_introspect
+  console.log('\n[Test 6] Verifying live variables visibility in autocompletion after code execution...');
+  exercise.run_code('post_exec_metric_score = 98.7\nuser_id_lookup = "usr_123"', 320, 320);
+  if (exercise && exercise.user_process && exercise.user_process.shell) {
+    pyodide.globals.set('_dcl_active_locals', exercise.user_process.shell.locals);
+  }
+  const postExecJson = introspectPythonFunction('', 0, 0, 'post_exec', '');
+  const postExecSuggestions = JSON.parse(postExecJson);
+  const foundMetric = postExecSuggestions.find((item) => item.label === 'post_exec_metric_score');
+  if (!foundMetric || foundMetric.type !== 'variable') {
+    throw new Error(`post_exec_metric_score not found in live introspection: ${postExecJson}`);
+  }
+  console.log('  ✅ PASS: Post-execution live variables discovered with correct types.');
+
+  // Test Case 7: Static in-editor variables and functions without code execution
+  console.log('\n[Test 7] Verifying static in-editor symbols without code execution...');
+  const unexecutedBuffer = `
+unexecuted_dataset_path = "/data/file.csv"
+def parse_records(raw_rows):
+    """Parses raw row records."""
+    pass
+class DataPipeline:
+    pass
+`;
+  const staticJson = introspectPythonFunction(unexecutedBuffer, 0, 0, 'unexec', '');
+  const staticSuggestions = JSON.parse(staticJson);
+  const foundDataset = staticSuggestions.find((item) => item.label === 'unexecuted_dataset_path');
+  if (!foundDataset || foundDataset.type !== 'variable') {
+    throw new Error(`unexecuted_dataset_path not found in static introspection: ${staticJson}`);
+  }
+
+  const staticFuncJson = introspectPythonFunction(unexecutedBuffer, 0, 0, 'parse_rec', '');
+  const staticFuncSuggestions = JSON.parse(staticFuncJson);
+  const foundFunc = staticFuncSuggestions.find((item) => item.label === 'parse_records');
+  if (!foundFunc || foundFunc.type !== 'function' || foundFunc.detail !== '(raw_rows)') {
+    throw new Error(`parse_records function not found in static introspection: ${staticFuncJson}`);
+  }
+  console.log('  ✅ PASS: Static in-code variables and functions discovered without execution.');
+
   console.log(`\n======================================================================`);
-  console.log(` All WASM & Python Integration Tests PASSED (4/4)`);
+  console.log(` All WASM & Python Integration Tests PASSED (7/7)`);
   console.log(`======================================================================\n`);
 }
 

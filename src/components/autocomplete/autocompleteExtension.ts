@@ -13,6 +13,7 @@ import { tokens } from '@datacamp/waffles/tokens';
 import type { IJsonRpcSession } from '../../jsonrpc/session';
 import { getDynamicCompletions } from './dynamicIntrospection';
 import {
+  extractDocumentSymbols,
   getStaticCompletionCatalog,
   staticCatalogToCompletions,
   templateToCompletion,
@@ -126,9 +127,14 @@ export function createLanguageCompletionSource(
 
     const matchRange = computeMatchRange(normalizedLanguage, context, tokenMatch);
     const lineObject = context.state.doc.lineAt(context.pos);
+    const docCode = context.state.doc.toString();
+    const documentStaticTemplates = extractDocumentSymbols(docCode, normalizedLanguage);
+    const documentStaticCompletions = documentStaticTemplates.map(templateToCompletion);
+    const baseOptions = mergeCompletionsByLabel(staticCompletions, documentStaticCompletions);
+
     const request: IntrospectionRequest = {
       language: normalizedLanguage,
-      code: context.state.doc.toString(),
+      code: docCode,
       line: lineObject.number - 1,
       column: context.pos - lineObject.from,
       prefix: tokenMatch ? tokenMatch.text : '',
@@ -136,11 +142,11 @@ export function createLanguageCompletionSource(
     };
 
     if (!session) {
-      if (staticCompletions.length === 0) return null;
+      if (baseOptions.length === 0) return null;
       return {
         from: matchRange.from,
         to: context.pos,
-        options: staticCompletions,
+        options: baseOptions,
       };
     }
 
@@ -155,7 +161,7 @@ export function createLanguageCompletionSource(
     return dynamicPromise.then((dynamicTemplates) => {
       if (context.aborted) return null;
       const dynamicCompletions = dynamicTemplates.map(templateToCompletion);
-      const mergedOptions = mergeCompletionsByLabel(staticCompletions, dynamicCompletions);
+      const mergedOptions = mergeCompletionsByLabel(baseOptions, dynamicCompletions);
       if (mergedOptions.length === 0) return null;
       return {
         from: matchRange.from,

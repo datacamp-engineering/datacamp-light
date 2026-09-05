@@ -41,6 +41,16 @@ describe('autocomplete extension', () => {
     expect(labels).toContain('head');
   });
 
+  it('returns static variables defined in document before or without execution', async () => {
+    const source = createLanguageCompletionSource('python');
+    const docText = 'custom_order_id = 9999\ncust';
+    const state = createState(docText);
+    const result = await resolveSource(source, state, docText.length);
+    expect(result).not.toBeNull();
+    const labels = result?.options.map((option) => option.label) ?? [];
+    expect(labels).toContain('custom_order_id');
+  });
+
   it('merges deduplicated dynamic completions into static options', async () => {
     const session = {
       request: vi.fn().mockResolvedValue({

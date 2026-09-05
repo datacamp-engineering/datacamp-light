@@ -379,4 +379,106 @@ function renderCompletionInfo(entry: CompletionSnippetTemplate): HTMLElement {
     exampleElement.textContent = entry.documentation.example;
     container.appendChild(exampleElement);
   }
-  return container;}
+  return container;
+}
+
+export function extractDocumentSymbols(code: string, language: string): CompletionSnippetTemplate[] {
+  if (!code || !code.trim()) return [];
+  const normalizedLanguage = (language || 'python').toLowerCase();
+  const templates: CompletionSnippetTemplate[] = [];
+  const seen = new Set<string>();
+
+  const add = (label: string, category: CompletionCategory, detail: string, boost: number) => {
+    if (!label || label.startsWith('_') || seen.has(label)) return;
+    seen.add(label);
+    templates.push({
+      label,
+      category,
+      detail,
+      snippet: label,
+      boost,
+    });
+  };
+
+  const lines = code.split('\n');
+
+  if (normalizedLanguage === 'python') {
+    for (const line of lines) {
+      const funcMatch = line.match(/^\s*(?:def|async\s+def)\s+([a-zA-Z_]\w*)\s*\(([^)]*)\)/);
+      if (funcMatch) {
+        add(funcMatch[1], 'function', `(${funcMatch[2].trim()})`, 89);
+        continue;
+      }
+      const classMatch = line.match(/^\s*class\s+([a-zA-Z_]\w*)/);
+      if (classMatch) {
+        add(classMatch[1], 'class', 'class', 89);
+        continue;
+      }
+      const importAsMatch = line.match(/^\s*import\s+[\w.]+\s+as\s+([a-zA-Z_]\w*)/);
+      if (importAsMatch) {
+        add(importAsMatch[1], 'module', 'module', 86);
+        continue;
+      }
+      const fromImportMatch = line.match(/^\s*from\s+[\w.]+\s+import\s+([^#\n]+)/);
+      if (fromImportMatch) {
+        const imports = fromImportMatch[1].split(',');
+        for (const item of imports) {
+          const parts = item.trim().split(/\s+as\s+/);
+          const alias = parts[parts.length - 1].trim();
+          if (alias) add(alias, 'variable', 'imported', 86);
+        }
+        continue;
+      }
+      const assignMatch = line.match(/^\s*([a-zA-Z_]\w*(?:\s*,\s*[a-zA-Z_]\w*)*)\s*(?::\s*[^=]+)?\s*=(?!=)/);
+      if (assignMatch) {
+        const names = assignMatch[1].split(',');
+        for (const n of names) {
+          const trimmed = n.trim();
+          if (trimmed) add(trimmed, 'variable', 'variable', 87);
+        }
+        continue;
+      }
+    }
+  } else if (normalizedLanguage === 'r') {
+    for (const line of lines) {
+      const funcMatch = line.match(/^\s*([a-zA-Z.][a-zA-Z0-9._]*)\s*(?:<-|=)\s*function\s*\(([^)]*)\)/);
+      if (funcMatch) {
+        add(funcMatch[1], 'function', `(${funcMatch[2].trim()})`, 89);
+        continue;
+      }
+      const assignMatch = line.match(/^\s*([a-zA-Z.][a-zA-Z0-9._]*)\s*(?:<-|=)(?!=)/);
+      if (assignMatch) {
+        add(assignMatch[1], 'variable', 'variable', 87);
+        continue;
+      }
+    }
+  } else if (normalizedLanguage === 'shell') {
+    for (const line of lines) {
+      const varMatch = line.match(/^\s*([a-zA-Z_]\w*)=/);
+      if (varMatch) {
+        add(varMatch[1], 'variable', 'environment variable', 87);
+        continue;
+      }
+      const funcMatch = line.match(/^\s*(?:function\s+)?([a-zA-Z_]\w*)\s*\(\)\s*\{/);
+      if (funcMatch) {
+        add(funcMatch[1], 'function', 'function', 89);
+        continue;
+      }
+    }
+  } else if (normalizedLanguage === 'sql') {
+    for (const line of lines) {
+      const tableMatch = line.match(/(?:CREATE\s+TABLE|CREATE\s+VIEW)\s+(?:IF\s+NOT\s+EXISTS\s+)?([a-zA-Z_]\w*)/i);
+      if (tableMatch) {
+        add(tableMatch[1], 'property', 'table', 88);
+        continue;
+      }
+      const cteMatch = line.match(/WITH\s+([a-zA-Z_]\w*)\s+AS/i);
+      if (cteMatch) {
+        add(cteMatch[1], 'property', 'CTE', 88);
+        continue;
+      }
+    }
+  }
+
+  return templates;
+}

@@ -368,6 +368,11 @@ self.onmessage = async (event: MessageEvent<JsonRpcMessage>) => {
       }
 
       const resultJson = exercise.run_code(transformedCode || '', height || 320, width || 320);
+      if (exercise && exercise.user_process && exercise.user_process.shell) {
+        try {
+          pyodide.globals.set('_dcl_active_locals', exercise.user_process.shell.locals);
+        } catch (error) {}
+      }
       const entries = JSON.parse(resultJson);
       const aggregated = emitOutputEntries(entries);
 
@@ -401,6 +406,11 @@ self.onmessage = async (event: MessageEvent<JsonRpcMessage>) => {
       let resultJson: string;
       try {
         resultJson = exercise.run_submit(transformedCode || '', height || 320, width || 320);
+        if (exercise && exercise.user_process && exercise.user_process.shell) {
+          try {
+            pyodide.globals.set('_dcl_active_locals', exercise.user_process.shell.locals);
+          } catch (error) {}
+        }
       } catch (submitError: any) {
         console.error('[DataCamp Light SCT Exception]', submitError);
         const rawErrorString = String(
@@ -471,6 +481,11 @@ self.onmessage = async (event: MessageEvent<JsonRpcMessage>) => {
     if (method === 'introspect') {
       const { code, line, column, prefix, triggerCharacter } = (params as any) || {};
       await initPyodide();
+      if (exercise && exercise.user_process && exercise.user_process.shell) {
+        try {
+          pyodide.globals.set('_dcl_active_locals', exercise.user_process.shell.locals);
+        } catch (error) {}
+      }
       const introspectFunction = pyodide.globals.get('dcl_introspect');
       if (typeof introspectFunction !== 'function') {
         throw new Error('Introspection function is not available in Pyodide');
