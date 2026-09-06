@@ -379,6 +379,34 @@
     print(f"Step 2 (Shared Memory): Mean = {mean_temp:.1f}°F, StdDev = {stdev_temp:.2f}")
   </code>
 </div>`
+        },
+        {
+          id: 'card-python-shell-shared',
+          title: '11. Python + Shell Unified Environment (Co-Located VFS)',
+          lang: 'python',
+          html: `<!-- Step 1: Python generates data into shared virtual filesystem -->
+<div data-datacamp-exercise data-lang="python" data-shared-environment="pipeline-demo">
+  <code data-type="sample-code">
+    # Step 1: Write a dataset to disk in the shared virtual filesystem
+    import pandas as pd
+    
+    df = pd.DataFrame({
+        "id": [101, 102, 103, 104, 105],
+        "name": ["Alice", "Bob", "Charlie", "David", "Eve"],
+        "role": ["Engineer", "Data Scientist", "Product Manager", "Designer", "Data Scientist"],
+        "salary_k": [140, 155, 135, 120, 160]
+    })
+    
+    df.to_csv("employees.csv", index=False)
+    print(f"Python: Saved {len(df)} records to employees.csv in shared VFS.")
+  </code>
+</div>
+
+<div style="height: 16px;"></div>
+
+<!-- Step 2: Shell terminal inspects, filters, or runs pip on the same filesystem -->
+<div data-datacamp-exercise data-lang="shell" data-shared-environment="pipeline-demo">
+</div>`
         }
       ];
 

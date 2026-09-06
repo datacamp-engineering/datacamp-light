@@ -548,6 +548,33 @@
 
     <div class="exercise">
       <div class="title">
+        <h2>Python + Shell Co-Located Environment (VFS Sharing)</h2>
+        <p>Python writes data to the in-memory virtual filesystem; the terminal inspects, queries, and filters the files in real time.</p>
+      </div>
+      <h3>Step 1: Python Data Exporter</h3>
+      <div data-datacamp-exercise data-lang="python" data-shared-environment="dev-demo-pipe">
+        <code data-type="sample-code">
+        import pandas as pd
+        df = pd.DataFrame({
+            "id": [101, 102, 103, 104, 105],
+            "name": ["Alice", "Bob", "Charlie", "David", "Eve"],
+            "role": ["Engineer", "Data Scientist", "Product Manager", "Designer", "Data Scientist"],
+            "salary_k": [140, 155, 135, 120, 160]
+        })
+        df.to_csv("employees.csv", index=False)
+        print(f"Python: Saved {len(df)} records to employees.csv in shared VFS.")
+        </code>
+      </div>
+
+      <div style="height: 20px;"></div>
+
+      <h3>Step 2: Shell Terminal (Inspect &amp; Filter)</h3>
+      <div data-datacamp-exercise data-lang="shell" data-shared-environment="dev-demo-pipe">
+      </div>
+    </div>
+
+    <div class="exercise">
+      <div class="title">
         <h2>AI Assistance Modes: Local Testing Showcase</h2>
         <p>Test the three local AI modes: Live Stream, First-party Sign-up Prompt, and Third-party DataLab Prompt.</p>
       </div>
