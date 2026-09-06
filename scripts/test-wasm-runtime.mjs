@@ -224,7 +224,20 @@ with open('python_to_shell.txt', 'w') as file:
   if (shellReadResult.output !== 'hello from python') {
     throw new Error(`Python -> Shell shared VFS failed: ${JSON.stringify(shellReadResult)}`);
   }
-  console.log('  ✅ PASS: Python wrote file and Shell read it via runCommand.');
+
+  const shellLsResult = activeShell.runCommand('ls');
+  if (!shellLsResult.output || !shellLsResult.output.includes('python_to_shell.txt')) {
+    throw new Error(`Shell ls did not find python_to_shell.txt: ${JSON.stringify(shellLsResult)}`);
+  }
+
+  const pythonBangLs = transformPythonFunction('!ls');
+  const bangLsResultJson = exercise.run_code(pythonBangLs, 320, 320);
+  const bangLsEntries = JSON.parse(bangLsResultJson);
+  const bangLsOutput = bangLsEntries.find((entry) => entry.type === 'output');
+  if (!bangLsOutput || !bangLsOutput.payload.includes('python_to_shell.txt')) {
+    throw new Error(`Python !ls did not find python_to_shell.txt: ${JSON.stringify(bangLsEntries)}`);
+  }
+  console.log('  ✅ PASS: Python wrote file, Shell read it via runCommand, and !ls lists it in Python.');
 
   // Test Case 9: Shell and Python shared virtual filesystem (Shell creates file -> Python reads file)
   console.log('\n[Test 9] Verifying Shell -> Python shared filesystem...');

@@ -247,7 +247,7 @@ async function initPyodide(): Promise<any> {
           activeShell = createShellInterpreter({
             vfs: wasmVirtualFileSystem,
             wasmRunner,
-            preferWasmOverBuiltins: true,
+            preferWasmOverBuiltins: false,
             onPipInstall: pipInstallInPyodide,
           });
         }

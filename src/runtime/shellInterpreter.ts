@@ -405,6 +405,7 @@ export function createShellInterpreter(options?: CreateShellInterpreterOptions) 
     'cp',
     'mv',
     'clear',
+    'pip',
   ]);
 
   const builtins: Record<string, Builtin> = {
