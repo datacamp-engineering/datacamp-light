@@ -81,6 +81,18 @@ class ScopedSession implements IJsonRpcSession, IRunCommandSession {
     throw new Error('runCommand is not supported for this session type');
   }
 
+  public async writeFile(params: { path: string; data: string }): Promise<{ cwd?: string }> {
+    return this.withActiveScope(() =>
+      this.entry.session.request<{ cwd?: string }, { path: string; data: string }>('writeFile', params),
+    );
+  }
+
+  public async readFile(params: { path: string }): Promise<{ content: string; cwd?: string }> {
+    return this.withActiveScope(() =>
+      this.entry.session.request<{ content: string; cwd?: string }, { path: string }>('readFile', params),
+    );
+  }
+
   public async request<TResult = unknown, TParams = Record<string, unknown>>(
     method: string,
     params?: TParams,
@@ -117,9 +129,15 @@ export interface AcquiredSession<T extends IJsonRpcSession = IJsonRpcSession> {
  * Acquires an execution session for a given language.
  *
  * If `sharedEnvironment` is provided (`true` or a string ID), sessions with
- * the same `(language, environmentId)` share the same runtime worker so variables,
- * imports, and functions persist across multiple exercises on the page, while output
- * streams are cleanly scoped to the calling widget.
+ * the same environment share the same runtime worker so variables, imports,
+ * and functions persist across multiple exercises on the page.
+ *
+ * Cross-language shared environments: once a shared environment is used,
+ * Shell exercises are bound to the same unified Pyodide+BusyBox worker that Python
+ * exercises in that environment use, so Python and Shell exercises share variables
+ * and a single virtual filesystem regardless of which language mounts first.
+ * The lightweight standalone ShellSession is only used for non-shared environments.
+ *
  */
 export function acquireSession(
   language: 'shell',
@@ -155,11 +173,17 @@ export function acquireSession(
       ? 'default'
       : String(sharedEnvironment).trim() || 'default';
 
-  const poolKey = `${language.toLowerCase()}:${environmentId}`;
+// Shared environments bind shell to the unified Pyodide+BusyBox worker so
+  // Python and Shell exercises with the same environment id share variables and a
+  // single virtual filesystem. R stays partitioned since it uses the main-thread
+  // webR runtime, and standalone (unshared) shells keep the lightweight worker.
+  const runtimeLanguage =
+    language.toLowerCase() === 'shell' ? 'python' : language.toLowerCase();
+  const poolKey = `${runtimeLanguage}:${environmentId}`;
 
   let entry = sharedPool.get(poolKey);
   if (!entry) {
-    const rootSession = createSessionForLanguage(language);
+    const rootSession = createSessionForLanguage(runtimeLanguage);
     entry = {
       session: rootSession,
       referenceCount: 0,

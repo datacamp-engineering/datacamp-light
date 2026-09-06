@@ -10,7 +10,8 @@ import {
   createEmscriptenVfs,
   createShellInterpreter,
 } from '../shellInterpreter';
-import type { IShellVfs, WasmAppletRunner } from '../shellInterpreter';
+import type { IShellVfs, PipInstallResult, WasmAppletRunner } from '../shellInterpreter';
+import { getShellVfsCompletions } from '../../components/autocomplete/dynamicIntrospection';
 import { SHELLWHAT_PY_SOURCES } from '../shellwhatSources';
 
 declare const loadPyodide: (options?: any) => Promise<any>;
@@ -94,6 +95,68 @@ async function loadPyodideRuntime(): Promise<any> {
   throw new Error('Pyodide loader not available');
 }
 
+async function pipInstallInPyodide(packages: string[]): Promise<PipInstallResult> {
+  const packagesToInstall: string[] = [];
+  const alreadyLoaded: string[] = [];
+  for (const requestedPackage of packages) {
+    const normalizedPackageName = requestedPackage.split('==')[0].split('>=')[0].split('<=')[0].split('~=')[0].split('!=')[0].trim();
+    if (loadedPackages.has(normalizedPackageName)) {
+      alreadyLoaded.push(requestedPackage);
+      continue;
+    }
+    loadedPackages.add(normalizedPackageName);
+    packagesToInstall.push(requestedPackage);
+  }
+
+  try {
+    const micropip = pyodide.pyimport('micropip');
+    if (packagesToInstall.length > 0) {
+      await micropip.install(packagesToInstall);
+      self.postMessage({
+        jsonrpc: '2.0',
+        method: 'session_output',
+        params: { type: 'output', payload: 'Installed ' + packagesToInstall.join(', ') },
+      });
+    } else if (alreadyLoaded.length > 0) {
+      self.postMessage({
+        jsonrpc: '2.0',
+        method: 'session_output',
+        params: { type: 'output', payload: alreadyLoaded.join(', ') + ' already installed' },
+      });
+    }
+    return { output: 'Installed ' + packages.join(', '), exitCode: 0 };
+  } catch (installError: any) {
+    // Fall back to pyodide.loadPackage for packages bundled with the runtime
+    let fallbackFailed = false;
+    for (const requestedPackage of packagesToInstall) {
+      try {
+        await pyodide.loadPackage(requestedPackage.split('==')[0].trim());
+        self.postMessage({
+          jsonrpc: '2.0',
+          method: 'session_output',
+          params: { type: 'output', payload: 'Installed ' + requestedPackage },
+        });
+      } catch (loadPackageError) {
+        fallbackFailed = true;
+        const installErrorMessage = String(installError?.message || installError);
+        self.postMessage({
+          jsonrpc: '2.0',
+          method: 'session_output',
+          params: { type: 'error', payload: 'pip: failed to install ' + requestedPackage + ': ' + installErrorMessage },
+        });
+      }
+    }
+    if (fallbackFailed) {
+      return {
+        error: 'pip: failed to install ' + packages.join(', '),
+        exitCode: 1,
+        output: '',
+      };
+    }
+    return { output: 'Installed ' + packages.join(', '), exitCode: 0 };
+  }
+}
+
 async function initPyodide(): Promise<any> {
   if (pyodideReadyPromise) {
     return pyodideReadyPromise;
@@ -130,7 +193,10 @@ async function initPyodide(): Promise<any> {
     try { pyodide.FS.chdir('/home/pyodide'); } catch (error) {}
 
     const wasmVirtualFileSystem: IShellVfs = createEmscriptenVfs(pyodide);
-    activeShell = createShellInterpreter({ vfs: wasmVirtualFileSystem });
+    activeShell = createShellInterpreter({
+      vfs: wasmVirtualFileSystem,
+      onPipInstall: pipInstallInPyodide,
+    });
 
     (async () => {
       try {
@@ -182,6 +248,7 @@ async function initPyodide(): Promise<any> {
             vfs: wasmVirtualFileSystem,
             wasmRunner,
             preferWasmOverBuiltins: true,
+            onPipInstall: pipInstallInPyodide,
           });
         }
       } catch (error) {}
@@ -384,8 +451,130 @@ self.onmessage = async (event: MessageEvent<JsonRpcMessage>) => {
       return;
     }
 
+    if (method === 'runCommand') {
+      const { command } = (params as any) || {};
+      const commandResult = activeShell.runCommand(command || '');
+      self.postMessage({
+        jsonrpc: '2.0',
+        id,
+        result: {
+          output: commandResult.output || '',
+          error: commandResult.error,
+          cwd: activeShell.getCwd(),
+        },
+      });
+      return;
+    }
+
+    if (method === 'writeFile') {
+      const { path: filePath, data } = (params as any) || {};
+      activeShell.writeFile(filePath || '', data || '');
+      self.postMessage({
+        jsonrpc: '2.0',
+        id,
+        result: { cwd: activeShell.getCwd() },
+      });
+      return;
+    }
+
+    if (method === 'readFile') {
+      const { path: filePath } = (params as any) || {};
+      const content = activeShell.readFile(filePath || '');
+      self.postMessage({
+        jsonrpc: '2.0',
+        id,
+        result: { content, cwd: activeShell.getCwd() },
+      });
+      return;
+    }
+
     if (method === 'submitCode') {
-      const { code, height, width, stdin } = (params as any) || {};
+      const { code, height, width, stdin, sct, pec, solution, language, studentResult } = (params as any) || {};
+
+      // Shell submissions run through the shared BusyBox shell so Python and
+      // Shell exercises in a shared environment see the same virtual filesystem.
+      if (language === 'shell') {
+        if (pec) activeShell.runScript(pec);
+
+        let studentOutput = studentResult;
+        if (typeof studentOutput !== 'string') {
+          const executionResult = activeShell.runScript(code || '');
+          studentOutput = executionResult.output || '';
+          if (executionResult.error) {
+            studentOutput += (studentOutput ? '\n' : '') + executionResult.error;
+          }
+        }
+
+        const isShellwhatSct = /\b(Ex\s*\(\s*\)|has_code|has_output|has_cwd|check_node|has_equal_ast)\b/.test(
+          sct || '',
+        );
+
+        if (isShellwhatSct) {
+          const evaluateShellwhatPy = pyodide.globals.get('evaluate_shellwhat');
+          if (!evaluateShellwhatPy) {
+
+            throw new Error('shellwhat evaluation function not initialized in Pyodide');
+          }
+          const rawResult = evaluateShellwhatPy(
+            sct || '',
+            code || '',
+            studentOutput || '',
+            pec || '',
+            solution || '',
+          );
+          const parsedResult = JSON.parse(rawResult);
+          const correct = typeof parsedResult.correct === 'boolean' ? parsedResult.correct : false;
+          const shellwhatMessage = parsedResult.message || 'Submission evaluated.';
+
+          self.postMessage({
+            jsonrpc: '2.0',
+            method: 'session_output',
+            params: { type: 'sct', payload: { correct, message: shellwhatMessage } },
+          });
+
+          self.postMessage({
+            jsonrpc: '2.0',
+            id,
+            result: {
+              correct,
+              message: shellwhatMessage,
+              output: studentOutput || '',
+            },
+          });
+          return;
+        }
+
+        let correct = true;
+        let feedbackMessage = 'Great work! Your solution passed all tests.';
+        if (sct && sct.trim() && correct) {
+
+          const sctMatch = sct.match(/test_student_typed\(\s*r?['"](.+?)['"]/);
+          if (sctMatch) {
+            const regex = new RegExp(sctMatch[1]);
+            if (!regex.test(code || '')) {
+              correct = false;
+              const messageMatch = sct.match(/msg\s*=\s*['"](.+?)['"]/);
+              feedbackMessage = messageMatch
+                ? messageMatch[1]
+                : 'Your command did not match the expected pattern.';
+            }
+          }
+        }
+
+        self.postMessage({
+          jsonrpc: '2.0',
+          method: 'session_output',
+          params: { type: 'sct', payload: { correct, message: feedbackMessage } },
+        });
+
+        self.postMessage({
+          jsonrpc: '2.0',
+          id,
+          result: { correct, message: feedbackMessage, output: studentOutput || '' },
+        });
+        return;
+      }
+
       const transformedCode = transformCode(code);
       await loadPackagesForCode(transformedCode);
 
@@ -479,8 +668,32 @@ self.onmessage = async (event: MessageEvent<JsonRpcMessage>) => {
     }
 
     if (method === 'introspect') {
-      const { code, line, column, prefix, triggerCharacter } = (params as any) || {};
+      const { code, line, column, prefix, triggerCharacter, language } = (params as any) || {};
       await initPyodide();
+
+      if (language === 'shell') {
+        const availableCommands =
+          typeof activeShell.getAvailableCommands === 'function'
+            ? activeShell.getAvailableCommands()
+            : undefined;
+        const completions = getShellVfsCompletions(
+          activeShell.getVfs(),
+          activeShell.getCwd(),
+          code || '',
+          line || 0,
+          column || 0,
+          prefix || '',
+          triggerCharacter || '',
+          availableCommands,
+        );
+        self.postMessage({
+          jsonrpc: '2.0',
+          id,
+          result: { completions },
+        });
+        return;
+      }
+
       if (exercise && exercise.user_process && exercise.user_process.shell) {
         try {
           pyodide.globals.set('_dcl_active_locals', exercise.user_process.shell.locals);
@@ -502,29 +715,6 @@ self.onmessage = async (event: MessageEvent<JsonRpcMessage>) => {
         jsonrpc: '2.0',
         id,
         result: { completions },
-      });
-      return;
-    }
-
-    if (method === 'evaluateShellwhat') {
-      const { sct, student_code, student_result, pec, solution } = (params as any) || {};
-      await initPyodide();
-      const evaluateShellwhatPy = pyodide.globals.get('evaluate_shellwhat');
-      if (!evaluateShellwhatPy) {
-        throw new Error('shellwhat evaluation function not initialized in Pyodide');
-      }
-      const rawResult = evaluateShellwhatPy(
-        sct || '',
-        student_code || '',
-        student_result || '',
-        pec || '',
-        solution || '',
-      );
-      const parsedResult = JSON.parse(rawResult);
-      self.postMessage({
-        jsonrpc: '2.0',
-        id,
-        result: parsedResult,
       });
       return;
     }

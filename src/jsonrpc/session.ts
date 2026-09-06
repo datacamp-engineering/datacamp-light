@@ -6,10 +6,14 @@ import type {
   IRunCodeResult,
   IRunCommandParams,
   IRunCommandResult,
+  IReadFileParams,
+  IReadFileResult,
   ISessionOutputNotification,
   ISessionStatus,
   ISubmitCodeParams,
   ISubmitCodeResult,
+  IWriteFileParams,
+  IWriteFileResult,
   JsonRpcId,
   JsonRpcMessage,
   JsonRpcNotification,
@@ -32,6 +36,8 @@ export interface IJsonRpcSession {
   initialize(params: IInitializeParams): Promise<void>;
   runCode(params: IRunCodeParams): Promise<IRunCodeResult>;
   submitCode(params: ISubmitCodeParams): Promise<ISubmitCodeResult>;
+  writeFile(params: IWriteFileParams): Promise<IWriteFileResult>;
+  readFile(params: IReadFileParams): Promise<IReadFileResult>;
   request<TResult = unknown, TParams = Record<string, unknown>>(
     method: string,
     params?: TParams,
@@ -160,6 +166,16 @@ export class JsonRpcSessionClient implements IJsonRpcSession {
       this.lifecycle.setStatus('ready');
       throw error;
     }
+  }
+
+  public async writeFile(params: IWriteFileParams): Promise<IWriteFileResult> {
+    const result = await this.request<IWriteFileResult, IWriteFileParams>('writeFile', params);
+    return result || {};
+  }
+
+  public async readFile(params: IReadFileParams): Promise<IReadFileResult> {
+    const result = await this.request<IReadFileResult, IReadFileParams>('readFile', params);
+    return result || { content: '' };
   }
 
   public onStatusChange(listener: StatusListener): () => void {

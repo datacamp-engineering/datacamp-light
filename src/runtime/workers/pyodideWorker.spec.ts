@@ -29,6 +29,12 @@ globalsMap.set('dcl_transform_ipython', (code: string) => {
     .replace(/^!(\w+)/gm, '_dcl_ipython_shell("$1")')
     .replace(/^\?(\w+)/gm, '_dcl_ipython_help("$1")');
 });
+globalsMap.set('evaluate_shellwhat', (_sct: string, _studentCode: string, _studentResult: string, _pec: string, _solution: string) => {
+  return JSON.stringify({
+    correct: true,
+    message: 'Your shell commands look great.',
+  });
+});
 
 const mockPyodideInstance = {
   FS: mockFileSystem,
@@ -135,5 +141,76 @@ describe('pyodideWorker System / FS and IPython Engine', () => {
     });
     expect(result.correct).toBe(true);
     expect(result.message).toBe('All tests passed');
+  });
+
+  it('runs shell commands through the unified shell interpreter', async () => {
+    const { call } = createPyodideWorkerHarness();
+    const result = await call('runCommand', { command: 'touch shell_rpc.txt' });
+    expect(result.output).toBe('');
+    expect(result.cwd).toBe('/home/pyodide');
+  });
+
+  it('exposes writeFile and readFile over the virtual filesystem', async () => {
+    const { call } = createPyodideWorkerHarness();
+    await call('writeFile', { path: 'rpc_notes.txt', data: 'hello from rpc' });
+    const readResult = await call('readFile', { path: 'rpc_notes.txt' });
+    expect(readResult.content).toBe('hello from rpc');
+    expect(readResult.cwd).toBe('/home/pyodide');
+  });
+
+  it('submits shell code through the polymorphic submitCode path', async () => {
+    const { call } = createPyodideWorkerHarness();
+    await call('initialize', { pec: '', solution: '', sct: '' });
+    const matching = await call('submitCode', {
+      code: 'cd projects',
+      sct: "test_student_typed(r'cd projects')",
+      language: 'shell',
+    });
+    expect(matching.correct).toBe(true);
+    expect(matching.message).toBe('Great work! Your solution passed all tests.');
+
+    const failing = await call('submitCode', {
+      code: 'ls',
+      sct: "test_student_typed(r'cd projects')",
+      language: 'shell',
+    });
+    expect(failing.correct).toBe(false);
+  });
+
+  it('evaluates shellwhat SCTs through the polymorphic submitCode path', async () => {
+    const { call } = createPyodideWorkerHarness();
+    await call('initialize', { pec: '', solution: '', sct: '' });
+    const result = await call('submitCode', {
+      code: 'mkdir data',
+      sct: "Ex().has_output()",
+      studentResult: 'mkdir data\n',
+      language: 'shell',
+    });
+    expect(result.correct).toBe(true);
+    expect(result.message).toBe('Your shell commands look great.');
+  });
+
+  it('introspects shell commands when language is shell', async () => {
+    const { call } = createPyodideWorkerHarness();
+    const result = await call('introspect', {
+      code: '',
+      line: 0,
+      column: 0,
+      prefix: '',
+      language: 'shell',
+    });
+    const labels = (result?.completions || []).map((item: any) => item.label);
+    expect(labels).toContain('mkdir');
+    expect(labels).toContain('pip');
+  });
+
+  it('rejects the deprecated evaluateShellwhat RPC method', async () => {
+    const { call, outbound } = createPyodideWorkerHarness();
+    await expect(call('evaluateShellwhat', {
+      sct: 'Ex()',
+      student_code: 'ls',
+      student_result:'',
+    })).rejects.toThrow();
+    expect(outbound.some((message) => (message as any).method === 'evaluateShellwhat')).toBe(false);
   });
 });

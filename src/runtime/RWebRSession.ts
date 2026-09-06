@@ -3,11 +3,15 @@ import type {
   IIntrospectCompletion,
   IIntrospectParams,
   IIntrospectResult,
+  IReadFileParams,
+  IReadFileResult,
   IRunCodeParams,
   IRunCodeResult,
   ISessionStatus,
   ISubmitCodeParams,
   ISubmitCodeResult,
+  IWriteFileParams,
+  IWriteFileResult,
 } from '../jsonrpc/types';
 import { SessionLifecycle } from './sessionLifecycle';
 import type { OutputListener, StatusListener } from './sessionLifecycle';
@@ -525,6 +529,18 @@ export class RWebRSession {
     }
   }
 
+  public async writeFile(params: IWriteFileParams): Promise<IWriteFileResult> {
+    const webR = await this.getWebR();
+    webR.FS.writeFile(params.path || '', params.data || '');
+    return { cwd: webR.FS.cwd?.() };
+  }
+
+  public async readFile(params: IReadFileParams): Promise<IReadFileResult> {
+    const webR = await this.getWebR();
+    const content = webR.FS.readFile(params.path || '', { encoding: 'utf8' });
+    return { content: String(content || ''), cwd: webR.FS.cwd?.() };
+  }
+
   public async request<TResult = unknown, TParams = Record<string, unknown>>(
     method: string,
     params?: TParams,
@@ -541,6 +557,15 @@ export class RWebRSession {
     }
     if (method === 'introspect') {
       return (await this.introspect(params as IIntrospectParams)) as unknown as TResult;
+    }
+    if (method === 'writeFile') {
+      await this.writeFile(params as IWriteFileParams);
+      return undefined as TResult;
+
+    }
+    if (method === 'readFile') {
+      return (await this.readFile(params as IReadFileParams)) as unknown as TResult;
+
     }
     throw new Error(`Method not implemented in RWebRSession: ${method}`);
   }

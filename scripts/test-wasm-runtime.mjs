@@ -60,9 +60,19 @@ async function runIntegrationTest() {
   try { pyodide.FS.mkdir('/tmp'); } catch (error) {}
   try { pyodide.FS.chdir('/home/pyodide'); } catch (error) {}
 
-  // 4. Mount VFS and Shell Interpreter
+// 4. Mount VFS and Shell Interpreter
   const wasmVirtualFileSystem = createEmscriptenVfs(pyodide);
-  const activeShell = createShellInterpreter({ vfs: wasmVirtualFileSystem });
+  const activeShell = createShellInterpreter({
+    vfs: wasmVirtualFileSystem,
+    onPipInstall: async (packages) => {
+      try {
+        await micropip.install(packages);
+        return { output: 'Installed ' + packages.join(', '), exitCode: 0 };
+      } catch (error) {
+        return { error: 'pip: ' + String(error), exitCode: 1, output: '' };
+      }
+    },
+  });
 
   globalThis.dcl_execute_shell = (commandString) => {
     const commandResult = activeShell.runCommand(commandString || '');
@@ -204,8 +214,61 @@ class DataPipeline:
   }
   console.log('  ✅ PASS: Static in-code variables and functions discovered without execution.');
 
+  // Test Case 8: Python and Shell shared virtual filesystem (Python writes file -> Shell reads file via runCommand)
+  console.log('\n[Test 8] Verifying Python -> Shell shared filesystem...');
+  await pyodide.runPythonAsync(`
+with open('python_to_shell.txt', 'w') as file:
+    file.write('hello from python')
+`);
+  const shellReadResult = activeShell.runCommand('cat python_to_shell.txt');
+  if (shellReadResult.output !== 'hello from python') {
+    throw new Error(`Python -> Shell shared VFS failed: ${JSON.stringify(shellReadResult)}`);
+  }
+  console.log('  ✅ PASS: Python wrote file and Shell read it via runCommand.');
+
+  // Test Case 9: Shell and Python shared virtual filesystem (Shell creates file -> Python reads file)
+  console.log('\n[Test 9] Verifying Shell -> Python shared filesystem...');
+  activeShell.runCommand('echo hello-from-shell > shell_to_python.txt');
+  const pythonReadBack = await pyodide.runPythonAsync(`open('shell_to_python.txt').read()`);
+  if (pythonReadBack !== 'hello-from-shell\n') {
+    throw new Error(`Shell -> Python shared VFS failed: ${JSON.stringify(pythonReadBack)}`);
+  }
+  console.log('  ✅ PASS: Shell created file and Python read it.');
+
+  // Test Case 10: Shell pip install inside Pyodide worker
+  console.log('\n[Test 10] Verifying shell pip install inside Pyodide worker...');
+  const pipInitialResult = activeShell.runCommand('pip install idna');
+  if (!pipInitialResult.output || !pipInitialResult.output.includes('Installing')) {
+    throw new Error(`pip install did not return install feedback: ${JSON.stringify(pipInitialResult)}`);
+  }
+  await activeShell.waitForPipInstall();
+  const pipFinalResult = activeShell.getLastPipInstallResult();
+  if (!pipFinalResult || pipFinalResult.exitCode !== 0) {
+    throw new Error(`pip install failed: ${JSON.stringify(pipFinalResult)}`);
+  }
+  await pyodide.pyimport('idna');
+  console.log('  ✅ PASS: pip install installed idna and module imports in Pyodide.');
+
+  // Test Case 11: writeFile / readFile contract over the shared virtual filesystem
+  // (the shellWorker JSON-RPC handlers wrap exactly these interpreter calls; the
+  // wire-level RPC round-trip is exercised in shellWorker.spec.ts under vitest)
+  console.log('\n[Test 11] Verifying writeFile/readFile contract over shared VFS...');
+  const sharedVfs = activeShell.getVfs();
+  sharedVfs.writeFile('/home/pyodide/rpc_shared.txt', 'hello rpc');
+  const rpcReadBack = sharedVfs.readFile('/home/pyodide/rpc_shared.txt');
+  if (rpcReadBack !== 'hello rpc') {
+    throw new Error(`writeFile/readFile contract failed: ${JSON.stringify(rpcReadBack)}`);
+  }
+  // Relative paths resolve against the shell cwd exactly as the RPC handlers do.
+  const relativeWrite = activeShell.writeFile('rpc_relative.txt', 'relative path');
+  const relativeRead = activeShell.getVfs().readFile('/home/pyodide/rpc_relative.txt');
+  if (relativeRead !== 'relative path') {
+    throw new Error(`writeFile/readFile relative path resolution failed: ${JSON.stringify(relativeRead)}`);
+  }
+  console.log('  ✅ PASS: writeFile/readFile contract round-trip and cwd resolution succeeded.');
+
   console.log(`\n======================================================================`);
-  console.log(` All WASM & Python Integration Tests PASSED (7/7)`);
+  console.log(` All WASM & Python Integration Tests PASSED (11/11)`);
   console.log(`======================================================================\n`);
 }
 

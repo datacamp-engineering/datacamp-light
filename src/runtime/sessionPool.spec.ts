@@ -152,4 +152,61 @@ describe('sessionPool', () => {
     firstAcquisition.release();
     secondAcquisition.release();
   });
+
+  it('binds shell and python to the same shared worker in a shared environment', () => {
+    const shellAcquisition = acquireSession('shell', 'shared-vfs');
+    const pythonAcquisition = acquireSession('python', 'shared-vfs');
+
+    expect((shellAcquisition.session as any).getUnderlyingSession()).toBe(
+      (pythonAcquisition.session as any).getUnderlyingSession(),
+    );
+    expect(getSharedPoolSize()).toBe(1);
+
+    shellAcquisition.release();
+    expect(getSharedPoolSize()).toBe(1); // Still 1 active reference
+
+    pythonAcquisition.release();
+    expect(getSharedPoolSize()).toBe(0); // Cleaned up
+  });
+
+  it('keeps shared shell environments separate from shared r environments', () => {
+    const shellAcquisition = acquireSession('shell', 'cross-language-demo');
+    const rAcquisition = acquireSession('r', 'cross-language-demo');
+
+    expect((shellAcquisition.session as any).getUnderlyingSession()).not.toBe(
+      (rAcquisition.session as any).getUnderlyingSession(),
+    );
+    expect(getSharedPoolSize()).toBe(2);
+
+    shellAcquisition.release();
+    rAcquisition.release();
+    expect(getSharedPoolSize()).toBe(0);
+  });
+
+  it('keeps shared python and shell environments partitioned by environment id', () => {
+    const firstEnvironment = acquireSession('shell', 'demo-a');
+    const secondEnvironment = acquireSession('python', 'demo-b');
+
+    expect((firstEnvironment.session as any).getUnderlyingSession()).not.toBe(
+      (secondEnvironment.session as any).getUnderlyingSession(),
+    );
+    expect(getSharedPoolSize()).toBe(2);
+
+    firstEnvironment.release();
+    secondEnvironment.release();
+    expect(getSharedPoolSize()).toBe(0);
+  });
+
+  it('keeps standalone shell sessions lightweight and isolated', () => {
+    const firstAcquisition = acquireSession('shell');
+    const secondAcquisition = acquireSession('shell');
+
+    expect(firstAcquisition.isShared).toBe(false);
+    expect(secondAcquisition.isShared).toBe(false);
+    expect(firstAcquisition.session).not.toBe(secondAcquisition.session);
+    expect(getSharedPoolSize()).toBe(0);
+
+    firstAcquisition.release();
+    secondAcquisition.release();
+  });
 });

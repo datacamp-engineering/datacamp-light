@@ -83,4 +83,25 @@ describe('RWebRSession', () => {
     expect(result.message).toBe('The contents of the variable <code>area</code> aren’t correct.');
     expect(session.getStatus().status).toBe('ready');
   });
+
+  it('exposes writeFileand readFile over the webR filesystem', async () => {
+    const session = new RWebRSession();
+    const store: Record<string, string> = {};
+    const mockWebR = {
+      FS: {
+        cwd: () => '/home/webr',
+        writeFile: (path: string, data: string) => {
+          store[path] = data;
+        },
+        readFile: (path: string) => store[path] || '',
+      },
+    };
+
+    (session as any).webRPromise = Promise.resolve(mockWebR);
+    await session.writeFile({ path: 'notes.txt', data: 'hello r' });
+    expect(await session.readFile({ path: 'notes.txt' })).toEqual({
+      content: 'hello r',
+      cwd: '/home/webr',
+    });
+  });
 });

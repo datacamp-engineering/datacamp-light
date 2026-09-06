@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import {
   createBusyboxRunner,
   createEmscriptenVfs,
@@ -224,5 +224,45 @@ describe('createEmscriptenVfs and createBusyboxRunner', () => {
     expect(vfs.exists('/home/repl/test.txt')).toBe(true);
     expect(shell.getCwd()).toBe('/home/repl');
     expect(shell.runCommand('ls').output).toBe('my_folder  test.txt');
+  });
+});
+
+describe('createShellInterpreter pip builtin', () => {
+  it('parses pip install arguments and invokes onPipInstall', async () => {
+    const onPipInstall = vi.fn().mockResolvedValue({
+      output: 'Installed numpy',
+      exitCode: 0,
+    });
+    const shell = createShellInterpreter({ onPipInstall });
+const initialResult = shell.runCommand('pip install numpy');
+    expect(initialResult.output).toContain('Installing numpy');
+    await shell.waitForPipInstall();
+    expect(shell.getLastPipInstallResult()?.exitCode).toBe(0);
+    expect(onPipInstall).toHaveBeenCalledWith(['numpy']);
+    expect(shell.getLastPipInstallResult()?.output).toContain('Installed');
+  });
+
+  it('supports pip install -r requirements file', async () => {
+    const onPipInstall = vi.fn().mockResolvedValue({
+      output: 'Installed requirements',
+      exitCode: 0,
+    });
+    const shell = createShellInterpreter({ onPipInstall });
+    shell.writeFile('requirements.txt', '# comment\nnumpy\npandas==2.2.2\n');
+    shell.runCommand('pip install -r requirements.txt');
+    await shell.waitForPipInstall();
+    expect(onPipInstall).toHaveBeenCalledWith(['numpy', 'pandas==2.2.2']);
+  });
+
+  it('reports an error when pip runs without a Python environment', () => {
+    const shell = createShellInterpreter();
+const result = shell.runCommand('pip install numpy');
+    expect(result.error).toContain('Python environment not available in standalone shell');
+  });
+
+  it('reports an error when no packages are specified', () => {
+    const shell = createShellInterpreter({ onPipInstall: async () => ({ output: '', exitCode: 0 }) });
+    const result = shell.runCommand('pip install');
+    expect(result.error).toContain('no packages specified');
   });
 });

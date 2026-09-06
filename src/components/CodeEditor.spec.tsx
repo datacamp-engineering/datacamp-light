@@ -43,4 +43,15 @@ describe('CodeEditor', () => {
     const cmEditor = container.querySelector('.cm-editor');
     expect(cmEditor).toBeInTheDocument();
   });
+
+  it('renders shell code with shell syntax highlighting mode', () => {
+    const handleChange = vi.fn();
+    const { container } = render(
+      <CodeEditor code="ls -la" language="shell" onChange={handleChange} />,
+    );
+
+    const cmEditor = container.querySelector('.cm-editor');
+    expect(cmEditor).toBeInTheDocument();
+    expect(container.textContent).toContain('ls');
+  });
 });

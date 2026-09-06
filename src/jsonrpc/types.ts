@@ -73,6 +73,24 @@ export interface IRunCommandResult {
   cwd: string;
 }
 
+export interface IWriteFileParams {
+  path: string;
+  data: string;
+}
+
+export interface IWriteFileResult {
+  cwd?: string;
+}
+
+export interface IReadFileParams {
+  path: string;
+}
+
+export interface IReadFileResult {
+  content: string;
+  cwd?: string;
+}
+
 export interface ISubmitCodeParams {
   code: string;
   sct?: string;
@@ -80,6 +98,8 @@ export interface ISubmitCodeParams {
   solution?: string;
   width?: number;
   height?: number;
+  language?: string;
+  studentResult?: string;
 }
 
 export interface ISubmitCodeResult {

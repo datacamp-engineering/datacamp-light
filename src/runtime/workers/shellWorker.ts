@@ -121,6 +121,28 @@ self.onmessage = async (event: MessageEvent<JsonRpcMessage>) => {
       return;
     }
 
+    if (method === 'writeFile') {
+      const { path: filePath, data } = (params as any) || {};
+      activeShell.writeFile(filePath || '', data || '');
+      self.postMessage({
+        jsonrpc: '2.0',
+        id,
+        result: { cwd: activeShell.getCwd() },
+      });
+      return;
+    }
+
+    if (method === 'readFile') {
+      const { path: filePath } = (params as any) || {};
+      const content = activeShell.readFile(filePath || '');
+      self.postMessage({
+        jsonrpc: '2.0',
+        id,
+        result: { content, cwd: activeShell.getCwd() },
+      });
+      return;
+    }
+
     if (method === 'runCommand') {
       const { command } = (params as any) || {};
       await getWasmModule();

@@ -19,6 +19,7 @@ import { AiExplanationPanel } from './AiExplanationPanel';
 import { AiUpsellBanner } from './AiUpsellBanner';
 import { CodeEditor } from './CodeEditor';
 import { DCLWidgetShell } from './DCLWidgetShell';
+import { DropZoneOverlay } from './DropZoneOverlay';
 import { FeedbackBanner } from './FeedbackBanner';
 import { Footer } from './Footer';
 import { OutputConsole } from './OutputConsole';
@@ -163,6 +164,7 @@ const ShellExercise: React.FC<{
         code: typedHistory.join('\n'),
         sct,
         pec: preExerciseCode,
+        language: 'shell',
       });
       setFeedback({ correct: result.correct, message: result.message });
       onFeedback?.(result.correct, result.message);
@@ -205,57 +207,72 @@ const ShellExercise: React.FC<{
     [session],
   );
 
+  const handleFileDrop = useCallback(
+    async (file: File) => {
+      try {
+        const content = await file.text();
+        const result = await session.writeFile({ path: file.name, data: content });
+        console.log(`[VFS] Uploaded ${file.name} (${file.size}) to ${result.cwd || ''}`);
+      } catch (uploadError: any) {
+        console.warn(`[VFS] Failed to upload ${file.name}:`, uploadError);
+      }
+    },
+    [session],
+  );
+
   return (
-    <DCLWidgetShell theme={activeTheme}>
-      <ActionBar
-        onSubmit={handleSubmit}
-        onReset={handleReset}
-        onToggleHint={hint ? () => setShowingHint((previous) => !previous) : undefined}
-        isExecuting={isSubmitting}
-        executingAction={isSubmitting ? 'submit' : null}
-        hasHint={Boolean(hint)}
-        showingHint={showingHint}
-        hasSct={Boolean(sct && sct.trim())}
-        showRunButton={false}
-        status={status}
-        borderTop={false}
-        resetAriaLabel="Reset terminal"
-      />
-
-      {showingHint && hint && <HintPanel hint={hint} />}
-
-      {feedback && (
-        <FeedbackBanner
-          correct={feedback.correct}
-          message={feedback.message}
-          onClose={() => setFeedback(null)}
+    <DropZoneOverlay theme={activeTheme} onFileDrop={handleFileDrop}>
+      <DCLWidgetShell theme={activeTheme}>
+        <ActionBar
+          onSubmit={handleSubmit}
+          onReset={handleReset}
+          onToggleHint={hint ? () => setShowingHint((previous) => !previous) : undefined}
+          isExecuting={isSubmitting}
+          executingAction={isSubmitting ? 'submit' : null}
+          hasHint={Boolean(hint)}
+          showingHint={showingHint}
+          hasSct={Boolean(sct && sct.trim())}
+          showRunButton={false}
+          status={status}
+          borderTop={false}
+          resetAriaLabel="Reset terminal"
         />
-      )}
 
-      <TerminalConsole
-        onExecuteCommand={handleExecuteShellCommand}
-        onIntrospect={handleIntrospect}
-        prompt="$ "
-        height={terminalHeight}
-        resetKey={resetCounter}
-        theme={activeTheme}
-      />
+        {showingHint && hint && <HintPanel hint={hint} />}
 
-      <ResizeHandle
-        ariaLabel="Resize terminal"
-        onResize={(deltaY) =>
-          setTerminalHeight((previous) => Math.max(120, Math.min(800, previous + deltaY)))
-        }
-      />
+        {feedback && (
+          <FeedbackBanner
+            correct={feedback.correct}
+            message={feedback.message}
+            onClose={() => setFeedback(null)}
+          />
+        )}
 
-      <Footer
-        theme={activeTheme}
-        onToggleTheme={toggleTheme}
-        utmSource={utmSource}
-        utmCampaign={utmCampaign}
-        impactTrackingLink={impactTrackingLink}
-      />
-    </DCLWidgetShell>
+        <TerminalConsole
+          onExecuteCommand={handleExecuteShellCommand}
+          onIntrospect={handleIntrospect}
+          prompt="$ "
+          height={terminalHeight}
+          resetKey={resetCounter}
+          theme={activeTheme}
+        />
+
+        <ResizeHandle
+          ariaLabel="Resize terminal"
+          onResize={(deltaY) =>
+            setTerminalHeight((previous) => Math.max(120, Math.min(800, previous + deltaY)))
+          }
+        />
+
+        <Footer
+          theme={activeTheme}
+          onToggleTheme={toggleTheme}
+          utmSource={utmSource}
+          utmCampaign={utmCampaign}
+          impactTrackingLink={impactTrackingLink}
+        />
+      </DCLWidgetShell>
+    </DropZoneOverlay>
   );
 };
 
@@ -611,16 +628,30 @@ const CodeExercise: React.FC<DataCampExerciseProps> = ({
     setAiState((previous) => ({ ...previous, visible: false }));
   };
 
+  const handleFileDrop = useCallback(
+    async (file: File) => {
+      try {
+        const content = await file.text();
+        const result = await session.writeFile({ path: file.name, data: content });
+        console.log(`[VFS] Uploaded ${file.name} (${file.size}) to ${result.cwd || ''}`);
+      } catch (uploadError: any) {
+        console.warn(`[VFS] Failed to upload ${file.name}:`, uploadError);
+      }
+    },
+    [session],
+  );
+
   return (
-    <DCLWidgetShell theme={activeTheme}>
-      <CodeEditor
-        code={code}
-        onChange={setCode}
-        height={editorHeight}
-        language={language}
-        session={session}
-        autocomplete={autocomplete}
-      />
+    <DropZoneOverlay theme={activeTheme} onFileDrop={handleFileDrop}>
+      <DCLWidgetShell theme={activeTheme}>
+        <CodeEditor
+          code={code}
+          onChange={setCode}
+          height={editorHeight}
+          language={language}
+          session={session}
+          autocomplete={autocomplete}
+        />
 
       <ResizeHandle
         ariaLabel="Resize code editor"
@@ -724,6 +755,7 @@ const CodeExercise: React.FC<DataCampExerciseProps> = ({
         utmSource={utmSource}
       />
     </DCLWidgetShell>
+    </DropZoneOverlay>
   );
 };
 

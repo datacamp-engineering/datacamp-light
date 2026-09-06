@@ -124,4 +124,33 @@ describe('shellWorker JSON-RPC contract', () => {
     const pathLabels = (pathResult?.completions || []).map((c: any) => c.label);
     expect(pathLabels).toContain('my_project/');
   });
+
+  it('writeFile and readFile expose the virtual filesystem via RPC', async () => {
+    const { call } = createWorkerHarness();
+    await call('runCommand', { command: 'cd /home/repl' });
+    await call('writeFile', { path: 'rpc_notes.txt', data: 'hello from rpc' });
+    const readResult = await call('readFile', { path: 'rpc_notes.txt' });
+    expect(readResult.content).toBe('hello from rpc');
+    expect(readResult.cwd).toBe('/home/repl');
+  });
+
+  it('readFile resolves relative paths againstthe current working directory', async () => {
+    const { call } = createWorkerHarness();
+    await call('runCommand', { command: 'cd /home/repl' });
+    await call('runCommand', { command: 'mkdir projects' });
+    await call('runCommand', { command: 'cd projects' });
+    await call('writeFile', { path: 'uploaded.txt', data: 'relative' });
+    const readResult = await call('readFile', { path: 'uploaded.txt' });
+    expect(readResult.content).toBe('relative');
+    expect(readResult.cwd).toBe('/home/repl/projects');
+  });
+
+  it('pip reports Python environment not available in standalone shell', async () => {
+    const { call } = createWorkerHarness();
+    await call('runCommand', { command: 'cd /home/repl' });
+    const result = await call('runCommand', { command: 'pip install numpy' });
+    expect(result.output).toBe('');
+    expect(result.error).toContain('Python environment not available in standalone shell');
+    expect(result.cwd).toBe('/home/repl');
+  });
 });

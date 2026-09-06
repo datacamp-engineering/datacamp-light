@@ -245,6 +245,53 @@ export interface CreateShellInterpreterOptions {
   vfs?: IShellVfs;
   wasmRunner?: WasmAppletRunner;
   preferWasmOverBuiltins?: boolean;
+  onPipInstall?: (packages: string[]) => Promise<PipInstallResult | void>;
+}
+
+export interface PipInstallResult {
+  output: string;
+  error?: string;
+  exitCode: number;
+}
+
+function parsePipInstallArguments(
+  args: string[],
+  vfs: IShellVfs,
+): { packages?: string[]; error?: string } {
+  const packages: string[] = [];
+  let requirementsFile: string | undefined;
+  for (let index = 0; index < args.length; index++) {
+    const argument = args[index];
+    if (argument === 'install') {
+      // Skip the pip subcommand itself; only the package arguments follow
+    } else if (argument === '-r' || argument === '--requirement') {
+      requirementsFile = args[++index];
+    } else if (
+      argument === '-q' ||
+      argument === '--quiet' ||
+      argument === '--upgrade' ||
+      argument === '-U' ||
+      argument === '--no-deps' ||
+      argument === '--user'
+    ) {
+      // Ignore common pip flags; only the package list matters.
+    } else if (!argument.startsWith('-')) {
+      packages.push(argument);
+    }
+  }
+  if (requirementsFile) {
+    try {
+      const requirementsContent = vfs.readFile(requirementsFile);
+      for (const rawLine of requirementsContent.split('\n')) {
+        const line = rawLine.trim();
+        if (!line || line.startsWith('#')) continue;
+        packages.push(line.split(/\s+/)[0].trim());
+      }
+    } catch (requirementsError: any) {
+      return { error: 'pip: could not open requirements file: ' + requirementsFile };
+    }
+  }
+  return { packages };
 }
 
 /**
@@ -255,8 +302,11 @@ export interface CreateShellInterpreterOptions {
  */
 export function createShellInterpreter(options?: CreateShellInterpreterOptions) {
   const vfs = options?.vfs || createMemoryVfs();
+  const onPipInstall = options?.onPipInstall;
   const wasmRunner = options?.wasmRunner;
   const preferWasm = options?.preferWasmOverBuiltins ?? Boolean(wasmRunner);
+  const pendingPipInstallations: Array<Promise<PipInstallResult | void>> = [];
+  let lastPipInstallResult: PipInstallResult | null = null;
 
   function tokenize(command: string): string[] {
     const tokens: string[] = [];
@@ -596,6 +646,32 @@ export function createShellInterpreter(options?: CreateShellInterpreterOptions) 
     },
     true: () => ({ output: '', exitCode: 0 }),
     false: () => ({ output: '', exitCode: 1 }),
+    pip: (args) => {
+      const parsedInstall = parsePipInstallArguments(args, vfs);
+      if (parsedInstall.error) {
+        return { error: parsedInstall.error, exitCode: 1 };
+      }
+      const packages = parsedInstall.packages || [];
+      if (packages.length === 0) {
+        return { error: 'pip: no packages specified', exitCode: 1 };
+      }
+      if (!onPipInstall) {
+        return { error: 'pip: Python environment not available in standalone shell', exitCode: 1 };
+      }
+      const installingMessage = 'Installing ' + packages.join(', ') + '...\n';
+      const pendingInstall = Promise.resolve().then(() =>
+        Promise.resolve(onPipInstall(packages)).catch((installError: any) => ({
+          error: 'pip: ' + String(installError?.message || installError),
+          exitCode: 1,
+          output: '',
+        })),
+      );
+      pendingPipInstallations.push(pendingInstall);
+      pendingInstall.then((result) => {
+        lastPipInstallResult = (result as PipInstallResult) || { output: '', exitCode: 0 };
+      });
+      return { output: installingMessage, exitCode: 0 };
+    },
     clear: () => ({ output: '\x1bc', exitCode: 0 }),
   };
 
@@ -758,5 +834,12 @@ export function createShellInterpreter(options?: CreateShellInterpreterOptions) 
       } catch {}
       return Array.from(new Set([...builtinNames, ...vfsBinaries])).filter(Boolean).sort();
     },
+    waitForPipInstall: async () => {
+      while (pendingPipInstallations.length > 0) {
+        const pendingBatch = pendingPipInstallations.splice(0);
+        await Promise.all(pendingBatch);
+      }
+    },
+    getLastPipInstallResult: () => lastPipInstallResult,
   };
 }

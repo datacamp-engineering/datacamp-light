@@ -28,16 +28,14 @@ export function createShellSession(): IRunCommandSession {
       const runRes = await client.runCode({ code: params.code });
       try {
         const pyodideSession = getSharedPyodideSession();
-        const evalRes = await pyodideSession.request<{ correct: boolean; message: string }>(
-          'evaluateShellwhat',
-          {
-            sct,
-            student_code: params.code,
-            student_result: runRes.output || '',
-            pec: params.pec || '',
-            solution: params.solution || '',
-          },
-        );
+        const evalRes = await pyodideSession.submitCode({
+          sct,
+          code: params.code,
+          pec: params.pec || '',
+          solution: params.solution || '',
+          studentResult: runRes.output || '',
+          language: 'shell',
+        });
         return {
           correct: evalRes.correct,
           message: evalRes.message,
