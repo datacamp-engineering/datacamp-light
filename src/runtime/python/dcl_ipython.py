@@ -6,14 +6,18 @@ import re
 import sys
 import time
 
+ANSI_ESCAPE_PATTERN = re.compile(r"\x1b\[[0-9;]*[a-zA-Z]|\x1b[a-zA-Z]")
+
 
 def ipython_shell_escape(command_string):
-    return os.system(command_string)
+    os.system(command_string)
+    return None
 
 
 def ipython_get_output_lines(command_string):
     result = builtins._dcl_execute_shell(command_string)
-    output_string = result.get("output", "") or ""
+    raw_output = result.get("output", "") or ""
+    output_string = ANSI_ESCAPE_PATTERN.sub("", raw_output) if raw_output else ""
     return output_string.split("\n") if output_string else []
 
 

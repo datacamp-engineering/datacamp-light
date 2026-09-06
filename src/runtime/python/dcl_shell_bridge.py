@@ -1,9 +1,12 @@
 import builtins
 import json
 import os
+import re
 import subprocess
 import sys
 import js
+
+ANSI_ESCAPE_PATTERN = re.compile(r"\x1b\[[0-9;]*[a-zA-Z]|\x1b[a-zA-Z]")
 
 
 def execute_shell_command(command_string):
@@ -14,9 +17,11 @@ def execute_shell_command(command_string):
 def custom_os_system(command_string):
     result = execute_shell_command(command_string)
     if result.get("output"):
-        sys.stdout.write(result["output"] + "\n")
+        clean_output = ANSI_ESCAPE_PATTERN.sub("", result["output"])
+        sys.stdout.write(clean_output + "\n")
     if result.get("error"):
-        sys.stderr.write(result["error"] + "\n")
+        clean_error = ANSI_ESCAPE_PATTERN.sub("", result["error"])
+        sys.stderr.write(clean_error + "\n")
     return result.get("exitCode", 0)
 
 
@@ -63,8 +68,10 @@ def custom_subprocess_run(
 
     result = execute_shell_command(command_string)
     returncode = result.get("exitCode", 0)
-    output_string = result.get("output", "") or ""
-    error_string = result.get("error", "") or ""
+    raw_output = result.get("output", "") or ""
+    raw_error = result.get("error", "") or ""
+    output_string = ANSI_ESCAPE_PATTERN.sub("", raw_output) if raw_output else ""
+    error_string = ANSI_ESCAPE_PATTERN.sub("", raw_error) if raw_error else ""
 
     is_text = bool(text or universal_newlines or encoding)
 
