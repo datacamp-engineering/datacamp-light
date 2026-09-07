@@ -107,11 +107,17 @@ export function getSettings(element: HTMLElement): DataCampExerciseProps {
       ? false
       : rawSharedEnv;
 
-  const rawAutocomplete = element.getAttribute('data-autocomplete');
+const rawAutocomplete = element.getAttribute('data-autocomplete');
   const autocomplete =
     rawAutocomplete === null
       ? true
       : rawAutocomplete.toLowerCase() !== 'false';
+
+  const rawPreviewDropZone = element.getAttribute('data-preview-drop-zone');
+  const previewDropZone =
+    rawPreviewDropZone === null
+      ? false
+      : rawPreviewDropZone.toLowerCase() !== 'false';
 
   return {
     id,
@@ -126,8 +132,9 @@ export function getSettings(element: HTMLElement): DataCampExerciseProps {
     height,
     showRunButton,
     showAi,
-    mockAi,
+mockAi,
     autocomplete,
+    previewDropZone,
     sharedEnvironment,
     utmSource: element.getAttribute('data-utm-source') || undefined,
     utmCampaign: element.getAttribute('data-utm-campaign') || undefined,

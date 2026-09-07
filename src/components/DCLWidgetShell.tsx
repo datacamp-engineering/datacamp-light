@@ -39,9 +39,11 @@ export const DCLWidgetShell: React.FC<DCLWidgetShellProps> = ({
             containerType: 'inline-size',
             fontFamily: tokens.fontFamilies.sansSerif,
             fontSize: tokens.fontSizes.medium,
+            isolation: 'isolate',
             lineHeight: tokens.lineHeights.relaxed,
             maxWidth: '100%',
             overflow: 'hidden',
+            position: 'relative',
             '& *': {
               boxSizing: 'border-box',
             },

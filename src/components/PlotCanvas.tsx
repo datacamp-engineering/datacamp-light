@@ -64,7 +64,7 @@ export const PlotCanvas: React.FC<PlotCanvasProps> = ({ plots, height = 400 }) =
           position: 'sticky',
           top: 0,
           transition: 'box-shadow 0.15s ease-in-out',
-          zIndex: tokens.zIndex.sticky,
+          zIndex: 1,
         }}
       >
         <Chapeau css={{ fontSize: `${tokens.fontSizes.small} !important`, margin: 0 }}>

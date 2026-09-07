@@ -8,6 +8,7 @@ export interface DropZoneOverlayProps {
   children: ReactNode;
   theme?: 'light' | 'dark';
   onFileDrop: (file: File) => void | Promise<void>;
+  preview?: boolean;
 }
 
 /**
@@ -20,6 +21,7 @@ export const DropZoneOverlay: React.FC<DropZoneOverlayProps> = ({
   children,
   theme: themeMode = 'dark',
   onFileDrop,
+  preview = false,
 }) => {
   const [isDraggingOver, setIsDraggingOver] = useState(false);
   const dragDepthReference = useRef(0);
@@ -30,6 +32,7 @@ export const DropZoneOverlay: React.FC<DropZoneOverlayProps> = ({
   }, [onFileDrop]);
 
   const isLightMode = themeMode === 'light';
+  const showOverlay = isDraggingOver || preview;
 
   const handleDragEnter = (event: React.DragEvent) => {
     event.preventDefault();
@@ -65,6 +68,7 @@ export const DropZoneOverlay: React.FC<DropZoneOverlayProps> = ({
   return (
     <div
       css={{
+        isolation: 'isolate',
         position: 'relative',
       }}
       onDragEnter={handleDragEnter}
@@ -73,7 +77,7 @@ export const DropZoneOverlay: React.FC<DropZoneOverlayProps> = ({
       onDrop={handleDrop}
     >
       {children}
-      {isDraggingOver && (
+      {showOverlay && (
         <div
           css={{
             alignItems: 'center',
@@ -82,7 +86,7 @@ export const DropZoneOverlay: React.FC<DropZoneOverlayProps> = ({
             justifyContent: 'center',
             pointerEvents: 'none',
             position: 'absolute',
-            zIndex: tokens.zIndex.sticky + 1,
+            zIndex: 10,
           }}
         >
           <div
@@ -94,6 +98,7 @@ export const DropZoneOverlay: React.FC<DropZoneOverlayProps> = ({
               borderRadius: tokens.borderRadius.medium,
               inset: tokens.spacingNew.tiny,
               position: 'absolute',
+              zIndex: 1,
             }}
           />
           <div
@@ -110,6 +115,8 @@ export const DropZoneOverlay: React.FC<DropZoneOverlayProps> = ({
               fontWeight: tokens.fontWeights.bold,
               gap: tokens.spacingNew.tiny,
               padding: `${tokens.spacingNew.medium} ${tokens.spacingNew.large}`,
+              position: 'relative',
+              zIndex: 2,
             }}
           >
             <Multidoc

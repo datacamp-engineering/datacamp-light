@@ -399,6 +399,24 @@
 <!-- Step 2: Shell terminal inspects, filters, or runs pip on the same filesystem -->
 <div data-datacamp-exercise data-lang="shell" data-shared-environment="pipeline-demo">
 </div>`
+        },
+        {
+          id: 'card-drop-zone-preview',
+          title: '12. Drag & Drop Hover State (Virtual Filesystem)',
+          lang: 'python',
+          html: `<!-- Drag and drop any local file onto this card to add it to the in-memory virtual filesystem -->
+<div data-datacamp-exercise data-lang="python" data-preview-drop-zone="true">
+  <code data-type="sample-code">
+    # Drag a local file (e.g. sales.csv) onto this card to add it
+    # to the exercise's in-memory working directory.
+    #
+    # The overlay below is the hover state you see while dragging,
+    # so you can preview it before trying with a real file.
+    
+    import os
+    print("Files in working directory:", sorted(os.listdir(".")))
+  </code>
+</div>`
         }
       ];
 

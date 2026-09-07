@@ -43,6 +43,7 @@ export interface DataCampExerciseProps {
   showAi?: boolean;
   mockAi?: boolean | string;
   autocomplete?: boolean;
+  previewDropZone?: boolean;
   sharedEnvironment?: boolean | string;
   utmSource?: string;
   utmCampaign?: string;
@@ -79,6 +80,7 @@ const ShellExercise: React.FC<{
   sct: string;
   height: number | string;
   theme?: 'light' | 'dark';
+  previewDropZone?: boolean;
   sharedEnvironment?: boolean | string;
   utmSource?: string;
   utmCampaign?: string;
@@ -91,6 +93,7 @@ const ShellExercise: React.FC<{
   sct,
   height,
   theme: themeMode,
+  previewDropZone = false,
   sharedEnvironment,
   utmSource,
   utmCampaign,
@@ -221,7 +224,11 @@ const ShellExercise: React.FC<{
   );
 
   return (
-    <DropZoneOverlay theme={activeTheme} onFileDrop={handleFileDrop}>
+    <DropZoneOverlay
+      theme={activeTheme}
+      onFileDrop={handleFileDrop}
+      preview={previewDropZone}
+    >
       <DCLWidgetShell theme={activeTheme}>
         <ActionBar
           onSubmit={handleSubmit}
@@ -291,6 +298,7 @@ const CodeExercise: React.FC<DataCampExerciseProps> = ({
   showAi = true,
   mockAi = false,
   autocomplete = true,
+  previewDropZone = false,
   sharedEnvironment,
   utmSource,
   utmCampaign,
@@ -643,7 +651,11 @@ const CodeExercise: React.FC<DataCampExerciseProps> = ({
   );
 
   return (
-    <DropZoneOverlay theme={activeTheme} onFileDrop={handleFileDrop}>
+    <DropZoneOverlay
+      theme={activeTheme}
+      onFileDrop={handleFileDrop}
+      preview={previewDropZone}
+    >
       <DCLWidgetShell theme={activeTheme}>
         <CodeEditor
           code={code}
@@ -776,7 +788,7 @@ export const DataCampExercise: React.FC<DataCampExerciseProps> = (props) => {
     onFeedback,
   } = props;
 
-  if (language === 'shell') {
+if (language === 'shell') {
     return (
       <ShellExercise
         height={height}
@@ -784,7 +796,8 @@ export const DataCampExercise: React.FC<DataCampExerciseProps> = (props) => {
         impactTrackingLink={impactTrackingLink}
         onFeedback={onFeedback}
         onSubmit={onSubmit}
-        preExerciseCode={preExerciseCode}
+preExerciseCode={preExerciseCode}
+        previewDropZone={props.previewDropZone}
         sct={sct}
         sharedEnvironment={props.sharedEnvironment}
         theme={theme}

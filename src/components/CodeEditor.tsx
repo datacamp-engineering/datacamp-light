@@ -63,7 +63,7 @@ const dcEditorTheme = EditorView.theme({
     backgroundColor: theme.background.secondary,
     borderBottom: `${tokens.borderWidth.thin} solid ${theme.border.main}`,
     color: theme.text.main,
-    zIndex: tokens.zIndex.sticky,
+    zIndex: 1,
   },
   '.cm-panel.cm-search': {
     alignItems: 'center',
