@@ -118,7 +118,7 @@ export const TerminalConsole: React.FC<TerminalConsoleProps> = ({
   prompt = '$ ',
   initialCwd = '/home/repl',
   height = 260,
-  welcomeMessage = 'Welcome to the DataCamp Light shell (WebAssembly).\r\n',
+  welcomeMessage = 'Welcome to the DataCamp Light shell.\r\n',
   resetKey,
   theme: themeMode = 'dark',
 }) => {

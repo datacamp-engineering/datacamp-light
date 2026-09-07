@@ -224,12 +224,11 @@ const ShellExercise: React.FC<{
   );
 
   return (
-    <DropZoneOverlay
-      theme={activeTheme}
-      onFileDrop={handleFileDrop}
-      preview={previewDropZone}
-    >
-      <DCLWidgetShell theme={activeTheme}>
+    <DCLWidgetShell theme={activeTheme}>
+      <DropZoneOverlay
+        onFileDrop={handleFileDrop}
+        preview={previewDropZone}
+      >
         <ActionBar
           onSubmit={handleSubmit}
           onReset={handleReset}
@@ -279,8 +278,8 @@ const ShellExercise: React.FC<{
           utmCampaign={utmCampaign}
           impactTrackingLink={impactTrackingLink}
         />
-      </DCLWidgetShell>
-    </DropZoneOverlay>
+      </DropZoneOverlay>
+    </DCLWidgetShell>
   );
 };
 
@@ -651,12 +650,11 @@ const CodeExercise: React.FC<DataCampExerciseProps> = ({
   );
 
   return (
-    <DropZoneOverlay
-      theme={activeTheme}
-      onFileDrop={handleFileDrop}
-      preview={previewDropZone}
-    >
-      <DCLWidgetShell theme={activeTheme}>
+    <DCLWidgetShell theme={activeTheme}>
+      <DropZoneOverlay
+        onFileDrop={handleFileDrop}
+        preview={previewDropZone}
+      >
         <CodeEditor
           code={code}
           onChange={setCode}
@@ -767,8 +765,8 @@ const CodeExercise: React.FC<DataCampExerciseProps> = ({
         utmCampaign={utmCampaign}
         utmSource={utmSource}
       />
+      </DropZoneOverlay>
     </DCLWidgetShell>
-    </DropZoneOverlay>
   );
 };
 
