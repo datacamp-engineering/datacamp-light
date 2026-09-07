@@ -83,6 +83,7 @@ export const DropZoneOverlay: React.FC<DropZoneOverlayProps> = ({
             justifyContent: 'center',
             pointerEvents: 'none',
             position: 'absolute',
+            zIndex: 10,
           }}
         >
           <div
@@ -92,6 +93,7 @@ export const DropZoneOverlay: React.FC<DropZoneOverlayProps> = ({
               inset: tokens.spacingNew.tiny,
               overflow: 'hidden',
               position: 'absolute',
+              zIndex: 1,
               '&::before': {
                 backgroundColor: theme.blue.main,
                 content: '""',
@@ -104,7 +106,7 @@ export const DropZoneOverlay: React.FC<DropZoneOverlayProps> = ({
           <div
             css={{
               alignItems: 'center',
-              backgroundColor: theme.background.contrast,
+              backgroundColor: theme.background.main,
               borderRadius: tokens.borderRadius.medium,
               boxShadow: tokens.boxShadow.medium,
               color: theme.text.main,
@@ -116,6 +118,7 @@ export const DropZoneOverlay: React.FC<DropZoneOverlayProps> = ({
               gap: tokens.spacingNew.tiny,
               padding: `${tokens.spacingNew.medium} ${tokens.spacingNew.large}`,
               position: 'relative',
+              zIndex: 2,
             }}
           >
             <Multidoc
