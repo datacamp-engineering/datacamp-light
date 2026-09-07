@@ -9,7 +9,7 @@ const mockFileSystem = {
   mkdirTree: () => {},
   mkdir: () => {},
   chdir: () => {},
-  cwd: () => '/home/pyodide',
+  cwd: () => '/home/repl',
   writeFile: (filePath: string, content: string) => {
     pythonFiles[filePath] = content;
   },
@@ -147,7 +147,7 @@ describe('pyodideWorker System / FS and IPython Engine', () => {
     const { call } = createPyodideWorkerHarness();
     const result = await call('runCommand', { command: 'touch shell_rpc.txt' });
     expect(result.output).toBe('');
-    expect(result.cwd).toBe('/home/pyodide');
+    expect(result.cwd).toBe('/home/repl');
   });
 
   it('exposes writeFile and readFile over the virtual filesystem', async () => {
@@ -155,7 +155,7 @@ describe('pyodideWorker System / FS and IPython Engine', () => {
     await call('writeFile', { path: 'rpc_notes.txt', data: 'hello from rpc' });
     const readResult = await call('readFile', { path: 'rpc_notes.txt' });
     expect(readResult.content).toBe('hello from rpc');
-    expect(readResult.cwd).toBe('/home/pyodide');
+    expect(readResult.cwd).toBe('/home/repl');
   });
 
   it('submits shell code through the polymorphic submitCode path', async () => {

@@ -188,9 +188,9 @@ async function initPyodide(): Promise<any> {
     }
 
     try { pyodide.FS.mkdir('/home'); } catch (error) {}
-    try { pyodide.FS.mkdir('/home/pyodide'); } catch (error) {}
+    try { pyodide.FS.mkdir('/home/repl'); } catch (error) {}
     try { pyodide.FS.mkdir('/tmp'); } catch (error) {}
-    try { pyodide.FS.chdir('/home/pyodide'); } catch (error) {}
+    try { pyodide.FS.chdir('/home/repl'); } catch (error) {}
 
     const wasmVirtualFileSystem: IShellVfs = createEmscriptenVfs(pyodide);
     activeShell = createShellInterpreter({

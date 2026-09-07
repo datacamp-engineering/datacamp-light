@@ -43,7 +43,7 @@ def ipython_print_working_directory():
 
 
 def ipython_change_directory(path_string=""):
-    target_directory = path_string.strip() if path_string else "/home/pyodide"
+    target_directory = path_string.strip() if path_string else "/home/repl"
     try:
         os.chdir(target_directory)
         builtins._dcl_execute_shell(f"cd {target_directory}")

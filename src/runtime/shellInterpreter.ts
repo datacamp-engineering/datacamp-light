@@ -1,3 +1,9 @@
+export interface IShellVfsStat {
+  size: number;
+  mtime: Date;
+  isDir: boolean;
+}
+
 /**
  * Unified in-memory Virtual File System (VFS) interface.
  * Implemented by both pure-JS dictionary and Emscripten MEMFS.
@@ -13,6 +19,7 @@ export interface IShellVfs {
   exists(path: string): boolean;
   isDir(path: string): boolean;
   readdir(path: string): string[];
+  stat?(path: string): IShellVfsStat;
 }
 
 export type WasmAppletRunner = (
@@ -98,6 +105,16 @@ export function createMemoryVfs(): IShellVfs {
     },
     exists: (path: string) => Boolean(files[resolvePath(path)]),
     isDir: (path: string) => files[resolvePath(path)]?.type === 'dir',
+    stat: (path: string) => {
+      const target = resolvePath(path);
+      const entry = files[target];
+      if (!entry) throw new Error('no such file or directory: ' + path);
+      return {
+        size: entry.type === 'dir' ? 4096 : (entry.content?.length || 0),
+        mtime: new Date(),
+        isDir: entry.type === 'dir',
+      };
+    },
     readdir: (path: string) => {
       const target = resolvePath(path);
       const prefix = target === '/' ? '/' : target + '/';
@@ -182,6 +199,15 @@ export function createEmscriptenVfs(mod: any): IShellVfs {
       } catch (e) {
         return false;
       }
+    },
+    stat: (path: string) => {
+      const target = resolvePath(path);
+      const s = mod.FS.stat(target);
+      return {
+        size: s.size || (mod.FS.isDir(s.mode) ? 4096 : 0),
+        mtime: s.mtime ? new Date(s.mtime) : new Date(),
+        isDir: mod.FS.isDir(s.mode),
+      };
     },
     readdir: (path: string) => {
       const target = resolvePath(path);
@@ -422,6 +448,11 @@ export function createShellInterpreter(options?: CreateShellInterpreterOptions) 
     ls: (args) => {
       const showAll = args.includes('-a') || args.includes('-la') || args.includes('-al');
       const showAlmostAll = args.includes('-A');
+      const isLong = args.some(
+        (arg) =>
+          arg.startsWith('-') &&
+          (arg.includes('l') || arg.includes('la') || arg.includes('al')),
+      );
       const positionalArguments = args.filter((arg) => !arg.startsWith('-'));
       const target = positionalArguments[0] || vfs.cwd();
       try {
@@ -438,7 +469,56 @@ export function createShellInterpreter(options?: CreateShellInterpreterOptions) 
           // Standard POSIX ls hides dotfiles and hidden directories (.name)
           entries = entries.filter((name) => !name.startsWith('.'));
         }
-        return { output: entries.join('  '), exitCode: 0 };
+
+        const formatDate = (date: Date) => {
+          const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+          const month = months[date.getMonth()];
+          const day = String(date.getDate()).padStart(2, ' ');
+          const hours = String(date.getHours()).padStart(2, '0');
+          const minutes = String(date.getMinutes()).padStart(2, '0');
+          return `${month} ${day} ${hours}:${minutes}`;
+        };
+
+        if (isLong) {
+          const lines = entries.map((name) => {
+            let isDirectory = false;
+            let size = 4096;
+            let mtime = new Date();
+
+            if (name === '.' || name === '..') {
+              isDirectory = true;
+            } else {
+              const fullPath = (target === '/' ? '' : target) + '/' + name;
+              isDirectory = vfs.isDir(fullPath);
+              if (vfs.stat) {
+                try {
+                  const statObj = vfs.stat(fullPath);
+                  size = statObj.size;
+                  mtime = statObj.mtime;
+                  isDirectory = statObj.isDir;
+                } catch {}
+              }
+            }
+
+            const permissions = isDirectory ? 'drwxrwxrwx' : '-rw-rw-r--';
+            const linkCount = '   1';
+            const sizeString = String(size).padStart(9, ' ');
+            const dateString = formatDate(mtime);
+            const coloredName = isDirectory ? `\x1b[1;34m${name}\x1b[0m` : name;
+            return `${permissions} ${linkCount} ${sizeString} ${dateString} ${coloredName}`;
+          });
+          return { output: lines.join('\n'), exitCode: 0 };
+        }
+
+        const coloredEntries = entries.map((name) => {
+          const fullPath = (target === '/' ? '' : target) + '/' + name;
+          if (name === '.' || name === '..' || vfs.isDir(fullPath)) {
+            return `\x1b[1;34m${name}\x1b[0m`;
+          }
+          return name;
+        });
+
+        return { output: coloredEntries.join('  '), exitCode: 0 };
       } catch (readDirectoryError: any) {
         return { error: 'ls: ' + readDirectoryError.message, exitCode: 1 };
       }

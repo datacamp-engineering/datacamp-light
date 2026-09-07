@@ -56,9 +56,9 @@ async function runIntegrationTest() {
   }
 
   try { pyodide.FS.mkdir('/home'); } catch (error) {}
-  try { pyodide.FS.mkdir('/home/pyodide'); } catch (error) {}
+  try { pyodide.FS.mkdir('/home/repl'); } catch (error) {}
   try { pyodide.FS.mkdir('/tmp'); } catch (error) {}
-  try { pyodide.FS.chdir('/home/pyodide'); } catch (error) {}
+  try { pyodide.FS.chdir('/home/repl'); } catch (error) {}
 
 // 4. Mount VFS and Shell Interpreter
   const wasmVirtualFileSystem = createEmscriptenVfs(pyodide);
@@ -139,7 +139,7 @@ _get_fontconfig_fonts()
 
   // Test Case 3: IPython shell escape with virtual filesystem file creation
   console.log('\n[Test 3] Verifying IPython shell escape (!cat) on virtual filesystem...');
-  pyodide.FS.writeFile('/home/pyodide/integration_test.txt', 'Hello WASM Integration');
+  pyodide.FS.writeFile('/home/repl/integration_test.txt', 'Hello WASM Integration');
   const transformPythonFunction = pyodide.globals.get('dcl_transform_ipython');
   const shellEscapeCode = transformPythonFunction('!cat integration_test.txt');
   const shellResultJson = exercise.run_code(shellEscapeCode, 320, 320);
@@ -267,14 +267,14 @@ with open('python_to_shell.txt', 'w') as file:
   // wire-level RPC round-trip is exercised in shellWorker.spec.ts under vitest)
   console.log('\n[Test 11] Verifying writeFile/readFile contract over shared VFS...');
   const sharedVfs = activeShell.getVfs();
-  sharedVfs.writeFile('/home/pyodide/rpc_shared.txt', 'hello rpc');
-  const rpcReadBack = sharedVfs.readFile('/home/pyodide/rpc_shared.txt');
+  sharedVfs.writeFile('/home/repl/rpc_shared.txt', 'hello rpc');
+  const rpcReadBack = sharedVfs.readFile('/home/repl/rpc_shared.txt');
   if (rpcReadBack !== 'hello rpc') {
     throw new Error(`writeFile/readFile contract failed: ${JSON.stringify(rpcReadBack)}`);
   }
   // Relative paths resolve against the shell cwd exactly as the RPC handlers do.
   const relativeWrite = activeShell.writeFile('rpc_relative.txt', 'relative path');
-  const relativeRead = activeShell.getVfs().readFile('/home/pyodide/rpc_relative.txt');
+  const relativeRead = activeShell.getVfs().readFile('/home/repl/rpc_relative.txt');
   if (relativeRead !== 'relative path') {
     throw new Error(`writeFile/readFile relative path resolution failed: ${JSON.stringify(relativeRead)}`);
   }
