@@ -73,7 +73,7 @@ export const DropZoneOverlay: React.FC<DropZoneOverlayProps> = ({
       onDragLeave={handleDragLeave}
       onDrop={handleDrop}
     >
-      {children}
+      <div css={{ isolation: 'isolate' }}>{children}</div>
       {showOverlay && (
         <div
           css={{
@@ -83,7 +83,6 @@ export const DropZoneOverlay: React.FC<DropZoneOverlayProps> = ({
             justifyContent: 'center',
             pointerEvents: 'none',
             position: 'absolute',
-            zIndex: 10,
           }}
         >
           <div
@@ -93,7 +92,6 @@ export const DropZoneOverlay: React.FC<DropZoneOverlayProps> = ({
               inset: tokens.spacingNew.tiny,
               overflow: 'hidden',
               position: 'absolute',
-              zIndex: 1,
               '&::before': {
                 backgroundColor: theme.blue.main,
                 content: '""',
@@ -118,7 +116,6 @@ export const DropZoneOverlay: React.FC<DropZoneOverlayProps> = ({
               gap: tokens.spacingNew.tiny,
               padding: `${tokens.spacingNew.medium} ${tokens.spacingNew.large}`,
               position: 'relative',
-              zIndex: 2,
             }}
           >
             <Multidoc
