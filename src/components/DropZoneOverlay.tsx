@@ -1,3 +1,4 @@
+import { Multidoc } from '@datacamp/waffles/icon';
 import { theme } from '@datacamp/waffles/theme';
 import { tokens } from '@datacamp/waffles/tokens';
 import React, { useEffect, useRef, useState } from 'react';
@@ -10,7 +11,7 @@ export interface DropZoneOverlayProps {
 }
 
 /**
- * Waffles-styled drag-and-drop overlay that uploads dropped files into the
+ * Waffles-styled drag-and-drop overlay that ingests dropped files into the
  * underlying exercise session's virtual filesystem. The overlay sits over the
  * whole widget card and only renders once a file is actually dragged over it,
  * so it never intercepts clicks or keyboard interactions on the exercise.
@@ -107,26 +108,30 @@ export const DropZoneOverlay: React.FC<DropZoneOverlayProps> = ({
               fontFamily: tokens.fontFamilies.sansSerif,
               fontSize: tokens.fontSizes.medium,
               fontWeight: tokens.fontWeights.bold,
-              gap: tokens.spacingNew.small,
-              padding: tokens.spacingNew.medium,
+              gap: tokens.spacingNew.tiny,
+              padding: `${tokens.spacingNew.medium} ${tokens.spacingNew.large}`,
             }}
           >
-            <svg
-              aria-hidden="true"
-              fill="none"
-              height="40"
-              stroke={theme.blue.main}
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth="1.5"
-              viewBox="0 0 24 24"
-              width="40"
+            <Multidoc
+              css={{
+                color: theme.blue.main,
+                height: 40,
+                marginBottom: tokens.spacingNew.tiny,
+                width: 40,
+              }}
+            />
+            <span css={{ color: theme.text.main, fontWeight: tokens.fontWeights.bold }}>
+              Drop files to add to working directory
+            </span>
+            <span
+              css={{
+                color: theme.text.subtle,
+                fontSize: tokens.fontSizes.small,
+                fontWeight: tokens.fontWeights.regular,
+              }}
             >
-              <path d="M17.5 19a4.5 4.5 0 0 0-1.1-8.87 3.7 3.7 0 0 0-6.7-2.03A3.5 3.5 0 0 0 4.5 11.5 4.5 4.5 0 0 0 2.9 7.5" />
-              <path d="M12 12v6" />
-              <path d="M9 15l3 3 3-3" />
-            </svg>
-            <span>Drop files to upload into the exercise filesystem</span>
+              Saved locally in your session's filesystem
+            </span>
           </div>
         </div>
       )}

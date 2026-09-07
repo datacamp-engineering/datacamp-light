@@ -212,9 +212,9 @@ const ShellExercise: React.FC<{
       try {
         const content = await file.text();
         const result = await session.writeFile({ path: file.name, data: content });
-        console.log(`[VFS] Uploaded ${file.name} (${file.size}) to ${result.cwd || ''}`);
+        console.log(`Added ${file.name} (${file.size} bytes) to ${result.cwd || ''}`);
       } catch (uploadError: any) {
-        console.warn(`[VFS] Failed to upload ${file.name}:`, uploadError);
+        console.warn(`Failed to add ${file.name}:`, uploadError);
       }
     },
     [session],
@@ -252,6 +252,7 @@ const ShellExercise: React.FC<{
           onExecuteCommand={handleExecuteShellCommand}
           onIntrospect={handleIntrospect}
           prompt="$ "
+          initialCwd="/home/repl"
           height={terminalHeight}
           resetKey={resetCounter}
           theme={activeTheme}
@@ -633,9 +634,9 @@ const CodeExercise: React.FC<DataCampExerciseProps> = ({
       try {
         const content = await file.text();
         const result = await session.writeFile({ path: file.name, data: content });
-        console.log(`[VFS] Uploaded ${file.name} (${file.size}) to ${result.cwd || ''}`);
+        console.log(`Added ${file.name} (${file.size} bytes) to ${result.cwd || ''}`);
       } catch (uploadError: any) {
-        console.warn(`[VFS] Failed to upload ${file.name}:`, uploadError);
+        console.warn(`Failed to add ${file.name}:`, uploadError);
       }
     },
     [session],

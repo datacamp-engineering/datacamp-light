@@ -98,6 +98,7 @@ interface TerminalConsoleProps {
   onExecuteCommand: (command: string) => Promise<TerminalCommandResult>;
   onIntrospect?: (code: string, column: number) => Promise<Array<{ label: string; category?: string }>>;
   prompt?: string;
+  initialCwd?: string;
   height?: number | string;
   welcomeMessage?: string;
   resetKey?: number | string;
@@ -115,6 +116,7 @@ export const TerminalConsole: React.FC<TerminalConsoleProps> = ({
   onExecuteCommand,
   onIntrospect,
   prompt = '$ ',
+  initialCwd = '/home/repl',
   height = 260,
   welcomeMessage = 'Welcome to the DataCamp Light shell (WebAssembly).\r\n',
   resetKey,
@@ -127,7 +129,7 @@ export const TerminalConsole: React.FC<TerminalConsoleProps> = ({
   const historyReference = useRef<string[]>([]);
   const historyIndexReference = useRef<number | null>(null);
   const isExecutingReference = useRef(false);
-  const currentWorkingDirectoryReference = useRef<string | null>(null);
+  const currentWorkingDirectoryReference = useRef<string | null>(initialCwd || '/home/repl');
   const activeTabCompletionReference = useRef<ActiveTabCompletion | null>(null);
 
   const onExecuteCommandReference = useRef(onExecuteCommand);
