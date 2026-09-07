@@ -19,7 +19,6 @@ export interface DropZoneOverlayProps {
  */
 export const DropZoneOverlay: React.FC<DropZoneOverlayProps> = ({
   children,
-  theme: themeMode = 'dark',
   onFileDrop,
   preview = false,
 }) => {
@@ -31,7 +30,6 @@ export const DropZoneOverlay: React.FC<DropZoneOverlayProps> = ({
     onFileDropReference.current = onFileDrop;
   }, [onFileDrop]);
 
-  const isLightMode = themeMode === 'light';
   const showOverlay = isDraggingOver || preview;
 
   const handleDragEnter = (event: React.DragEvent) => {
@@ -91,14 +89,19 @@ export const DropZoneOverlay: React.FC<DropZoneOverlayProps> = ({
         >
           <div
             css={{
-              backgroundColor: isLightMode
-                ? 'rgba(5, 120, 255, 0.08)'
-                : 'rgba(5, 120, 255, 0.14)',
-              border: `2px dashed ${theme.blue.main}`,
+              border: `2px dashed ${theme.blue.text}`,
               borderRadius: tokens.borderRadius.medium,
               inset: tokens.spacingNew.tiny,
+              overflow: 'hidden',
               position: 'absolute',
               zIndex: 1,
+              '&::before': {
+                backgroundColor: theme.blue.main,
+                content: '""',
+                inset: 0,
+                opacity: tokens.opacity.low,
+                position: 'absolute',
+              },
             }}
           />
           <div
@@ -121,7 +124,7 @@ export const DropZoneOverlay: React.FC<DropZoneOverlayProps> = ({
           >
             <Multidoc
               css={{
-                color: theme.blue.main,
+                color: theme.blue.text,
                 height: 40,
                 marginBottom: tokens.spacingNew.tiny,
                 width: 40,
