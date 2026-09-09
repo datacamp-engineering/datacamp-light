@@ -77,30 +77,32 @@ jobs:
     executor: aws-deploy
     steps:
       - run:
-          name: Backup legacy CDN files (idempotent snapshot to dcl/v3/)
+          name: Backup legacy CDN files (idempotent snapshot: root/prod -> dcl/v2/, dcl/latest -> dcl/v3/)
           command: |
-            if aws s3 ls s3://cdn.datacamp.com/dcl/v3/dev/dcl-react.js.gz >/dev/null 2>&1; then
-              echo "Legacy CDN backup at dcl/v3/ already exists. Skipping."
+            if aws s3 ls s3://cdn.datacamp.com/dcl/v2/dcl-react.js.gz >/dev/null 2>&1; then
+              echo "Legacy CDN backup at dcl/v2/ already exists. Skipping."
               exit 0
             fi
 
-            echo "Backing up active legacy assets to dcl/v3/..."
-            # Dev prefix & root entrypoint
-            aws s3 sync s3://cdn.datacamp.com/dcl-react-dev/ s3://cdn.datacamp.com/dcl/v3/dev/
-            aws s3 cp s3://cdn.datacamp.com/dcl-react-dev.js.gz s3://cdn.datacamp.com/dcl/v3/dev/dcl-react-dev.js.gz || true
+            echo "Backing up active legacy assets (root entrypoint is the v2 build today; dcl/latest is the v3 beta)..."
+            # Dev prefix & root entrypoint (v2-era shared paths)
+            aws s3 sync s3://cdn.datacamp.com/dcl-react-dev/ s3://cdn.datacamp.com/dcl/v2/dev/
+            aws s3 cp s3://cdn.datacamp.com/dcl-react-dev.js.gz s3://cdn.datacamp.com/dcl/v2/dev/dcl-react-dev.js.gz || true
 
-            # Staging prefix & root entrypoint
-            aws s3 sync s3://cdn.datacamp.com/dcl-react-staging/ s3://cdn.datacamp.com/dcl/v3/staging/
-            aws s3 cp s3://cdn.datacamp.com/dcl-react-staging.js.gz s3://cdn.datacamp.com/dcl/v3/staging/dcl-react-staging.js.gz || true
+            # Staging prefix & root entrypoint (v2-era shared paths)
+            aws s3 sync s3://cdn.datacamp.com/dcl-react-staging/ s3://cdn.datacamp.com/dcl/v2/staging/
+            aws s3 cp s3://cdn.datacamp.com/dcl-react-staging.js.gz s3://cdn.datacamp.com/dcl/v2/staging/dcl-react-staging.js.gz || true
 
-            # Prod prefix & root entrypoints
-            aws s3 sync s3://cdn.datacamp.com/dcl-react-prod/ s3://cdn.datacamp.com/dcl/v3/prod/
-            aws s3 cp s3://cdn.datacamp.com/dcl-react.js.gz s3://cdn.datacamp.com/dcl/v3/prod/dcl-react.js.gz || true
-            aws s3 sync s3://cdn.datacamp.com/dcl/latest/ s3://cdn.datacamp.com/dcl/v3/latest/ || true
+            # Prod prefix & root entrypoint (root dcl-react.js.gz is served from the v2 line today)
+            aws s3 sync s3://cdn.datacamp.com/dcl-react-prod/ s3://cdn.datacamp.com/dcl/v2/prod/
+            aws s3 cp s3://cdn.datacamp.com/dcl-react.js.gz s3://cdn.datacamp.com/dcl/v2/dcl-react.js.gz || true
+
+            # v3 beta builds live only under dcl/latest/ (never cut over to the root entrypoint)
+            aws s3 sync s3://cdn.datacamp.com/dcl/latest/ s3://cdn.datacamp.com/dcl/v3/ || true
 
             # Historical standalone example
-            aws s3 cp s3://cdn.datacamp.com/dcl-react/standalone-example.html s3://cdn.datacamp.com/dcl/v3/legacy/standalone-example.html || true
-            echo "Legacy backup to dcl/v3/ completed successfully."
+            aws s3 cp s3://cdn.datacamp.com/dcl-react/standalone-example.html s3://cdn.datacamp.com/dcl/v2/legacy/standalone-example.html || true
+            echo "Legacy backup to dcl/v2/ and dcl/v3/ completed successfully."
 
   deploy-dev:
     executor: aws-deploy
