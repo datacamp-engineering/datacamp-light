@@ -35,6 +35,9 @@ globalsMap.set('evaluate_shellwhat', (_sct: string, _studentCode: string, _stude
     message: 'Your shell commands look great.',
   });
 });
+globalsMap.set('_dcl_run_plain_code', (code: string) => {
+  return JSON.stringify([{ type: 'output', payload: `Executed: ${code}` }]);
+});
 
 const mockPyodideInstance = {
   FS: mockFileSystem,
@@ -212,5 +215,23 @@ describe('pyodideWorker System / FS and IPython Engine', () => {
       student_result:'',
     })).rejects.toThrow();
     expect(outbound.some((message) => (message as any).method === 'evaluateShellwhat')).toBe(false);
+  });
+
+  it('supports plain Python runCode without pre-existing exercise or SCT', async () => {
+    const { call } = createPyodideWorkerHarness();
+    await call('initialize', { pec: '', solution: '', sct: '' });
+    const result = await call('runCode', { code: 'a = 1 + 1\na' });
+    expect(result.output).toBe('Executed: a = 1 + 1\na');
+  });
+
+  it('lazily escalates plain Python session to evaluate submitCode', async () => {
+    const { call } = createPyodideWorkerHarness();
+    await call('initialize', { pec: '', solution: '', sct: '' });
+    const result = await call('submitCode', {
+      code: 'print("hello")',
+      sct: 'success_msg("Passed")',
+    });
+    expect(result.correct).toBe(true);
+    expect(result.message).toBe('All tests passed');
   });
 });

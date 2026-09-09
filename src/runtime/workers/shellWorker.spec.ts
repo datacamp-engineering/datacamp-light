@@ -153,4 +153,24 @@ describe('shellWorker JSON-RPC contract', () => {
     expect(result.error).toContain('Python environment not available in standalone shell');
     expect(result.cwd).toBe('/home/repl');
   });
+
+  it('grades shell exercise with regex test_student_typed SCT successfully', async () => {
+    const { call } = createWorkerHarness();
+    const result = await call('submitCode', {
+      code: 'mkdir -p project/src',
+      sct: "test_student_typed(r'mkdir\\s+-p\\s+project/src', msg='Please use mkdir with -p')",
+    });
+    expect(result.correct).toBe(true);
+    expect(result.message).toBe('Great work! Your solution passed all tests.');
+  });
+
+  it('fails shell exercise with custom message when regex SCT is not satisfied', async () => {
+    const { call } = createWorkerHarness();
+    const result = await call('submitCode', {
+      code: 'mkdir project',
+      sct: "test_student_typed(r'mkdir\\s+-p', msg='Please create directories recursively with -p')",
+    });
+    expect(result.correct).toBe(false);
+    expect(result.message).toBe('Please create directories recursively with -p');
+  });
 });

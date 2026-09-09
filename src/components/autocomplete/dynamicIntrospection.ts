@@ -1,8 +1,9 @@
 import type { IJsonRpcSession } from '../../jsonrpc/session';
 import type { IIntrospectCompletion, IIntrospectResult } from '../../jsonrpc/types';
-import type { IShellVfs } from '../../runtime/shellInterpreter';
-import { shellCatalog } from './staticCatalogs';
+import { getShellVfsCompletions } from '../../runtime/shellCompletions';
 import type { CompletionCategory, CompletionSnippetTemplate, IntrospectionRequest } from './types';
+
+export { getShellVfsCompletions };
 
 const DEBOUNCE_DELAY_MS = 80;
 const INTROSPECTION_TIMEOUT_MS = 1000;
@@ -14,97 +15,6 @@ interface PendingDebounce {
 }
 
 const pendingDebounces = new Map<string, PendingDebounce>();
-
-export function getShellVfsCompletions(
-  vfs: IShellVfs,
-  cwd: string,
-  code: string,
-  line: number,
-  column: number,
-  _prefix: string,
-  triggerCharacter: string,
-  availableCommands?: string[],
-): CompletionSnippetTemplate[] {
-  const lines = (code || '').split('\n');
-  const currentLine = lines[line] || '';
-  const textBeforeCursor = currentLine.slice(0, column);
-  const trimmedLeft = textBeforeCursor.trimStart();
-  const hasSpace = /\s/.test(trimmedLeft);
-  const isCommandPosition = !hasSpace && !triggerCharacter;
-
-  let currentToken = '';
-  if (isCommandPosition) {
-    currentToken = trimmedLeft;
-  } else {
-    const match = textBeforeCursor.match(/[\w./~-]*$/);
-    currentToken = match ? match[0] : '';
-  }
-
-  const commandName = trimmedLeft.split(/\s+/)[0] || '';
-  const completions: CompletionSnippetTemplate[] = [];
-
-  if (isCommandPosition && !currentToken.includes('/')) {
-    const commandsToSearch =
-      availableCommands && availableCommands.length > 0
-        ? availableCommands
-        : shellCatalog.templates.map((template) => template.label);
-
-    const seenCommands = new Set<string>();
-    for (const command of commandsToSearch) {
-      if (command.startsWith(currentToken) && !seenCommands.has(command)) {
-        seenCommands.add(command);
-        completions.push({
-          label: command,
-          detail: 'shell command',
-          category: 'function',
-          snippet: command,
-          boost: 90,
-        });
-      }
-    }
-    return completions;
-  }
-
-  const lastSlashIndex = currentToken.lastIndexOf('/');
-  let targetDirectory = cwd;
-  let partialName = currentToken;
-
-  if (lastSlashIndex !== -1) {
-    const rawDirectory = lastSlashIndex === 0 ? '/' : currentToken.slice(0, lastSlashIndex);
-    partialName = currentToken.slice(lastSlashIndex + 1);
-    targetDirectory = rawDirectory.startsWith('/')
-      ? rawDirectory
-      : `${cwd}/${rawDirectory}`.replace(/\/+/g, '/');
-  }
-
-  let entries: string[] = [];
-  try {
-    entries = vfs.readdir(targetDirectory) || [];
-  } catch {
-    return [];
-  }
-
-  for (const entry of entries) {
-    if (entry === '.' || entry === '..') continue;
-    if (!entry.startsWith(partialName)) continue;
-    const fullPath = `${targetDirectory}/${entry}`.replace(/\/+/g, '/');
-    const isDirectory = vfs.isDir(fullPath);
-
-    if (commandName === 'cd' && !isDirectory) {
-      continue;
-    }
-
-    completions.push({
-      label: isDirectory ? `${entry}/` : entry,
-      detail: isDirectory ? 'directory' : 'file',
-      category: isDirectory ? 'directory' : 'file',
-      snippet: isDirectory ? `${entry}/` : entry,
-      boost: isDirectory ? 85 : 75,
-    });
-  }
-
-  return completions;
-}
 
 export function getDynamicCompletions(
   language: string,
