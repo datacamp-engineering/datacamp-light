@@ -1,4 +1,6 @@
-# Technical Architecture & Implementation Plan: DuckDB-wasm SQL Runtime, UI & Filesystem Integration
+# Technical Proposal: DuckDB-wasm SQL Runtime, UI & Filesystem Integration
+
+> **Status**: Proposed / Future Roadmap — Not implemented in DataCamp Light v4.
 
 ## 1. Executive Summary & Goals
 
@@ -6,7 +8,7 @@ DataCamp interactive courses, external interactive tutorials (`learnsqlonline.or
 
 Historically, SQL exercises required heavy server-side container infrastructure (PostgreSQL or MySQL container instances managed by backend orchestrators).
 
-**Objective**: Deliver a **100% client-side, zero-infrastructure SQL execution engine** in DataCamp Light v4 powered by **DuckDB-wasm**, styled with `@datacamp/waffles`, supporting live schema autocompletion, interactive tabular result viewing with pagination, and in-memory virtual filesystem ingestion (CSV, Parquet, JSON).
+**Objective**: Deliver a **100% client-side, zero-infrastructure SQL execution engine** in DataCamp Light powered by **DuckDB-wasm**, styled with `@datacamp/waffles`, supporting live schema autocompletion, interactive tabular result viewing with pagination, and in-memory virtual filesystem ingestion (CSV, Parquet, JSON).
 
 ---
 
@@ -59,7 +61,7 @@ Historically, SQL exercises required heavy server-side container infrastructure 
 ### Component A: AsyncDuckDB Web Worker Runtime (`src/runtime/sql/`)
 
 #### 1. On-Demand Lazy Loading from CDN
-To keep the primary DataCamp Light UMD/ESM bundle compact (~520 KB gzipped), DuckDB WASM binaries (~8.5 MB gzipped) are loaded dynamically on-demand only when a SQL exercise is present on the page.
+To keep the primary DataCamp Light bundle compact (~520 KB gzipped), DuckDB WASM binaries (~8.5 MB gzipped) would be loaded dynamically on-demand only when a SQL exercise is present on the page.
 
 * **Module**: `src/runtime/sql/duckdbLoader.ts`
 * **Bundle Selection**:
@@ -128,7 +130,7 @@ A full-featured data grid styled with `@datacamp/waffles`:
 
 ---
 
-## 4. Phased Implementation Roadmap
+## 4. Proposed Implementation Steps
 
 ### Phase 1: Dependencies & DuckDB Session Core
 - Add `@duckdb/duckdb-wasm` and `@codemirror/lang-sql`.
@@ -149,13 +151,3 @@ A full-featured data grid styled with `@datacamp/waffles`:
 - Implement `src/runtime/sql/sqlEvaluator.ts`.
 - Add `learnsqlonline.org` audit target in `scripts/audit-external-tutorials.mjs`.
 - Add interactive playground demo card in `index.html` and `docs/index.html`.
-
----
-
-## 5. Verification Gates
-
-1. **Typecheck**: `npm run typecheck` (`tsc --noEmit`).
-2. **Unit Tests**: `npm test` (`vitest run`).
-3. **Runtime Integration**: `npm run test:runtime`.
-4. **External Audit**: `npm run test:external -- --site=learnsqlonline.org`.
-5. **Build**: `npm run build` (`tsc -b && vite build`).

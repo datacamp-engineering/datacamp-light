@@ -120,9 +120,10 @@ jobs:
             aws s3 cp /tmp/workspace/dist/datacamp-light.css s3://cdn.datacamp.com/dcl-react-dev/datacamp-light.css --acl public-read --content-type "text/css"
 
             # Rewrite relative paths in HTML fixtures to point to dev CDN endpoints
-            sed -e "s|\.\./dist/|https://cdn.datacamp.com/dcl-react-dev/|g" -i /tmp/workspace/docs/index.html /tmp/workspace/docs/example.html
+            sed -e "s|\.\./dist/|https://cdn.datacamp.com/dcl-react-dev/|g" -i /tmp/workspace/docs/index.html /tmp/workspace/docs/example.html /tmp/workspace/docs/notebook.html
             aws s3 cp /tmp/workspace/docs/index.html s3://cdn.datacamp.com/dcl-react-dev/index.html --acl public-read --content-type "text/html"
             aws s3 cp /tmp/workspace/docs/example.html s3://cdn.datacamp.com/dcl-react-dev/example.html --acl public-read --content-type "text/html"
+            aws s3 cp /tmp/workspace/docs/notebook.html s3://cdn.datacamp.com/dcl-react-dev/notebook.html --acl public-read --content-type "text/html"
             aws cloudfront create-invalidation --distribution-id E11JM11LLUSZQE --paths "/dcl-react-dev/*"
 
   deploy-staging:
@@ -159,9 +160,10 @@ jobs:
               --cache-control "max-age=1296000"
 
             # 4. Upload demo/showcase pages rewritten for staging CDN
-            sed -e "s|\.\./dist/|https://cdn.datacamp.com/dcl/v4/staging/|g" -i /tmp/workspace/docs/index.html /tmp/workspace/docs/example.html
+            sed -e "s|\.\./dist/|https://cdn.datacamp.com/dcl/v4/staging/|g" -i /tmp/workspace/docs/index.html /tmp/workspace/docs/example.html /tmp/workspace/docs/notebook.html
             aws s3 cp /tmp/workspace/docs/index.html s3://cdn.datacamp.com/dcl/v4/staging/index.html --acl public-read --content-type "text/html"
             aws s3 cp /tmp/workspace/docs/example.html s3://cdn.datacamp.com/dcl/v4/staging/example.html --acl public-read --content-type "text/html"
+            aws s3 cp /tmp/workspace/docs/notebook.html s3://cdn.datacamp.com/dcl/v4/staging/notebook.html --acl public-read --content-type "text/html"
 
             # Invalidate CloudFront staging distribution cache
             aws cloudfront create-invalidation --distribution-id E11JM11LLUSZQE --paths "/dcl/v4/staging/*"
@@ -212,9 +214,10 @@ jobs:
             done
 
             # 5. Upload demo pages rewritten for production canonical base
-            sed -e "s|\.\./dist/|https://cdn.datacamp.com/dcl/v4/prod/|g" -i /tmp/workspace/docs/index.html /tmp/workspace/docs/example.html
+            sed -e "s|\.\./dist/|https://cdn.datacamp.com/dcl/v4/prod/|g" -i /tmp/workspace/docs/index.html /tmp/workspace/docs/example.html /tmp/workspace/docs/notebook.html
             aws s3 cp /tmp/workspace/docs/index.html s3://cdn.datacamp.com/dcl/v4/prod/index.html --acl public-read --content-type "text/html"
             aws s3 cp /tmp/workspace/docs/example.html s3://cdn.datacamp.com/dcl/v4/prod/example.html --acl public-read --content-type "text/html"
+            aws s3 cp /tmp/workspace/docs/notebook.html s3://cdn.datacamp.com/dcl/v4/prod/notebook.html --acl public-read --content-type "text/html"
 
             # 6. Invalidate CloudFront caches across production paths
             aws cloudfront create-invalidation --distribution-id E11JM11LLUSZQE --paths \
