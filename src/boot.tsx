@@ -1,4 +1,14 @@
+if (typeof globalThis !== 'undefined' && !(globalThis as any).process) {
+  (globalThis as any).process = { env: { NODE_ENV: 'production', NODE_NEV: 'production' } };
+}
+
 import './i18n';
+import './runtime/assetResolver';
+import { installGlobalFetchCache } from './runtime/assetCache';
+
+// Automatically install persistent fetch cache when DataCamp Light boots
+installGlobalFetchCache();
+
 import { createRoot } from 'react-dom/client';
 import { DataCampExercise } from './components/DataCampExercise';
 import type { DataCampExerciseProps } from './components/DataCampExercise';

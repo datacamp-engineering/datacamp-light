@@ -201,8 +201,8 @@ export const TerminalConsole: React.FC<TerminalConsoleProps> = ({
     const terminalInstance = new Xterm({
       cursorBlink: true,
       fontFamily: tokens.fontFamilies.mono,
-      fontSize: 13,
-      lineHeight: 1.3,
+      fontSize: parseInt(tokens.fontSizes.medium, 10),
+      lineHeight: 1.35,
       theme: {
         background: terminalBackground,
         foreground: terminalForeground,
@@ -332,6 +332,7 @@ export const TerminalConsole: React.FC<TerminalConsoleProps> = ({
           terminalInstance.write(
             buildPrompt(currentWorkingDirectoryReference.current, promptReference.current),
           );
+          terminalInstance.focus();
         }
         return;
       }
@@ -639,16 +640,24 @@ export const TerminalConsole: React.FC<TerminalConsoleProps> = ({
         height: typeof height === 'number' ? `${height}px` : height,
         minHeight: 120,
         overflow: 'hidden',
-        padding: tokens.spacingNew.xsmall,
+        padding: 0,
         position: 'relative',
         width: '100%',
         '& .xterm': {
           backgroundColor: theme.background.main,
+          boxSizing: 'border-box',
           height: '100%',
-          padding: tokens.spacingNew.tiny,
+          padding: '12px 0 0 16px',
+        },
+        '& .xterm-screen': {
+          padding: 0,
         },
         '& .xterm-viewport': {
           backgroundColor: `${theme.background.main} !important`,
+          height: '100% !important',
+        },
+        '& .xterm-scrollable-element': {
+          height: '100% !important',
         },
       }}
       ref={terminalContainerReference}

@@ -1,9 +1,10 @@
 import { Button } from '@datacamp/waffles/button';
-import { Cross, ExternalLink, Sparkles } from '@datacamp/waffles/icon';
+import { ExternalLink, Sparkles } from '@datacamp/waffles/icon';
 import { theme } from '@datacamp/waffles/theme';
 import { tokens } from '@datacamp/waffles/tokens';
 import React from 'react';
 import { getMainAppBaseUrl } from '../ai/aiConfig';
+import { BannerCloseButton, bannerRowStyle } from '../styles/bannerStyles';
 
 export interface AiUpsellBannerProps {
   variant: 'third-party' | 'signed-out';
@@ -59,16 +60,10 @@ export const AiUpsellBanner: React.FC<AiUpsellBannerProps> = ({
 
   return (
     <div
+      data-testid="ai-upsell-banner"
       css={{
-        alignItems: 'center',
-        backgroundColor: theme.background.secondary,
-        borderBottom: `${tokens.borderWidth.thin} solid ${theme.border.main}`,
-        borderTop: `${tokens.borderWidth.thin} solid ${theme.border.main}`,
-        display: 'flex',
+        ...bannerRowStyle,
         flexWrap: 'wrap',
-        gap: tokens.spacingNew.small,
-        justifyContent: 'space-between',
-        padding: `${tokens.spacingNew.small} ${tokens.spacingNew.medium}`,
       }}
     >
       <div css={{ alignItems: 'center', display: 'flex', gap: tokens.spacingNew.small }}>
@@ -110,12 +105,9 @@ export const AiUpsellBanner: React.FC<AiUpsellBannerProps> = ({
             Sign Up Free
           </Button>
         )}
-        <Button
-          aria-label="Close AI banner"
-          icon={<Cross size="small" />}
-          onClick={onClose}
-          size="small"
-          variant="plain"
+        <BannerCloseButton
+          label="Close AI banner"
+          onClose={onClose}
         />
       </div>
     </div>

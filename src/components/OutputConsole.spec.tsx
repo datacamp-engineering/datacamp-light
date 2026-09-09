@@ -59,4 +59,29 @@ describe('OutputConsole', () => {
     fireEvent.click(fixButton);
     expect(handleFixAndExplain).toHaveBeenCalledTimes(1);
   });
+
+  it('maintains input element in readOnly mode during execution and refocuses on completion', () => {
+    const { rerender } = renderWithShell(
+      <OutputConsole
+        entries={[]}
+        onExecuteCommand={vi.fn()}
+        isExecuting={true}
+      />,
+    );
+
+    const inputElement = screen.getByRole('textbox', { name: /console command input/i }) as HTMLInputElement;
+    expect(inputElement.readOnly).toBe(true);
+
+    rerender(
+      <DCLWidgetShell>
+        <OutputConsole
+          entries={[]}
+          onExecuteCommand={vi.fn()}
+          isExecuting={false}
+        />
+      </DCLWidgetShell>,
+    );
+
+    expect(inputElement.readOnly).toBe(false);
+  });
 });

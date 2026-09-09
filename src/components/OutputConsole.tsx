@@ -10,6 +10,12 @@ export interface ConsoleEntry {
   text: string;
 }
 
+const consoleTypographyStyle = {
+  fontFamily: tokens.fontFamilies.mono,
+  fontSize: tokens.fontSizes.medium,
+  lineHeight: tokens.lineHeights.default,
+};
+
 interface OutputConsoleProps {
   entries: ConsoleEntry[];
   prompt?: string;
@@ -39,6 +45,14 @@ export const OutputConsole: React.FC<OutputConsoleProps> = ({
   const [isScrolled, setIsScrolled] = useState(false);
 
   const hasErrorEntry = entries.some((entry) => entry.type === 'error');
+  const wasExecutingReference = useRef(false);
+
+  useEffect(() => {
+    if (wasExecutingReference.current && !isExecuting) {
+      inputReference.current?.focus();
+    }
+    wasExecutingReference.current = isExecuting;
+  }, [isExecuting]);
 
   useEffect(() => {
     if (containerReference.current) {
@@ -151,15 +165,13 @@ export const OutputConsole: React.FC<OutputConsoleProps> = ({
           <div
             key={entryIndex}
             css={{
+              ...consoleTypographyStyle,
               color:
                 entry.type === 'error'
                   ? theme.error.text
                   : entry.type === 'input'
                   ? theme.blue.text
                   : theme.text.main,
-              fontFamily: tokens.fontFamilies.mono,
-              fontSize: tokens.fontSizes.medium,
-              lineHeight: tokens.lineHeights.tight,
               marginBottom: tokens.spacingNew.tiny,
               whiteSpace: 'pre-wrap',
               wordBreak: 'break-word',
@@ -170,27 +182,41 @@ export const OutputConsole: React.FC<OutputConsoleProps> = ({
         ))}
 
         {onExecuteCommand && (
-          <div css={{ alignItems: 'center', display: 'flex', marginTop: tokens.spacingNew.tiny }}>
-            <span css={{ color: theme.blue.text, marginRight: tokens.spacingNew.xsmall, userSelect: 'none' }}>
+          <div
+            css={{
+              ...consoleTypographyStyle,
+              alignItems: 'center',
+              display: 'flex',
+              marginTop: tokens.spacingNew.tiny,
+            }}
+          >
+            <span
+              css={{
+                ...consoleTypographyStyle,
+                color: theme.blue.text,
+                marginRight: tokens.spacingNew.xsmall,
+                userSelect: 'none',
+                whiteSpace: 'pre',
+              }}
+            >
               {prompt}
             </span>
             <input
               aria-label="Console command input"
               css={{
+                ...consoleTypographyStyle,
                 backgroundColor: 'transparent',
                 border: 'none',
                 color: theme.text.main,
                 flex: 1,
-                fontFamily: tokens.fontFamilies.mono,
-                fontSize: tokens.fontSizes.medium,
                 outline: 'none',
                 padding: 0,
                 margin: 0,
               }}
-              disabled={isExecuting}
               onChange={(event) => setCurrentInput(event.target.value)}
               onKeyDown={handleKeyDown}
               placeholder={isExecuting ? 'Executing…' : ''}
+              readOnly={isExecuting}
               ref={inputReference}
               type="text"
               value={currentInput}

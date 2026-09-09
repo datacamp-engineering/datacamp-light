@@ -1,5 +1,5 @@
-import { render, screen } from '@testing-library/react';
-import { describe, expect, it } from 'vitest';
+import { fireEvent, render, screen } from '@testing-library/react';
+import { describe, expect, it, vi } from 'vitest';
 import { FeedbackBanner } from './FeedbackBanner';
 
 describe('FeedbackBanner', () => {
@@ -40,5 +40,13 @@ describe('FeedbackBanner', () => {
     const codeElement = container.querySelector('code');
     expect(codeElement).toBeInTheDocument();
     expect(codeElement?.textContent).toBe('area');
+  });
+
+  it('calls onClose when close button is clicked', () => {
+    const handleClose = vi.fn();
+    render(<FeedbackBanner correct={true} message="Great work!" onClose={handleClose} />);
+    const closeButton = screen.getByRole('button', { name: /close feedback/i });
+    fireEvent.click(closeButton);
+    expect(handleClose).toHaveBeenCalledTimes(1);
   });
 });

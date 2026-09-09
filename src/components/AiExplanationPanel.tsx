@@ -5,6 +5,7 @@ import { tokens } from '@datacamp/waffles/tokens';
 import { marked } from 'marked';
 import React from 'react';
 import type { LineChange } from '../ai/lineDiff';
+import { baseBannerStyle } from '../styles/bannerStyles';
 import { AiCodeDiff } from './AiCodeDiff';
 
 export interface AiExplanationPanelProps {
@@ -35,13 +36,8 @@ export const AiExplanationPanel: React.FC<AiExplanationPanelProps> = ({
   return (
     <div
       css={{
-        backgroundColor: theme.background.secondary,
-        borderBottom: `${tokens.borderWidth.thin} solid ${theme.border.main}`,
-        borderTop: `${tokens.borderWidth.thin} solid ${theme.border.main}`,
-        display: 'flex',
+        ...baseBannerStyle,
         flexDirection: 'column',
-        gap: tokens.spacingNew.small,
-        padding: `${tokens.spacingNew.small} ${tokens.spacingNew.medium}`,
       }}
     >
       <div

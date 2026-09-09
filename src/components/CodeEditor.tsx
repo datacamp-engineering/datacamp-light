@@ -12,7 +12,7 @@ import { tags as t } from '@lezer/highlight';
 import { basicSetup } from 'codemirror';
 import React, { useEffect, useRef } from 'react';
 import type { IJsonRpcSession } from '../jsonrpc/session';
-import { createAutocompleteExtension } from './autocomplete/autocompleteExtension';
+import { createLazyAutocompleteExtension } from './autocomplete/lazyAutocomplete';
 
 const dcEditorTheme = EditorView.theme({
   '&': {
@@ -22,13 +22,16 @@ const dcEditorTheme = EditorView.theme({
     fontSize: tokens.fontSizes.medium,
     height: '100%',
     minHeight: '100%',
-    padding: `${tokens.spacingNew.xsmall} ${tokens.spacingNew.medium}`,
+    padding: 0,
   },
   '&.cm-focused': {
     outline: 'none',
   },
   '&.cm-focused .cm-activeLine': {
     backgroundColor: `${theme.background.hover} !important`,
+  },
+  '&.cm-focused .cm-activeLineGutter': {
+    backgroundColor: 'transparent !important',
   },
   '&.cm-focused .cm-cursor': {
     borderLeftColor: theme.text.main,
@@ -38,10 +41,10 @@ const dcEditorTheme = EditorView.theme({
     backgroundColor: theme.blue.transparent,
   },
   '.cm-activeLine': {
-    backgroundColor: 'transparent',
+    backgroundColor: `${theme.background.hover} !important`,
   },
   '.cm-activeLineGutter': {
-    backgroundColor: theme.background.main,
+    backgroundColor: 'transparent !important',
   },
   '.cm-cursor': {
     borderLeftColor: theme.text.main,
@@ -51,9 +54,33 @@ const dcEditorTheme = EditorView.theme({
     backgroundColor: theme.background.main,
     borderRight: 'none',
     color: theme.text.inverseSubtle,
+    fontFamily: tokens.fontFamilies.mono,
+    fontSize: tokens.fontSizes.medium,
+    paddingLeft: tokens.spacingNew.medium,
+  },
+  '.cm-gutterElement': {
+    fontFamily: tokens.fontFamilies.mono,
+    fontSize: tokens.fontSizes.medium,
+    lineHeight: '1.5',
   },
   '.cm-scroller': {
+    alignItems: 'stretch',
+    display: 'flex',
+    fontFamily: tokens.fontFamilies.mono,
+    lineHeight: '1.5',
     overflow: 'auto',
+  },
+  '.cm-content': {
+    flexGrow: 1,
+    fontFamily: tokens.fontFamilies.mono,
+    lineHeight: '1.5',
+    minWidth: 0,
+    padding: '12px 0 8px 0',
+  },
+  '.cm-line': {
+    lineHeight: '1.5',
+    paddingLeft: tokens.spacingNew.xsmall,
+    paddingRight: tokens.spacingNew.medium,
   },
   '.cm-selectionBackground': {
     backgroundColor: theme.blue.transparent,
@@ -236,7 +263,7 @@ export const CodeEditor: React.FC<CodeEditorProps> = ({
       getLanguageExtension(language),
       ...(autocomplete
         ? [
-            createAutocompleteExtension(language, session),
+            createLazyAutocompleteExtension(language, session),
             Prec.highest(
               keymap.of([
                 { key: 'Tab', run: acceptCompletion },
@@ -248,7 +275,7 @@ export const CodeEditor: React.FC<CodeEditorProps> = ({
       dcEditorTheme,
       dcHighlightStyle,
       EditorView.lineWrapping,
-      Prec.highest(keymap.of([indentWithTab])),
+      keymap.of([indentWithTab]),
       EditorState.readOnly.of(readOnly),
       EditorView.updateListener.of((update: ViewUpdate) => {
         if (update.docChanged) {

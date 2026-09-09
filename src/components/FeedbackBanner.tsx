@@ -1,9 +1,13 @@
 import { CheckmarkCircle, CrossCircle } from '@datacamp/waffles/icon';
-import { theme } from '@datacamp/waffles/theme';
 import { tokens } from '@datacamp/waffles/tokens';
 import React from 'react';
+import {
+  BannerCloseButton,
+  getFeedbackBannerStyle,
+  getFeedbackTheme,
+} from '../styles/bannerStyles';
 
-interface FeedbackBannerProps {
+export interface FeedbackBannerProps {
   correct?: boolean;
   message?: string;
   onClose?: () => void;
@@ -20,37 +24,13 @@ export const FeedbackBanner: React.FC<FeedbackBannerProps> = ({
 
   const isSuccess = correct === true;
   const formattedMessage = message.replace(/`([^`]+)`/g, '<code>$1</code>').trim();
-
-  // Reuse waffles semantic colours so the banner reads like the product.
-  const bg = isSuccess ? theme.success.transparent : theme.error.transparent;
-  const border = isSuccess ? theme.success.main : theme.error.main;
-  const color = isSuccess ? theme.success.text : theme.error.text;
+  const feedbackTheme = getFeedbackTheme(isSuccess);
 
   return (
     <div
-      data-testid="feedback-banner"
+      css={getFeedbackBannerStyle(isSuccess)}
       data-correct={String(isSuccess)}
-      css={{
-        alignItems: 'center',
-        backgroundColor: bg,
-        borderBottom: `${tokens.borderWidth.medium} solid ${border}`,
-        borderTop: `${tokens.borderWidth.medium} solid ${border}`,
-        color,
-        display: 'flex',
-        fontSize: tokens.fontSizes.medium,
-        gap: tokens.spacingNew.small,
-        justifyContent: 'space-between',
-        padding: `${tokens.spacingNew.small} ${tokens.spacingNew.medium}`,
-        '& code': {
-          backgroundColor: isSuccess
-            ? 'rgba(0, 168, 90, 0.15)'
-            : 'rgba(255, 75, 75, 0.15)',
-          borderRadius: tokens.borderRadius.medium,
-          fontFamily: tokens.fontFamilies.mono,
-          fontSize: '0.9em',
-          padding: '2px 5px',
-        },
-      }}
+      data-testid="feedback-banner"
     >
       <div css={{ alignItems: 'center', display: 'flex', gap: tokens.spacingNew.xsmall }}>
         {isSuccess ? (
@@ -61,21 +41,11 @@ export const FeedbackBanner: React.FC<FeedbackBannerProps> = ({
         <span dangerouslySetInnerHTML={{ __html: formattedMessage }} />
       </div>
       {onClose && (
-        <button
-          aria-label="Close feedback"
-          css={{
-            background: 'none',
-            border: 'none',
-            color,
-            cursor: 'pointer',
-            fontSize: tokens.fontSizes.large,
-            lineHeight: tokens.lineHeights.tight,
-            padding: tokens.spacingNew.tiny,
-          }}
-          onClick={onClose}
-        >
-          ×
-        </button>
+        <BannerCloseButton
+          label="Close feedback"
+          color={feedbackTheme.color}
+          onClose={onClose}
+        />
       )}
     </div>
   );
