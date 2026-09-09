@@ -111,6 +111,27 @@ describe('getSettings', () => {
     expect(settings.impactTrackingLink).toBe('/c/67577/1012793/13294');
   });
 
+  it('should parse noLazyLoad from encoded data correctly', () => {
+    const data = {
+      language: 'python',
+      noLazyLoad: true,
+    };
+    const encodedData = btoa(JSON.stringify(data));
+    element.setAttribute('data-encoded', 'true');
+    element.textContent = encodeURIComponent(encodedData);
+    const settings = getSettings(element);
+    expect(settings.noLazyLoad).toBe(true);
+  });
+
+  it('should not set noLazyLoad when encoded data omits it', () => {
+    const data = { language: 'python' };
+    const encodedData = btoa(JSON.stringify(data));
+    element.setAttribute('data-encoded', 'true');
+    element.textContent = encodeURIComponent(encodedData);
+    const settings = getSettings(element);
+    expect(settings.noLazyLoad).toBeUndefined();
+  });
+
   it('should parse showAi attribute correctly', () => {
     const defaultSettings = getSettings(element);
     expect(defaultSettings.showAi).toBe(true);

@@ -39,6 +39,7 @@ export interface DataCampExerciseProps {
   autocomplete?: boolean;
   previewDropZone?: boolean;
   sharedEnvironment?: boolean | string;
+  noLazyLoad?: boolean;
   utmSource?: string;
   utmCampaign?: string;
   impactTrackingLink?: string;

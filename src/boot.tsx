@@ -28,10 +28,15 @@ export function getSettings(element: HTMLElement): DataCampExerciseProps {
     try {
       const decoded = atob(decodeURIComponent(element.textContent || ''));
       const exercise = JSON.parse(decoded);
+      const encodedNoLazyLoad =
+        typeof exercise.noLazyLoad === 'string'
+          ? exercise.noLazyLoad.toLowerCase() !== 'false'
+          : Boolean(exercise.noLazyLoad);
       return {
         id,
         hint: exercise.hint,
         language: exercise.language || 'python',
+        noLazyLoad: encodedNoLazyLoad || undefined,
         theme:
           exercise.theme === 'light' || exercise.theme === 'dark'
             ? exercise.theme
@@ -158,21 +163,22 @@ export function bootElement(element: HTMLElement): void {
     return;
   }
 
+  const settingsForLazyLoad = getSettings(element);
   const noLazyLoad =
-    element.hasAttribute('data-no-lazy-load') &&
-    element.getAttribute('data-no-lazy-load')?.toLowerCase() !== 'false';
+    settingsForLazyLoad.noLazyLoad === true ||
+    (element.hasAttribute('data-no-lazy-load') &&
+      element.getAttribute('data-no-lazy-load')?.toLowerCase() !== 'false');
 
   const mount = () => {
     if (element.classList.contains('datacamp-exercise-initialized')) {
       return;
     }
-    const settings = getSettings(element);
     element.innerHTML = '';
     element.classList.add('datacamp-exercise-initialized');
     element.removeAttribute('data-datacamp-exercise');
 
     const root = createRoot(element);
-    root.render(<DataCampExercise {...settings} />);
+    root.render(<DataCampExercise {...settingsForLazyLoad} />);
   };
 
   if (noLazyLoad || typeof IntersectionObserver === 'undefined') {
