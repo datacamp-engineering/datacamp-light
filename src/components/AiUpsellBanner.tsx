@@ -28,15 +28,22 @@ export const AiUpsellBanner: React.FC<AiUpsellBannerProps> = ({
   const isThirdParty = variant === 'third-party';
 
   const queryParameters = new URLSearchParams();
-  queryParameters.set('_tag', utmSource);
-  queryParameters.set('utm_source', utmSource);
-  queryParameters.set('utm_campaign', utmCampaign);
+  if (utmSource) {
+    queryParameters.set('_tag', utmSource);
+    queryParameters.set('utm_source', utmSource);
+  }
+  if (utmCampaign) {
+    queryParameters.set('utm_campaign', utmCampaign);
+  }
   if (code) {
     queryParameters.set('code', code);
     queryParameters.set('language', language);
   }
 
-  const directDatalabUrl = `https://www.datacamp.com/datalab/new?${queryParameters.toString()}`;
+  const queryString = queryParameters.toString();
+  const directDatalabUrl = queryString
+    ? `https://www.datacamp.com/datalab/new?${queryString}`
+    : 'https://www.datacamp.com/datalab/new';
 
   let datalabUrl = directDatalabUrl;
   if (impactTrackingLink) {
@@ -47,8 +54,12 @@ export const AiUpsellBanner: React.FC<AiUpsellBannerProps> = ({
     try {
       const affiliateUrl = new URL(baseAffiliateUrl);
       affiliateUrl.searchParams.set('u', directDatalabUrl);
-      affiliateUrl.searchParams.set('utm_source', utmSource);
-      affiliateUrl.searchParams.set('utm_campaign', utmCampaign);
+      if (utmSource) {
+        affiliateUrl.searchParams.set('utm_source', utmSource);
+      }
+      if (utmCampaign) {
+        affiliateUrl.searchParams.set('utm_campaign', utmCampaign);
+      }
       datalabUrl = affiliateUrl.toString();
     } catch {
       datalabUrl = baseAffiliateUrl;
@@ -56,9 +67,11 @@ export const AiUpsellBanner: React.FC<AiUpsellBannerProps> = ({
   }
 
   const currentUrl = typeof window !== 'undefined' ? window.location.href : 'https://www.datacamp.com';
-  const signUpUrl = `${getMainAppBaseUrl()}/users/sign_up?redirect=${encodeURIComponent(
-    currentUrl,
-  )}&utm_source=${encodeURIComponent(utmSource)}&utm_campaign=${encodeURIComponent(utmCampaign)}`;
+  const signUpParams = new URLSearchParams();
+  signUpParams.set('redirect', currentUrl);
+  if (utmSource) signUpParams.set('utm_source', utmSource);
+  if (utmCampaign) signUpParams.set('utm_campaign', utmCampaign);
+  const signUpUrl = `${getMainAppBaseUrl()}/users/sign_up?${signUpParams.toString()}`;
 
   return (
     <div

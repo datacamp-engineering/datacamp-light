@@ -79,6 +79,22 @@ describe('Footer', () => {
     expect(href.searchParams.get('utm_campaign')).toBe('test_campaign');
   });
 
+  it('omits UTM parameters when utmSource and utmCampaign are undefined or empty', () => {
+    renderWithShell(
+      <Footer
+        impactTrackingLink="/c/67577/1012793/13294"
+        utmCampaign=""
+        utmSource=""
+      />,
+    );
+    const link = screen.getByRole('link', { name: /DataLab/i });
+    const href = new URL(link.getAttribute('href') || '');
+    expect(href.origin).toBe('https://datacamp.pxf.io');
+    expect(href.searchParams.get('utm_source')).toBeNull();
+    expect(href.searchParams.get('utm_campaign')).toBeNull();
+    expect(href.searchParams.get('u')).toBe('https://www.datacamp.com/datalab/new');
+  });
+
   it('should render theme toggle button and trigger callback when clicked in dark mode', () => {
     const handleToggleTheme = vi.fn();
     renderWithShell(<Footer theme="dark" onToggleTheme={handleToggleTheme} />);

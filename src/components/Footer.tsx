@@ -28,16 +28,23 @@ export const Footer: React.FC<FooterProps> = ({
   onToggleTheme,
 }) => {
   const queryParameters = new URLSearchParams();
-  queryParameters.set('_tag', utmSource);
-  queryParameters.set('utm_source', utmSource);
-  queryParameters.set('utm_campaign', utmCampaign);
+  if (utmSource) {
+    queryParameters.set('_tag', utmSource);
+    queryParameters.set('utm_source', utmSource);
+  }
+  if (utmCampaign) {
+    queryParameters.set('utm_campaign', utmCampaign);
+  }
 
   if (code && (language === 'python' || language === 'r')) {
     queryParameters.set('code', code);
     queryParameters.set('language', language);
   }
 
-  const directDatalabUrl = `https://www.datacamp.com/datalab/new?${queryParameters.toString()}`;
+  const queryString = queryParameters.toString();
+  const directDatalabUrl = queryString
+    ? `https://www.datacamp.com/datalab/new?${queryString}`
+    : 'https://www.datacamp.com/datalab/new';
 
   let datalabUrl = directDatalabUrl;
   if (impactTrackingLink) {
@@ -48,8 +55,12 @@ export const Footer: React.FC<FooterProps> = ({
     try {
       const affiliateUrl = new URL(baseAffiliateUrl);
       affiliateUrl.searchParams.set('u', directDatalabUrl);
-      affiliateUrl.searchParams.set('utm_source', utmSource);
-      affiliateUrl.searchParams.set('utm_campaign', utmCampaign);
+      if (utmSource) {
+        affiliateUrl.searchParams.set('utm_source', utmSource);
+      }
+      if (utmCampaign) {
+        affiliateUrl.searchParams.set('utm_campaign', utmCampaign);
+      }
       datalabUrl = affiliateUrl.toString();
     } catch {
       datalabUrl = baseAffiliateUrl;

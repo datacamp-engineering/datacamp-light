@@ -57,6 +57,25 @@ describe('AiUpsellBanner', () => {
     expect(href.searchParams.get('u')).toContain('utm_campaign=blog_post');
   });
 
+  it('omits UTM parameters from third-party and sign-up URLs when empty', () => {
+    renderWithShell(
+      <AiUpsellBanner
+        impactTrackingLink="/c/67577/1012793/13294"
+        language="python"
+        onClose={vi.fn()}
+        utmCampaign=""
+        utmSource=""
+        variant="third-party"
+      />,
+    );
+
+    const ctaLink = screen.getByRole('link', { name: /open in datalab/i });
+    const href = new URL(ctaLink.getAttribute('href') || '');
+    expect(href.searchParams.get('utm_source')).toBeNull();
+    expect(href.searchParams.get('utm_campaign')).toBeNull();
+    expect(href.searchParams.get('u')).toBe('https://www.datacamp.com/datalab/new');
+  });
+
   it('renders signed-out upsell with Sign Up Free CTA link', () => {
     const handleClose = vi.fn();
     renderWithShell(
