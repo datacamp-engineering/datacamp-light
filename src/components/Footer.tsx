@@ -48,6 +48,8 @@ export const Footer: React.FC<FooterProps> = ({
     try {
       const affiliateUrl = new URL(baseAffiliateUrl);
       affiliateUrl.searchParams.set('u', directDatalabUrl);
+      affiliateUrl.searchParams.set('utm_source', utmSource);
+      affiliateUrl.searchParams.set('utm_campaign', utmCampaign);
       datalabUrl = affiliateUrl.toString();
     } catch {
       datalabUrl = baseAffiliateUrl;

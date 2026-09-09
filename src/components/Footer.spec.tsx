@@ -70,9 +70,13 @@ describe('Footer', () => {
       language: 'python',
     });
     const expectedDatalabUrl = `https://www.datacamp.com/datalab/new?${expectedParameters.toString()}`;
-    const expectedHref = `https://datacamp.pxf.io/c/67577/1012793/13294?u=${encodeURIComponent(expectedDatalabUrl)}`;
 
-    expect(link).toHaveAttribute('href', expectedHref);
+    const href = new URL(link.getAttribute('href') || '');
+    expect(href.origin).toBe('https://datacamp.pxf.io');
+    expect(href.pathname).toBe('/c/67577/1012793/13294');
+    expect(href.searchParams.get('u')).toBe(expectedDatalabUrl);
+    expect(href.searchParams.get('utm_source')).toBe('test_source');
+    expect(href.searchParams.get('utm_campaign')).toBe('test_campaign');
   });
 
   it('should render theme toggle button and trigger callback when clicked in dark mode', () => {
