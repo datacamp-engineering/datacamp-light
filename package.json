@@ -1,6 +1,6 @@
 {
   "name": "datacamp-light",
-  "version": "3.0.0",
+  "version": "4.0.0",
   "description": "Convert any blog or website to an interactive learning platform for data science using WebAssembly",
   "main": "dist/dcl-react.js",
   "module": "dist/dcl-react.es.js",
