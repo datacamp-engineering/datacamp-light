@@ -3,8 +3,8 @@ import { ExternalLink, Sparkles } from '@datacamp/waffles/icon';
 import { theme } from '@datacamp/waffles/theme';
 import { tokens } from '@datacamp/waffles/tokens';
 import React from 'react';
-import { getMainAppBaseUrl } from '../ai/aiConfig';
 import { BannerCloseButton, bannerRowStyle } from '../styles/bannerStyles';
+import { buildDataLabUrl, buildSignUpUrl } from '../utils/urlUtils';
 
 export interface AiUpsellBannerProps {
   variant: 'third-party' | 'signed-out';
@@ -27,51 +27,18 @@ export const AiUpsellBanner: React.FC<AiUpsellBannerProps> = ({
 }) => {
   const isThirdParty = variant === 'third-party';
 
-  const queryParameters = new URLSearchParams();
-  if (utmSource) {
-    queryParameters.set('_tag', utmSource);
-    queryParameters.set('utm_source', utmSource);
-  }
-  if (utmCampaign) {
-    queryParameters.set('utm_campaign', utmCampaign);
-  }
-  if (code) {
-    queryParameters.set('code', code);
-    queryParameters.set('language', language);
-  }
+  const datalabUrl = buildDataLabUrl({
+    code,
+    language,
+    utmSource,
+    utmCampaign,
+    impactTrackingLink,
+  });
 
-  const queryString = queryParameters.toString();
-  const directDatalabUrl = queryString
-    ? `https://www.datacamp.com/datalab/new?${queryString}`
-    : 'https://www.datacamp.com/datalab/new';
-
-  let datalabUrl = directDatalabUrl;
-  if (impactTrackingLink) {
-    const baseAffiliateUrl =
-      impactTrackingLink.startsWith('http://') || impactTrackingLink.startsWith('https://')
-        ? impactTrackingLink
-        : `https://datacamp.pxf.io${impactTrackingLink.startsWith('/') ? '' : '/'}${impactTrackingLink}`;
-    try {
-      const affiliateUrl = new URL(baseAffiliateUrl);
-      affiliateUrl.searchParams.set('u', directDatalabUrl);
-      if (utmSource) {
-        affiliateUrl.searchParams.set('utm_source', utmSource);
-      }
-      if (utmCampaign) {
-        affiliateUrl.searchParams.set('utm_campaign', utmCampaign);
-      }
-      datalabUrl = affiliateUrl.toString();
-    } catch {
-      datalabUrl = baseAffiliateUrl;
-    }
-  }
-
-  const currentUrl = typeof window !== 'undefined' ? window.location.href : 'https://www.datacamp.com';
-  const signUpParams = new URLSearchParams();
-  signUpParams.set('redirect', currentUrl);
-  if (utmSource) signUpParams.set('utm_source', utmSource);
-  if (utmCampaign) signUpParams.set('utm_campaign', utmCampaign);
-  const signUpUrl = `${getMainAppBaseUrl()}/users/sign_up?${signUpParams.toString()}`;
+  const signUpUrl = buildSignUpUrl({
+    utmSource,
+    utmCampaign,
+  });
 
   return (
     <div

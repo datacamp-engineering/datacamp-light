@@ -19,7 +19,7 @@ describe('Footer', () => {
     );
     expect(link).toHaveAttribute(
       'href',
-      'https://www.datacamp.com/datalab/new?_tag=test_source&utm_source=test_source&utm_campaign=test_campaign',
+      'https://www.datacamp.com/datalab/new?utm_source=test_source&utm_campaign=test_campaign',
     );
   });
 
@@ -36,11 +36,10 @@ describe('Footer', () => {
     const link = screen.getByRole('link', { name: /DataLab/i });
     expect(link).toBeInTheDocument();
     const expectedParameters = new URLSearchParams({
-      _tag: 'test_source',
+      _tag: 'sandbox',
+      code,
       utm_source: 'test_source',
       utm_campaign: 'test_campaign',
-      code,
-      language: 'python',
     });
     expect(link).toHaveAttribute(
       'href',
@@ -63,11 +62,10 @@ describe('Footer', () => {
     expect(link).toBeInTheDocument();
 
     const expectedParameters = new URLSearchParams({
-      _tag: 'test_source',
+      _tag: 'sandbox',
+      code,
       utm_source: 'test_source',
       utm_campaign: 'test_campaign',
-      code,
-      language: 'python',
     });
     const expectedDatalabUrl = `https://www.datacamp.com/datalab/new?${expectedParameters.toString()}`;
 

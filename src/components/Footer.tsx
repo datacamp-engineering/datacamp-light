@@ -7,6 +7,7 @@ import { theme } from '@datacamp/waffles/theme';
 import { tokens } from '@datacamp/waffles/tokens';
 import React from 'react';
 import type { ThemeMode } from '../theme/themeManager';
+import { buildDataLabUrl } from '../utils/urlUtils';
 
 export interface FooterProps {
   code?: string;
@@ -27,45 +28,13 @@ export const Footer: React.FC<FooterProps> = ({
   theme: activeTheme = 'dark',
   onToggleTheme,
 }) => {
-  const queryParameters = new URLSearchParams();
-  if (utmSource) {
-    queryParameters.set('_tag', utmSource);
-    queryParameters.set('utm_source', utmSource);
-  }
-  if (utmCampaign) {
-    queryParameters.set('utm_campaign', utmCampaign);
-  }
-
-  if (code && (language === 'python' || language === 'r')) {
-    queryParameters.set('code', code);
-    queryParameters.set('language', language);
-  }
-
-  const queryString = queryParameters.toString();
-  const directDatalabUrl = queryString
-    ? `https://www.datacamp.com/datalab/new?${queryString}`
-    : 'https://www.datacamp.com/datalab/new';
-
-  let datalabUrl = directDatalabUrl;
-  if (impactTrackingLink) {
-    const baseAffiliateUrl =
-      impactTrackingLink.startsWith('http://') || impactTrackingLink.startsWith('https://')
-        ? impactTrackingLink
-        : `https://datacamp.pxf.io${impactTrackingLink.startsWith('/') ? '' : '/'}${impactTrackingLink}`;
-    try {
-      const affiliateUrl = new URL(baseAffiliateUrl);
-      affiliateUrl.searchParams.set('u', directDatalabUrl);
-      if (utmSource) {
-        affiliateUrl.searchParams.set('utm_source', utmSource);
-      }
-      if (utmCampaign) {
-        affiliateUrl.searchParams.set('utm_campaign', utmCampaign);
-      }
-      datalabUrl = affiliateUrl.toString();
-    } catch {
-      datalabUrl = baseAffiliateUrl;
-    }
-  }
+  const datalabUrl = buildDataLabUrl({
+    code,
+    language,
+    utmSource,
+    utmCampaign,
+    impactTrackingLink,
+  });
 
   const isDarkMode = activeTheme === 'dark';
   const toggleLabel = isDarkMode ? 'Switch to light theme' : 'Switch to dark theme';
