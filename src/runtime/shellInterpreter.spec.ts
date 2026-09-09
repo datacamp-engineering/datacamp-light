@@ -266,3 +266,67 @@ const result = shell.runCommand('pip install numpy');
     expect(result.error).toContain('no packages specified');
   });
 });
+
+describe('createShellInterpreter builtins: export, env, which, date, expr', () => {
+  it('mutates environment variables with export and displays them with env', () => {
+    const shell = createShellInterpreter();
+    shell.runCommand('export GREETING=Hello USER_NAME=Alice');
+    const envResult = shell.runCommand('env');
+    expect(envResult.output).toContain('GREETING=Hello');
+    expect(envResult.output).toContain('USER_NAME=Alice');
+
+    const echoResult = shell.runCommand('echo $GREETING $USER_NAME');
+    expect(echoResult.output).toBe('Hello Alice');
+  });
+
+  it('locates available builtins using which', () => {
+    const shell = createShellInterpreter();
+    const result = shell.runCommand('which echo cat pwd');
+    expect(result.output).toBe('/bin/echo\n/bin/cat\n/bin/pwd');
+  });
+
+  it('formats dates using date', () => {
+    const shell = createShellInterpreter();
+    const result = shell.runCommand('date -d 2026-09-07 +%A');
+    expect(result.output).toBe('Monday');
+
+    const utcResult = shell.runCommand('date -d 2026-09-07T12:00:00Z');
+    expect(utcResult.output).toContain('2026');
+  });
+
+  it('evaluates string and arithmetic operations using expr', () => {
+    const shell = createShellInterpreter();
+    expect(shell.runCommand('expr index datacamp c').output).toBe('5');
+    expect(shell.runCommand('expr index datacamp a').output).toBe('2');
+    expect(shell.runCommand('expr length datacamp').output).toBe('8');
+    expect(shell.runCommand('expr substr datacamp 5 4').output).toBe('camp');
+    expect(shell.runCommand('expr 10 + 20').output).toBe('30');
+  });
+});
+
+describe('createShellInterpreter with WASM parser (dcl_run_sh_wasm)', () => {
+  it('delegates execution to dcl_run_sh_wasm when present and calls runner callback', () => {
+    const globalScope = globalThis as any;
+    const originalShRunner = globalScope.dcl_run_sh_wasm;
+
+    try {
+      globalScope.dcl_run_sh_wasm = (_script: string, execCallback: Function) => {
+        const cmdRes = execCallback('echo', ['from-wasm-sh'], '');
+        return {
+          output: `wasm-parsed: ${cmdRes.output}`,
+          exitCode: 0,
+        };
+      };
+
+      const shell = createShellInterpreter();
+      const result = shell.runCommand('echo from-wasm-sh');
+      expect(result.output).toBe('wasm-parsed: from-wasm-sh');
+    } finally {
+      if (originalShRunner) {
+        globalScope.dcl_run_sh_wasm = originalShRunner;
+      } else {
+        delete globalScope.dcl_run_sh_wasm;
+      }
+    }
+  });
+});
