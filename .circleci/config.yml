@@ -1,23 +1,22 @@
 # DataCamp Light v4 (WebAssembly) CI pipeline.
 #
-# Rollout policy (see HANDOFF.md "Rollout & CI Release Strategy"):
-# - This pipeline never writes the root /dcl-react.js.gz entrypoint. That
-#   cutover (Phase 3) is a deliberate, separate change once the v4 bundle is
-#   proven on its own CDN paths.
-# - Production targets (tag deploys): /dcl/v4/<version>/ (immutable), /dcl/v4/
-#   (latest v4 tag), and the alias /dcl-react-v4.js.gz.
-# - Development/staging targets mirror the legacy v3 paths so QA links stay
-#   stable: /dcl-react-dev.js.gz (branch v4) and /dcl-react-staging.js.gz
-#   (master).
+# Release & Rollout policy:
+# - Branch pushes (`v4`) deploy to /dcl-react-dev.js.gz and /dcl-react-dev/.
+# - Integration pushes (`master`) deploy to staging at /dcl/v4/staging/.
+# - Tagged releases (`v4.x.y`) execute the primary production cutover:
+#   immutable /dcl/v4/<version>/ artifacts, /dcl/v4/prod/, and overwrite
+#   the root entrypoint /dcl-react.js.gz and /dcl-react-prod/ aliases.
+# - Every deploy job is strictly gated behind `backup-legacy-cdn-artifacts`,
+#   which snapshots active CDN assets into /dcl/v2/ (root entrypoint +
+#   prod/staging/dev) and /dcl/v3/ (v3 beta under dcl/latest) before any
+#   v4 artifact is synced.
 #
 # Asset hosting contract (see src/config.ts):
-# - All secondary assets load from one canonical base: /dcl/v4/. Deploy jobs
-#   therefore upload busybox.js + busybox.wasm next to the bundles.
-# - busybox.wasm MUST be uploaded raw (no gzip) with content type
-#   application/wasm, and the CDN must send CORS headers for it (the worker
-#   fetches it from third-party embed pages).
-# - JS/CSS artifacts are uploaded gzip-compressed with the appropriate
-#   content-encoding header, matching the legacy .js.gz convention.
+# - All secondary assets load from canonical base /dcl/v4/.
+# - WASM binaries (*.wasm) are uploaded uncompressed with content-type
+#   application/wasm and CORS-enabled headers for third-party embeds.
+# - JS/CSS artifacts are uploaded with gzip pre-compression and
+#   content-encoding headers matching the legacy .js.gz contract.
 version: 2.1
 
 executors:
@@ -77,7 +76,7 @@ jobs:
     executor: aws-deploy
     steps:
       - run:
-          name: Backup legacy CDN files (idempotent snapshot: root/prod -> dcl/v2/, dcl/latest -> dcl/v3/)
+          name: "Backup legacy CDN files (idempotent snapshot to dcl/v2 and dcl/v3)"
           command: |
             if aws s3 ls s3://cdn.datacamp.com/dcl/v2/dcl-react.js.gz >/dev/null 2>&1; then
               echo "Legacy CDN backup at dcl/v2/ already exists. Skipping."
@@ -142,8 +141,12 @@ jobs:
               --exclude "*.wasm" \
               --cache-control "max-age=1296000"
 
-            # 2. Upload WASM binary (raw binary, application/wasm, CORS enabled)
+            # 2. Upload WASM binaries explicitly (sync excludes *.wasm): raw binary needs content-type application/wasm and CORS-relevant caching
             aws s3 cp /tmp/workspace/dist/busybox.wasm s3://cdn.datacamp.com/dcl/v4/staging/busybox.wasm \
+              --acl public-read \
+              --content-type "application/wasm" \
+              --cache-control "max-age=1296000"
+            aws s3 cp /tmp/workspace/dist/sh-runner.wasm s3://cdn.datacamp.com/dcl/v4/staging/sh-runner.wasm \
               --acl public-read \
               --content-type "application/wasm" \
               --cache-control "max-age=1296000"
@@ -179,8 +182,16 @@ jobs:
               --exclude "*.wasm" \
               --cache-control "max-age=31536000"
 
-            # 2. Upload WASM binary (raw binary, application/wasm, CORS enabled)
+            # 2. Upload WASM binaries explicitly (sync excludes *.wasm): raw binary needs content-type application/wasm and CORS-relevant caching
             aws s3 cp /tmp/workspace/dist/busybox.wasm s3://cdn.datacamp.com/dcl/v4/prod/busybox.wasm \
+              --acl public-read \
+              --content-type "application/wasm" \
+              --cache-control "max-age=31536000"
+            aws s3 cp /tmp/workspace/dist/sh-runner.wasm s3://cdn.datacamp.com/dcl/v4/prod/sh-runner.wasm \
+              --acl public-read \
+              --content-type "application/wasm" \
+              --cache-control "max-age=31536000"
+            aws s3 cp /tmp/workspace/dist/sh-runner.wasm s3://cdn.datacamp.com/dcl/v4/$CIRCLE_TAG/sh-runner.wasm \
               --acl public-read \
               --content-type "application/wasm" \
               --cache-control "max-age=31536000"

@@ -7,7 +7,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "tsc -b && vite build",
+    "build": "tsc -b && vite build && node scripts/merge-licenses.mjs",
     "serve": "node scripts/serve-compressed.mjs",
     "serve:compressed": "node scripts/serve-compressed.mjs",
     "test": "vitest run",
@@ -40,7 +40,6 @@
     "codemirror": "^6.0.1",
     "i18next": "^26.4.0",
     "marked": "^18.0.11",
-    "pyodide": "^0.27.3",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "react-i18next": "^17.0.12"
@@ -54,6 +53,8 @@
     "@types/react-dom": "^18.3.5",
     "@vitejs/plugin-react": "^4.3.4",
     "happy-dom": "^17.4.4",
+    "pyodide": "^0.27.3",
+    "rollup-plugin-license": "^3.7.1",
     "typescript": "~5.7.2",
     "vite": "^6.2.0",
     "vitest": "^3.0.9"
