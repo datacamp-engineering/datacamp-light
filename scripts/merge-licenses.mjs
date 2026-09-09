@@ -12,6 +12,8 @@ const tmpWorkerLicenseFile = path.join(rootDir, '.temp', 'third-party-licenses-w
 const outputLicenseFile = path.join(distDir, 'THIRD_PARTY_LICENSES.txt');
 const manifestFile = path.join(rootDir, 'scripts', 'vendor-manifest.json');
 const vendorBusyboxDir = path.join(rootDir, 'vendor', 'busybox');
+const goLicenseFile = path.join(rootDir, 'vendor', 'golang-go', 'LICENSE');
+const mvdanShLicenseFile = path.join(rootDir, 'vendor', 'mvdan-sh', 'LICENSE');
 const sourceBusyboxDir = path.join(distDir, 'source', 'busybox');
 const cacheDir = path.join(rootDir, '.cache', 'busybox-source');
 
@@ -30,69 +32,6 @@ const VENDOR_BUSYBOX_FILES = [
   'LICENSE.APACHE-2.0',
   'LICENSE.GPL-2.0',
 ];
-
-// Full license texts for the BSD-3-Clause runtime assets. Embedded as
-// constants (fetched verbatim once from the upstream repositories) so that
-// generation is deterministic and the build never depends on network access:
-// - wasm_exec.js / the Go runtime: LICENSE from github.com/golang/go
-// - sh-runner.wasm (mvdan/sh): LICENSE from github.com/mvdan/sh
-const BSD3_GO_AUTHORS = `Copyright 2009 The Go Authors.
-
-Redistribution and use in source and binary forms, with or without
-modification, are permitted provided that the following conditions are
-met:
-
-   * Redistributions of source code must retain the above copyright
-notice, this list of conditions and the following disclaimer.
-   * Redistributions in binary form must reproduce the above
-copyright notice, this list of conditions and the following disclaimer
-in the documentation and/or other materials provided with the
-distribution.
-   * Neither the name of Google LLC nor the names of its
-contributors may be used to endorse or promote products derived from
-this software without specific prior written permission.
-
-THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
-"AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
-LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
-A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
-OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
-SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
-LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
-DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
-THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
-(INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
-OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-`;
-
-const BSD3_MVDAN_SH = `Copyright (c) 2016, Daniel Martí. All rights reserved.
-
-Redistribution and use in source and binary forms, with or without
-modification, are permitted provided that the following conditions are
-met:
-
-   * Redistributions of source code must retain the above copyright
-notice, this list of conditions and the following disclaimer.
-   * Redistributions in binary form must reproduce the above
-copyright notice, this list of conditions and the following disclaimer
-in the documentation and/or other materials provided with the
-distribution.
-   * Neither the name of the copyright holder nor the names of its
-contributors may be used to endorse or promote products derived from
-this software without specific prior written permission.
-
-THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
-"AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
-LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
-A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
-OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
-SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
-LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
-DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
-THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
-(INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
-OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-`;
 
 const SECTION_RULE = '-'.repeat(80);
 const PAGE_RULE = '='.repeat(80);
@@ -182,7 +121,7 @@ function unionLicenseEntries(mainEntries, workerEntries) {
   return merged;
 }
 
-function assembleThirdPartyLicenses(bundledLicenseEntries, runtimeAssets, gplText) {
+function assembleThirdPartyLicenses(bundledLicenseEntries, runtimeAssets, licenseTexts) {
   const parts = [];
 
   parts.push(`${PAGE_RULE}
@@ -247,17 +186,17 @@ ${SECTION_RULE}
 --- GNU General Public License, version 2 (GPL-2.0) ---------------------------
 Applies to: busybox.js, busybox.wasm (BusyBox)
 
-${gplText.trimEnd()}
+${licenseTexts.gpl.trimEnd()}
 
 --- BSD-3-Clause — © The Go Authors --------------------------------------------
 Applies to: wasm_exec.js (Go runtime shim for sh-runner.wasm)
 
-${BSD3_GO_AUTHORS.trimEnd()}
+${licenseTexts.goBsd3.trimEnd()}
 
 --- BSD-3-Clause — mvdan-sh authors --------------------------------------------
 Applies to: sh-runner.wasm (mvdan/sh parser)
 
-${BSD3_MVDAN_SH.trimEnd()}
+${licenseTexts.mvdanShBsd3.trimEnd()}
 `);
 
   return `${parts.join('\n')}\n`;
@@ -319,10 +258,20 @@ async function mergeLicenses() {
   if (runtimeAssets.length === 0) {
     throw new Error(`No runtimeAssets found in ${manifestFile}`);
   }
-  const gplText = readRequiredFile(
-    path.join(vendorBusyboxDir, 'LICENSE.GPL-2.0'),
-    'GPL-2.0 license text',
-  );
+  const licenseTexts = {
+    gpl: readRequiredFile(
+      path.join(vendorBusyboxDir, 'LICENSE.GPL-2.0'),
+      'GPL-2.0 license text (run "node scripts/update-vendor.mjs" first)',
+    ),
+    goBsd3: readRequiredFile(
+      goLicenseFile,
+      'BSD-3-Clause license text for the Go runtime (run "node scripts/update-vendor.mjs" first)',
+    ),
+    mvdanShBsd3: readRequiredFile(
+      mvdanShLicenseFile,
+      'BSD-3-Clause license text for mvdan/sh (run "node scripts/update-vendor.mjs" first)',
+    ),
+  };
 
   // 1. Merge the runtime-asset manifest and the bundled npm dependency report
   //    into a single licenses file for the CDN.
@@ -330,7 +279,7 @@ async function mergeLicenses() {
     parseLicenseEntries(mainReport),
     parseLicenseEntries(workerReport),
   );
-  const report = assembleThirdPartyLicenses(bundledLicenseEntries, runtimeAssets, gplText);
+  const report = assembleThirdPartyLicenses(bundledLicenseEntries, runtimeAssets, licenseTexts);
   fs.writeFileSync(outputLicenseFile, report, 'utf8');
 
   // 2. The plugin outputs are only intermediate: remove them so the final
@@ -347,7 +296,7 @@ async function mergeLicenses() {
   console.log(`\nWrote ${path.relative(rootDir, outputLicenseFile)} (${reportLines} lines):`);
   console.log(`  - 1. Separate runtime assets: ${runtimeAssets.length} assets from vendor-manifest.json`);
   console.log(`  - 2. Bundled npm dependencies: ${bundledLicenseEntries.length} packages (main bundle + Web Worker bundles)`);
-  console.log('  - 3. License texts: GPL-2.0 (vendor/busybox), BSD-3-Clause (Go Authors), BSD-3-Clause (mvdan-sh)');
+  console.log('  - 3. License texts read from /vendor: GPL-2.0 (vendor/busybox), BSD-3-Clause (vendor/golang-go), BSD-3-Clause (vendor/mvdan-sh)');
   console.log(`Removed ${path.relative(rootDir, tmpLicenseFile)} and ${path.relative(rootDir, tmpWorkerLicenseFile)}`);
   console.log(`\nAssembled ${path.relative(rootDir, sourceBusyboxDir)}/ (GPL-2.0 Corresponding Source):`);
   VENDOR_BUSYBOX_FILES.forEach((fileName) => console.log(`  - ${fileName} (copied from vendor/busybox/)`));

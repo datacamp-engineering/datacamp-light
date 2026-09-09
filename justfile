@@ -18,7 +18,7 @@ build-busybox:
 build-sh-runner:
 	bash scripts/build-sh-runner.sh
 
-# Sync vendor/busybox from the pinned upstream commit and regenerate vendor/PROVENANCE.md
+# Sync all vendored files (build recipe + third-party licenses) from their pinned upstream refs and regenerate vendor/PROVENANCE.md
 update-vendor:
 	node scripts/update-vendor.mjs
 
