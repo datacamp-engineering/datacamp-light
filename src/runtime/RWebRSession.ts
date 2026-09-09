@@ -1,3 +1,4 @@
+import dclConfig from '../config';
 import type {
   IInitializeParams,
   IIntrospectCompletion,
@@ -16,6 +17,15 @@ import type {
 import { SessionLifecycle } from './sessionLifecycle';
 import type { OutputListener, StatusListener } from './sessionLifecycle';
 import { TESTWHAT_R_SOURCES } from './testwhatSources';
+import {
+  buildTestwhatEvaluationScript,
+  unpackRListResult,
+} from './r/testwhatHarness';
+
+import { cachedAssetFetch, installGlobalFetchCache } from './assetCache';
+
+// Install persistent cache interceptor for main thread and webR network fetches
+installGlobalFetchCache();
 
 /**
  * webR-backed session for R exercises.
@@ -29,7 +39,27 @@ import { TESTWHAT_R_SOURCES } from './testwhatSources';
  * injected directly into the webR virtual environment alongside pre-compiled
  * CRAN WASM dependencies (`evaluate`, `stringdist`, `R6`, `magrittr`, `praise`).
  */
-const WEBR_LATEST_URL = 'https://webr.r-wasm.org/latest/webr.mjs';
+const WEBR_LATEST_URL = dclConfig.webrUrl;
+const WEBR_BIN_WASM_URL = dclConfig.webrBinWasmUrl;
+const WEBR_WORKER_URL = dclConfig.webrWorkerUrl;
+
+let prewarmWebRPromise: Promise<void> | null = null;
+
+function prewarmWebRAssetCache(): Promise<void> {
+  if (prewarmWebRPromise) return prewarmWebRPromise;
+
+  prewarmWebRPromise = (async () => {
+    try {
+      // Pre-warm the WebR binary assets into browser Cache Storage
+      await Promise.all([
+        cachedAssetFetch(WEBR_BIN_WASM_URL).catch(() => {}),
+        cachedAssetFetch(WEBR_WORKER_URL).catch(() => {}),
+      ]);
+    } catch {}
+  })();
+
+  return prewarmWebRPromise;
+}
 
 const TESTWHAT_CRAN_DEPS = ['evaluate', 'R6', 'magrittr', 'stringdist', 'praise', 'markdown'];
 
@@ -65,6 +95,7 @@ export class RWebRSession {
   private async getWebR(): Promise<any> {
     if (this.webRPromise == null) {
       this.webRPromise = (async () => {
+        await prewarmWebRAssetCache();
         const { WebR } = await import(/* @vite-ignore */ WEBR_LATEST_URL);
         const webR = new WebR();
         await webR.init();
@@ -258,133 +289,22 @@ export class RWebRSession {
       if (isTestwhatSct) {
         await this.ensureTestwhatInstalled(webR);
 
-        // Escape R strings safely
-        const escapeRString = (str: string) => JSON.stringify(str);
-
-        const evalHarness = `
-          local({
-            pec_code <- ${escapeRString(pec)}
-            student_code <- ${escapeRString(code)}
-            solution_code <- ${escapeRString(solution)}
-            sct_code <- ${escapeRString(sct)}
-
-            student_env <- new.env(parent = .GlobalEnv)
-            solution_env <- new.env(parent = .GlobalEnv)
-
-            if (nchar(trimws(pec_code)) > 0) {
-              eval(parse(text = pec_code), envir = student_env)
-              eval(parse(text = pec_code), envir = solution_env)
-            }
-
-            if (nchar(trimws(solution_code)) > 0) {
-              eval(parse(text = solution_code), envir = solution_env)
-            }
-
-            output_list <- list()
-            if (requireNamespace("evaluate", quietly = TRUE)) {
-              raw_output <- evaluate::evaluate(student_code, envir = student_env)
-              output_list <- lapply(raw_output, function(item) {
-                if (inherits(item, "source")) {
-                  list(type = "code", payload = gsub("\\n+$", "", item$src))
-                } else if (inherits(item, "message")) {
-                  list(type = "r-message", payload = gsub("\\n+$", "", item$message))
-                } else if (inherits(item, "warning")) {
-                  list(type = "r-warning", payload = paste0("Warning message: ", item$message))
-                } else if (inherits(item, "error")) {
-                  list(type = "r-error", payload = paste0("Error: ", item$message))
-                } else {
-                  list(type = "output", payload = gsub("\\n+$", "", item))
-                }
-              })
-            } else {
-              eval(parse(text = student_code), envir = student_env)
-            }
-
-            testwhat_result <- test_exercise(sct = sct_code,
-                                             ex_type = "NormalExercise",
-                                             pec = pec_code,
-                                             student_code = student_code,
-                                             solution_code = solution_code,
-                                             student_env = student_env,
-                                             solution_env = solution_env,
-                                             output_list = output_list,
-                                             allow_errors = FALSE,
-                                             force_diagnose = FALSE,
-                                             seed = 42)
-
-            text_outputs <- character(0)
-            for (item in output_list) {
-              if (is.list(item) && !is.null(item$type) && item$type %in% c("output", "r-message", "r-warning", "r-error")) {
-                text_outputs <- c(text_outputs, item$payload)
-              }
-            }
-
-            list(correct = testwhat_result$correct,
-                 message = if (is.null(testwhat_result$message)) "Great work!" else testwhat_result$message,
-                 output = paste(text_outputs, collapse = "\n"))
-          })
-        `;
+        const evalHarness = buildTestwhatEvaluationScript({
+          preExerciseCode: pec,
+          studentCode: code,
+          solutionCode: solution,
+          submissionCorrectnessTest: sct,
+        });
 
         try {
           const evaluationResultObject = await webR.evalR(evalHarness);
-          const unpackedResult: any = await evaluationResultObject.toJs();
-          console.log('[r-sct] testwhat result:', unpackedResult);
+          const rawUnpackedResult: any = await evaluationResultObject.toJs();
+          console.log('[r-sct] testwhat result:', rawUnpackedResult);
 
-          let correct = false;
-          let message = '';
-          let output = '';
-
-          if (unpackedResult && typeof unpackedResult === 'object') {
-            if (Array.isArray(unpackedResult.names) && Array.isArray(unpackedResult.values)) {
-              const correctIndex = unpackedResult.names.indexOf('correct');
-              const messageIndex = unpackedResult.names.indexOf('message');
-              const outputIndex = unpackedResult.names.indexOf('output');
-              if (correctIndex !== -1) {
-                const targetValueObject = unpackedResult.values[correctIndex];
-                correct = Array.isArray(targetValueObject?.values)
-                  ? Boolean(targetValueObject.values[0])
-                  : Boolean(targetValueObject);
-              }
-              if (messageIndex !== -1) {
-                const targetValueObject = unpackedResult.values[messageIndex];
-                message = Array.isArray(targetValueObject?.values)
-                  ? String(targetValueObject.values[0] ?? '')
-                  : String(targetValueObject ?? '');
-              }
-              if (outputIndex !== -1) {
-                const targetValueObject = unpackedResult.values[outputIndex];
-                output = Array.isArray(targetValueObject?.values)
-                  ? String(targetValueObject.values[0] ?? '')
-                  : String(targetValueObject ?? '');
-              }
-            } else {
-              if ('correct' in unpackedResult) {
-                correct = Array.isArray(unpackedResult.correct)
-                  ? Boolean(unpackedResult.correct[0])
-                  : Boolean(unpackedResult.correct);
-              }
-              if ('message' in unpackedResult) {
-                message = Array.isArray(unpackedResult.message)
-                  ? String(unpackedResult.message[0] ?? '')
-                  : String(unpackedResult.message ?? '');
-              }
-              if ('output' in unpackedResult) {
-                output = Array.isArray(unpackedResult.output)
-                  ? String(unpackedResult.output[0] ?? '')
-                  : String(unpackedResult.output ?? '');
-              }
-            }
-          }
+          const { correct, message, output } = unpackRListResult(rawUnpackedResult);
 
           if (output) {
             this.lifecycle.emitOutput({ type: 'output', payload: output });
-          }
-
-          message = message.trim();
-          if (!message) {
-            message = correct
-              ? 'Great work! Your solution passed all tests.'
-              : 'Incorrect solution.';
           }
 
           this.lifecycle.setStatus('ready');

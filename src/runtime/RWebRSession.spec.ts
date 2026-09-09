@@ -104,4 +104,57 @@ describe('RWebRSession', () => {
       cwd: '/home/webr',
     });
   });
+
+  it('runs plain R code without installing testwhat CRAN packages', async () => {
+    const session = new RWebRSession();
+    const mockWebR = {
+      installPackages: vi.fn().mockResolvedValue(undefined),
+      globalShelter: {
+        captureR: vi.fn().mockResolvedValue({
+          output: [{ type: 'stdout', data: '[1] 42\n' }],
+          images: [],
+        }),
+      },
+      evalR: vi.fn().mockResolvedValue({
+        toJs: vi.fn().mockResolvedValue({
+          type: 'character',
+          values: ['[1] 42'],
+        }),
+      }),
+      evalRVoid: vi.fn().mockResolvedValue(undefined),
+    };
+    (session as any).webRPromise = Promise.resolve(mockWebR);
+
+    await session.runCode({ code: 'x <- 42\nx' });
+    expect(mockWebR.installPackages).not.toHaveBeenCalled();
+    expect(session.getStatus().status).toBe('ready');
+  });
+
+  it('grades non-testwhat assertions without installing testwhat CRAN packages', async () => {
+    const session = new RWebRSession();
+    const mockWebR = {
+      installPackages: vi.fn().mockResolvedValue(undefined),
+      globalShelter: {
+        captureR: vi.fn().mockResolvedValue({
+          output: [{ type: 'stdout', data: '[1] 10\n' }],
+          images: [],
+        }),
+      },
+      evalR: vi.fn().mockResolvedValue({
+        toJs: vi.fn().mockResolvedValue({
+          type: 'logical',
+          values: [true],
+        }),
+      }),
+      evalRVoid: vi.fn().mockResolvedValue(undefined),
+    };
+    (session as any).webRPromise = Promise.resolve(mockWebR);
+
+    const result = await session.submitCode({
+      code: 'x <- 10',
+      sct: 'stopifnot(x == 10)',
+    });
+    expect(mockWebR.installPackages).not.toHaveBeenCalled();
+    expect(result.correct).toBe(true);
+  });
 });
