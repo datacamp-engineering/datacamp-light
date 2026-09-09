@@ -8,12 +8,14 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
-    "serve": "vite preview",
+    "serve": "node scripts/serve-compressed.mjs",
+    "serve:compressed": "node scripts/serve-compressed.mjs",
     "test": "vitest run",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
     "test:runtime": "node scripts/test-wasm-runtime.mjs",
     "test:external": "node scripts/audit-external-tutorials.mjs",
+    "test:network": "node scripts/measure-network-footprint.mjs",
     "typecheck": "tsc --noEmit",
     "update:shellwhat": "node scripts/update-shellwhat.js",
     "update:testwhat": "node scripts/update-testwhat.js"
@@ -34,6 +36,7 @@
     "@lezer/highlight": "^1.2.1",
     "@xterm/addon-fit": "^0.11.0",
     "@xterm/xterm": "^6.0.0",
+    "bash-parser": "^0.5.0",
     "codemirror": "^6.0.1",
     "i18next": "^26.4.0",
     "marked": "^18.0.11",
