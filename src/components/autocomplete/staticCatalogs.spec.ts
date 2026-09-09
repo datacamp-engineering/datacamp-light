@@ -63,6 +63,11 @@ describe('static completion catalogs', () => {
     expect(defCompletion.boost).toBeDefined();
     expect(defCompletion.detail).toContain('Function');
     expect(typeof defCompletion.info).toBe('function');
+
+    // Simple keywords with no extra docs omit the redundant info panel
+    const whileCompletion = completions.find((completion) => completion.label === 'while') as Completion;
+    expect(whileCompletion).toBeDefined();
+    expect(whileCompletion.info).toBeUndefined();
   });
 
   it('statically extracts variables and functions from document code without execution', () => {

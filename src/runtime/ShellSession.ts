@@ -1,6 +1,6 @@
 import type { IRunCommandSession } from '../jsonrpc/session';
 import type { ISubmitCodeParams, ISubmitCodeResult } from '../jsonrpc/types';
-import { getSharedPyodideSession } from './pyodideEvaluator';
+import { acquireSession } from './sessionPool';
 import ShellWorkerConstructor from './workers/shellWorker?worker&inline';
 import { createWorkerJsonRpcSession } from './workerSession';
 
@@ -27,8 +27,8 @@ export function createShellSession(): IRunCommandSession {
       // Execute the code in shell worker to capture output and environment
       const runRes = await client.runCode({ code: params.code });
       try {
-        const pyodideSession = getSharedPyodideSession();
-        const evalRes = await pyodideSession.submitCode({
+        const pyodideSession = acquireSession('python', 'shared-shellwhat-evaluator');
+        const evalRes = await pyodideSession.session.submitCode({
           sct,
           code: params.code,
           pec: params.pec || '',

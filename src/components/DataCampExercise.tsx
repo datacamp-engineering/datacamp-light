@@ -2,15 +2,6 @@ import '../i18n';
 import { theme } from '@datacamp/waffles/theme';
 import { tokens } from '@datacamp/waffles/tokens';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import {
-  checkIsUserSignedIn,
-  explainCode,
-  fixAndExplainCode,
-  parseFixAndExplainResponse,
-} from '../ai/aiClient';
-import { isFirstPartyDomain } from '../ai/aiConfig';
-import { computeLineDiff } from '../ai/lineDiff';
-import type { LineChange } from '../ai/lineDiff';
 import type { ISessionOutputNotification, ISessionStatus } from '../jsonrpc/types';
 import { acquireSession } from '../runtime/sessionPool';
 import { useResolvedTheme } from '../theme/themeManager';
@@ -27,6 +18,9 @@ import type { ConsoleEntry } from './OutputConsole';
 import { PlotCanvas } from './PlotCanvas';
 import { ResizeHandle } from './ResizeHandle';
 import { TerminalConsole } from './TerminalConsole';
+import { useAiAssistance } from './hooks/useAiAssistance';
+import { useSessionFileDrop } from './hooks/useSessionFileDrop';
+import { baseBannerStyle } from '../styles/bannerStyles';
 
 export interface DataCampExerciseProps {
   id?: string;
@@ -56,11 +50,10 @@ export interface DataCampExerciseProps {
 const HintPanel: React.FC<{ hint: string }> = ({ hint }) => (
   <div
     css={{
-      backgroundColor: theme.background.secondary,
-      borderTop: `${tokens.borderWidth.thin} solid ${theme.border.main}`,
+      ...baseBannerStyle,
       color: theme.text.secondary,
       fontSize: tokens.fontSizes.medium,
-      padding: `${tokens.spacingNew.small} ${tokens.spacingNew.medium}`,
+      display: 'block',
     }}
     dangerouslySetInnerHTML={{ __html: hint }}
   />
@@ -316,24 +309,6 @@ const CodeExercise: React.FC<DataCampExerciseProps> = ({
   const [executingAction, setExecutingAction] = useState<'run' | 'submit' | null>(null);
   const [status, setStatus] = useState<ISessionStatus>({ status: 'none' });
 
-  const [aiState, setAiState] = useState<{
-    visible: boolean;
-    type: 'explain' | 'fix' | 'upsell';
-    upsellVariant?: 'third-party' | 'signed-out';
-    title?: string;
-    explanation: string;
-    diff?: LineChange[];
-    proposedCode?: string;
-    isLoading: boolean;
-    error: string | null;
-  }>({
-    visible: false,
-    type: 'explain',
-    explanation: '',
-    isLoading: false,
-    error: null,
-  });
-
   const initialEditorHeight = typeof height === 'number' ? height : 240;
   const [editorHeight, setEditorHeight] = useState<number>(initialEditorHeight);
   const [outputHeight, setOutputHeight] = useState<number>(140);
@@ -343,6 +318,24 @@ const CodeExercise: React.FC<DataCampExerciseProps> = ({
     () => acquireSession(language, sharedEnvironment),
     [language, sharedEnvironment],
   );
+
+  const { handleFileDrop } = useSessionFileDrop(session);
+
+  const {
+    aiState,
+    setAiState,
+    handleExplainCode,
+    handleFixAndExplain,
+    handleCloseAiPanel: handleCloseAi,
+    handleApplyAiDiff: handleAcceptFix,
+    handleRejectAiDiff: handleRejectFix,
+  } = useAiAssistance({
+    showAi,
+    mockAi,
+    code,
+    language,
+    onApplyReplacementCode: setCode,
+  });
 
   const prompt = language === 'r' ? '> ' : '>>> ';
 
@@ -482,172 +475,14 @@ const CodeExercise: React.FC<DataCampExerciseProps> = ({
     setShowingHint((previous) => !previous);
   };
 
-  const handleExplainCode = async () => {
-    if (!showAi) return;
-
-    if (!isFirstPartyDomain(mockAi)) {
-      setAiState({
-        visible: true,
-        type: 'upsell',
-        upsellVariant: 'third-party',
-        explanation: '',
-        isLoading: false,
-        error: null,
-      });
-      return;
-    }
-
-    setAiState({
-      visible: true,
-      type: 'explain',
-      title: 'Code Explanation',
-      explanation: '',
-      isLoading: true,
-      error: null,
-    });
-
-    const isSignedIn = await checkIsUserSignedIn(mockAi);
-    if (!isSignedIn) {
-      setAiState({
-        visible: true,
-        type: 'upsell',
-        upsellVariant: 'signed-out',
-        explanation: '',
-        isLoading: false,
-        error: null,
-      });
-      return;
-    }
-
-    try {
-      await explainCode({
-        code,
-        language,
-        mockAi,
-        onChunk: (chunk) => {
-          setAiState((previous) => ({
-            ...previous,
-            explanation: chunk,
-            isLoading: false,
-          }));
-        },
-      });
-      setAiState((previous) => ({ ...previous, isLoading: false }));
-    } catch (explanationError: any) {
-      setAiState((previous) => ({
-        ...previous,
-        isLoading: false,
-        error: explanationError.message || 'Failed to generate code explanation',
-      }));
-    }
-  };
-
-  const handleFixAndExplain = async () => {
-    if (!showAi) return;
-
+  const handleTriggerFixAndExplain = () => {
     const lastErrorEntry = consoleEntries
       .slice()
       .reverse()
       .find((entry) => entry.type === 'error');
     const errorMessage = lastErrorEntry?.text || feedback?.message || 'Error occurred';
-
-    if (!isFirstPartyDomain(mockAi)) {
-      setAiState({
-        visible: true,
-        type: 'upsell',
-        upsellVariant: 'third-party',
-        explanation: '',
-        isLoading: false,
-        error: null,
-      });
-      return;
-    }
-
-    setAiState({
-      visible: true,
-      type: 'fix',
-      title: 'Fix & Explain',
-      explanation: '',
-      isLoading: true,
-      error: null,
-    });
-
-    const isSignedIn = await checkIsUserSignedIn(mockAi);
-    if (!isSignedIn) {
-      setAiState({
-        visible: true,
-        type: 'upsell',
-        upsellVariant: 'signed-out',
-        explanation: '',
-        isLoading: false,
-        error: null,
-      });
-      return;
-    }
-
-    try {
-      const result = await fixAndExplainCode({
-        code,
-        error: errorMessage,
-        language,
-        mockAi,
-        onChunk: (chunk) => {
-          const parsed = parseFixAndExplainResponse(chunk);
-          if (parsed.explanation) {
-            setAiState((previous) => ({
-              ...previous,
-              explanation: parsed.explanation,
-              isLoading: false,
-            }));
-          }
-        },
-      });
-
-      const diff = result.updatedCode ? computeLineDiff(code, result.updatedCode) : undefined;
-
-      setAiState((previous) => ({
-        ...previous,
-        diff,
-        explanation: result.explanation || previous.explanation,
-        isLoading: false,
-        proposedCode: result.updatedCode,
-      }));
-    } catch (fixError: any) {
-      setAiState((previous) => ({
-        ...previous,
-        isLoading: false,
-        error: fixError.message || 'Failed to generate fix and explanation',
-      }));
-    }
+    handleFixAndExplain(errorMessage);
   };
-
-  const handleAcceptFix = () => {
-    if (aiState.proposedCode) {
-      setCode(aiState.proposedCode);
-    }
-    setAiState((previous) => ({ ...previous, visible: false }));
-  };
-
-  const handleRejectFix = () => {
-    setAiState((previous) => ({ ...previous, visible: false }));
-  };
-
-  const handleCloseAi = () => {
-    setAiState((previous) => ({ ...previous, visible: false }));
-  };
-
-  const handleFileDrop = useCallback(
-    async (file: File) => {
-      try {
-        const content = await file.text();
-        const result = await session.writeFile({ path: file.name, data: content });
-        console.log(`Added ${file.name} (${file.size} bytes) to ${result.cwd || ''}`);
-      } catch (uploadError: any) {
-        console.warn(`Failed to add ${file.name}:`, uploadError);
-      }
-    },
-    [session],
-  );
 
   return (
     <DCLWidgetShell theme={activeTheme}>
@@ -730,7 +565,7 @@ const CodeExercise: React.FC<DataCampExerciseProps> = ({
         entries={consoleEntries}
         prompt={prompt}
         onExecuteCommand={handleExecuteConsoleCommand}
-        onFixAndExplain={handleFixAndExplain}
+        onFixAndExplain={handleTriggerFixAndExplain}
         isExecuting={executingAction !== null}
         isFixingAndExplaining={aiState.isLoading && aiState.type === 'fix'}
         showAi={showAi}

@@ -7,7 +7,8 @@ import { EditorState } from '@codemirror/state';
 import { EditorView } from '@codemirror/view';
 import { describe, expect, it, vi } from 'vitest';
 import type { IJsonRpcSession } from '../../jsonrpc/session';
-import { createAutocompleteExtension, createLanguageCompletionSource } from './autocompleteExtension';
+import { createLanguageCompletionSource } from './autocompleteExtension';
+import { createLazyAutocompleteExtension } from './lazyAutocomplete';
 
 const createState = (documentText: string): EditorState => EditorState.create({ doc: documentText });
 
@@ -106,7 +107,24 @@ describe('autocomplete extension', () => {
   });
 
   it('creates a valid extension with theme and configuration', () => {
-    const extension = createAutocompleteExtension('python');
+    const extension = createLazyAutocompleteExtension('python');
     expect(Array.isArray(extension)).toBe(true);
+  });
+
+  it('suppresses autocomplete popup when typing trailing whitespace like import pandas as ', async () => {
+    const source = createLanguageCompletionSource('python');
+    const docText = 'import pandas as ';
+    const state = createState(docText);
+    const result = await resolveSource(source, state, docText.length, false);
+    expect(result).toBeNull();
+  });
+
+  it('returns completions on empty token when explicitly requested with Ctrl+Space', async () => {
+    const source = createLanguageCompletionSource('python');
+    const docText = 'import pandas as ';
+    const state = createState(docText);
+    const result = await resolveSource(source, state, docText.length, true);
+    expect(result).not.toBeNull();
+    expect((result?.options.length ?? 0)).toBeGreaterThan(0);
   });
 });
