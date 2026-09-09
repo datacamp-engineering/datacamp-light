@@ -9,19 +9,19 @@ import time
 ANSI_ESCAPE_PATTERN = re.compile(r"\x1b\[[0-9;]*[a-zA-Z]|\x1b[a-zA-Z]")
 
 
-def ipython_shell_escape(command_string):
+def _ipython_shell_escape(command_string):
     os.system(command_string)
     return None
 
 
-def ipython_get_output_lines(command_string):
+def _ipython_get_output_lines(command_string):
     result = builtins._dcl_execute_shell(command_string)
     raw_output = result.get("output", "") or ""
     output_string = ANSI_ESCAPE_PATTERN.sub("", raw_output) if raw_output else ""
     return output_string.split("\n") if output_string else []
 
 
-def ipython_time_execution(target_function):
+def _ipython_time_execution(target_function):
     start_time = time.perf_counter()
     result = target_function()
     end_time = time.perf_counter()
@@ -36,13 +36,13 @@ def ipython_time_execution(target_function):
     return result
 
 
-def ipython_print_working_directory():
+def _ipython_print_working_directory():
     current_working_directory = os.getcwd()
     print(repr(current_working_directory))
     return current_working_directory
 
 
-def ipython_change_directory(path_string=""):
+def _ipython_change_directory(path_string=""):
     target_directory = path_string.strip() if path_string else "/home/repl"
     try:
         os.chdir(target_directory)
@@ -51,7 +51,7 @@ def ipython_change_directory(path_string=""):
         print(f"cd error: {error}")
 
 
-def ipython_environment(argument_string=""):
+def _ipython_environment(argument_string=""):
     trimmed_argument = argument_string.strip()
     if not trimmed_argument:
         for key, value in sorted(os.environ.items()):
@@ -63,7 +63,7 @@ def ipython_environment(argument_string=""):
         print(os.environ.get(trimmed_argument.strip(), ""))
 
 
-def ipython_who(scope=None):
+def _ipython_who(scope=None):
     if scope is None:
         try:
             scope = sys._getframe(1).f_globals
@@ -95,7 +95,7 @@ def ipython_who(scope=None):
         print("Interactive namespace is empty.")
 
 
-def ipython_whos(scope=None):
+def _ipython_whos(scope=None):
     if scope is None:
         try:
             scope = sys._getframe(1).f_globals
@@ -148,7 +148,7 @@ def ipython_whos(scope=None):
         print(f"{variable_name:<10} {variable_type:<6} {information}")
 
 
-def ipython_help(target_name, detailed=False, scope=None):
+def _ipython_help(target_name, detailed=False, scope=None):
     if scope is None:
         try:
             scope = sys._getframe(1).f_globals
@@ -179,15 +179,15 @@ def ipython_help(target_name, detailed=False, scope=None):
             pass
 
 
-builtins._dcl_ipython_shell = ipython_shell_escape
-builtins._dcl_ipython_getoutput = ipython_get_output_lines
-builtins._dcl_ipython_time = ipython_time_execution
-builtins._dcl_ipython_pwd = ipython_print_working_directory
-builtins._dcl_ipython_cd = ipython_change_directory
-builtins._dcl_ipython_env = ipython_environment
-builtins._dcl_ipython_who = ipython_who
-builtins._dcl_ipython_whos = ipython_whos
-builtins._dcl_ipython_help = ipython_help
+builtins._dcl_ipython_shell = _ipython_shell_escape
+builtins._dcl_ipython_getoutput = _ipython_get_output_lines
+builtins._dcl_ipython_time = _ipython_time_execution
+builtins._dcl_ipython_pwd = _ipython_print_working_directory
+builtins._dcl_ipython_cd = _ipython_change_directory
+builtins._dcl_ipython_env = _ipython_environment
+builtins._dcl_ipython_who = _ipython_who
+builtins._dcl_ipython_whos = _ipython_whos
+builtins._dcl_ipython_help = _ipython_help
 
 
 def dcl_transform_ipython(code_string):

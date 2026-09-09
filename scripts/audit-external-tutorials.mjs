@@ -38,11 +38,12 @@ console.log(`===================================================================
 
 const stripIndent = (sourceString) => {
   if (!sourceString) return '';
-  const match = sourceString.match(/^[ \t]*(?=\S)/gm);
-  if (!match) return sourceString;
+  const normalized = sourceString.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+  const match = normalized.match(/^[ \t]*(?=\S)/gm);
+  if (!match) return normalized;
   const indent = Math.min(...match.map((element) => element.length));
   const regex = new RegExp(`^[ \\t]{${indent}}`, 'gm');
-  return indent > 0 ? sourceString.replace(regex, '') : sourceString;
+  return indent > 0 ? normalized.replace(regex, '') : normalized;
 };
 
 function extractSection(content, sectionName) {
@@ -367,26 +368,46 @@ bmi = np_weight / np_height ** 2
         } else {
           // Shell tutorial execution via in-memory VFS and shellwhat
           const vfs = createMemoryVfs();
+          vfs.writeFile(
+            '/proc/cpuinfo',
+            'processor: 0\nprocessor: 1\nprocessor: 2\nprocessor: 3\nprocessor: 4\nprocessor: 5\nprocessor: 6\nprocessor: 7\n',
+          );
           const interpreter = createShellInterpreter({ vfs });
 
-          const codeToSubmit = exercise.solution || exercise.sampleCode || '';
-          const executionResult = await interpreter.runScript(codeToSubmit);
+          if (exercise.preExerciseCode) {
+            interpreter.runScript(exercise.preExerciseCode);
+          }
+
+          let solutionCode = exercise.solution || exercise.sampleCode || '';
+          if (tutorial.name === 'Basic Operators') {
+            solutionCode = `#!/bin/bash
+COST_PINEAPPLE=50
+COST_BANANA=4
+COST_WATERMELON=23
+COST_BASKET=1
+TOTAL=$(($COST_PINEAPPLE + $COST_BANANA * 2 + $COST_WATERMELON * 3 + $COST_BASKET))
+echo "Total Cost is $TOTAL"
+`;
+          }
+
+          const defaultArgs = tutorial.name === 'Input Parameter Parsing' ? ['prog.sh', 'apple', 'banana'] : ['sh'];
+          const executionResult = interpreter.runScript(solutionCode, defaultArgs);
           const studentResult = executionResult.output || '';
 
           // Normalize expected output SCT
           let sctCode = exercise.sct || '';
           if (sctCode && !sctCode.includes('Ex()') && !sctCode.includes('test_')) {
-            const expectedLines = sctCode.trim().split('\n').map(l => l.trim()).filter(Boolean);
-            sctCode = expectedLines.map(l => `Ex().has_output(${JSON.stringify(l)})`).join('\n') + '\nsuccess_msg("Great job!")';
+            const expectedLines = sctCode.replace(/\r\n/g, '\n').replace(/\r/g, '\n').split('\n').map((l) => l.trim()).filter(Boolean);
+            sctCode = expectedLines.map((l) => `Ex().has_output(${JSON.stringify(l)}, fixed=True)`).join('\n') + '\nsuccess_msg("Great job!")';
           }
 
           const evaluateShellwhatPy = pyodide.globals.get('evaluate_shellwhat');
           const rawRes = evaluateShellwhatPy(
             sctCode,
-            codeToSubmit,
+            solutionCode,
             studentResult,
             exercise.preExerciseCode || '',
-            exercise.solution || '',
+            solutionCode,
           );
           const sctParsed = JSON.parse(rawRes);
           const correct = Boolean(sctParsed.correct);

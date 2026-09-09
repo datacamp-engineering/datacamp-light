@@ -158,7 +158,7 @@ def dcl_introspect(code, line, column, prefix, trigger):
                                 "label": attribute,
                                 "type": "function" if is_callable else "property",
                                 "detail": signature[:80] if signature else type(value).__name__,
-                                "info": documentation.split("\n\n")[0][:300] if documentation else "",
+                                "info": documentation.strip() if documentation else "",
                                 "boost": 95 if attribute.startswith(attribute_prefix) else 80,
                             }
                         )
@@ -179,7 +179,10 @@ def dcl_introspect(code, line, column, prefix, trigger):
             value_type = "module"
         elif isinstance(value, type):
             value_type = "class"
-        documentation = inspect.getdoc(value) or ""
+        # Only inspect docstring for classes, functions, and modules - not primitive variables like float/int/str/bool
+        documentation = ""
+        if isinstance(value, (types.ModuleType, types.FunctionType, types.MethodType, type)) or callable(value):
+            documentation = inspect.getdoc(value) or ""
         signature = type(value).__name__
         if callable(value):
             try:
@@ -191,7 +194,7 @@ def dcl_introspect(code, line, column, prefix, trigger):
                 "label": name,
                 "type": value_type,
                 "detail": signature[:80],
-                "info": documentation.split("\n\n")[0][:300] if documentation else "",
+                "info": documentation.strip() if documentation else "",
                 "boost": 96 if name.startswith(prefix) else 82,
             }
         )

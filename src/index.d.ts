@@ -27,6 +27,8 @@ declare module '*?worker' {
   export default workerConstructor;
 }
 
+declare module 'bash-parser';
+
 interface Window {
   initAddedDCLightExercises: () => void;
   initDataCampLight: () => void;

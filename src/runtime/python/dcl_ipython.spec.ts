@@ -4,15 +4,15 @@ import dclIpythonSource from './dcl_ipython.py?raw';
 describe('dcl_ipython Python module', () => {
   it('contains valid Python definitions for IPython shell escapes, introspection, and magics', () => {
     expect(dclIpythonSource).toContain('def dcl_transform_ipython(code_string):');
-    expect(dclIpythonSource).toContain('def ipython_shell_escape(command_string):');
-    expect(dclIpythonSource).toContain('def ipython_get_output_lines(command_string):');
-    expect(dclIpythonSource).toContain('def ipython_time_execution(target_function):');
-    expect(dclIpythonSource).toContain('def ipython_print_working_directory():');
-    expect(dclIpythonSource).toContain('def ipython_change_directory(path_string=""):');
-    expect(dclIpythonSource).toContain('def ipython_environment(argument_string=""):');
-    expect(dclIpythonSource).toContain('def ipython_who(scope=None):');
-    expect(dclIpythonSource).toContain('def ipython_whos(scope=None):');
-    expect(dclIpythonSource).toContain('def ipython_help(target_name, detailed=False, scope=None):');
+    expect(dclIpythonSource).toContain('def _ipython_shell_escape(command_string):');
+    expect(dclIpythonSource).toContain('def _ipython_get_output_lines(command_string):');
+    expect(dclIpythonSource).toContain('def _ipython_time_execution(target_function):');
+    expect(dclIpythonSource).toContain('def _ipython_print_working_directory():');
+    expect(dclIpythonSource).toContain('def _ipython_change_directory(path_string=""):');
+    expect(dclIpythonSource).toContain('def _ipython_environment(argument_string=""):');
+    expect(dclIpythonSource).toContain('def _ipython_who(scope=None):');
+    expect(dclIpythonSource).toContain('def _ipython_whos(scope=None):');
+    expect(dclIpythonSource).toContain('def _ipython_help(target_name, detailed=False, scope=None):');
   });
 
   it('matches expected transformation regexes for shell escapes and magics', () => {

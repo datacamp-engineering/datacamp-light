@@ -1,0 +1,418 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Jupyter Notebook in WebAssembly — DataCamp Light</title>
+    <link rel="stylesheet" href="../dist/datacamp-light.css" />
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <style>
+      :root {
+        --bg-color: #05192d;
+        --card-bg: #0b2540;
+        --border-color: #1e3d5f;
+        --text-main: #ffffff;
+        --text-muted: #8fa7bf;
+        --accent-blue: #0578ff;
+        --accent-green: #03ef62;
+        --code-bg: #031322;
+      }
+
+      [data-theme="light"] {
+        --bg-color: #f7fafc;
+        --card-bg: #ffffff;
+        --border-color: #e2e8f0;
+        --text-main: #1a202c;
+        --text-muted: #718096;
+        --accent-blue: #0578ff;
+        --accent-green: #00873d;
+        --code-bg: #edf2f7;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        padding: 0;
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+        background-color: var(--bg-color);
+        color: var(--text-main);
+        line-height: 1.6;
+      }
+
+      header {
+        background-color: var(--card-bg);
+        border-bottom: 1px solid var(--border-color);
+        padding: 16px 24px;
+        position: sticky;
+        top: 0;
+        z-index: 100;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        flex-wrap: wrap;
+        gap: 16px;
+      }
+
+      .header-title {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+      }
+
+      .header-title h1 {
+        margin: 0;
+        font-size: 20px;
+        font-weight: 700;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+
+      .badge {
+        font-size: 12px;
+        font-weight: 600;
+        padding: 2px 8px;
+        border-radius: 12px;
+        background-color: rgba(5, 120, 255, 0.15);
+        color: var(--accent-blue);
+        border: 1px solid rgba(5, 120, 255, 0.3);
+      }
+
+      .controls {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+      }
+
+      .btn {
+        background-color: var(--accent-blue);
+        color: #ffffff;
+        border: none;
+        padding: 8px 16px;
+        border-radius: 6px;
+        font-size: 14px;
+        font-weight: 600;
+        cursor: pointer;
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        transition: opacity 0.2s;
+      }
+
+      .btn:hover {
+        opacity: 0.9;
+      }
+
+      .btn-secondary {
+        background-color: transparent;
+        color: var(--text-main);
+        border: 1px solid var(--border-color);
+      }
+
+      .btn-secondary:hover {
+        background-color: rgba(255, 255, 255, 0.05);
+      }
+
+      .container {
+        max-width: 960px;
+        margin: 32px auto;
+        padding: 0 20px 80px;
+      }
+
+      .notebook-wrapper {
+        display: flex;
+        flex-direction: column;
+        gap: 24px;
+      }
+
+      .cell-markdown {
+        background-color: var(--card-bg);
+        border: 1px solid var(--border-color);
+        border-radius: 8px;
+        padding: 20px 24px;
+        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+      }
+
+      .cell-markdown h1,
+      .cell-markdown h2,
+      .cell-markdown h3 {
+        margin-top: 0;
+        color: var(--text-main);
+        border-bottom: 1px solid var(--border-color);
+        padding-bottom: 8px;
+      }
+
+      .cell-markdown p,
+      .cell-markdown li {
+        color: var(--text-muted);
+        font-size: 15px;
+      }
+
+      .cell-markdown code {
+        font-family: "JetBrains Mono", Consolas, Monaco, monospace;
+        background-color: var(--code-bg);
+        padding: 2px 6px;
+        border-radius: 4px;
+        font-size: 13px;
+        color: var(--text-main);
+      }
+
+      .cell-code-container {
+        position: relative;
+      }
+
+      .cell-prompt {
+        font-family: "JetBrains Mono", monospace;
+        font-size: 13px;
+        font-weight: 700;
+        color: var(--accent-blue);
+        margin-bottom: 6px;
+        display: flex;
+        align-items: center;
+        gap: 6px;
+      }
+
+      .drop-zone {
+        border: 2px dashed var(--border-color);
+        border-radius: 8px;
+        padding: 32px 20px;
+        text-align: center;
+        margin-bottom: 32px;
+        background-color: rgba(5, 120, 255, 0.03);
+        cursor: pointer;
+        transition: border-color 0.2s, background-color 0.2s;
+      }
+
+      .drop-zone.dragover {
+        border-color: var(--accent-blue);
+        background-color: rgba(5, 120, 255, 0.1);
+      }
+
+      .drop-zone p {
+        margin: 4px 0 0;
+        color: var(--text-muted);
+        font-size: 14px;
+      }
+    </style>
+  </head>
+  <body>
+    <header>
+      <div class="header-title">
+        <h1>
+          <span>🪐 Jupyter Notebook Player</span>
+        </h1>
+        <span class="badge">WebAssembly Shared Kernel</span>
+      </div>
+      <div class="controls">
+        <label class="btn btn-secondary" for="ipynb-upload">
+          📂 Load .ipynb
+          <input type="file" id="ipynb-upload" accept=".ipynb,application/json" style="display: none;" />
+        </label>
+        <button class="btn btn-secondary" id="btn-theme-toggle">🌓 Theme</button>
+      </div>
+    </header>
+
+    <div class="container">
+      <div class="drop-zone" id="drop-zone">
+        <strong>Drag & Drop any <code>.ipynb</code> Jupyter Notebook here</strong>
+        <p>Runs 100% in your browser using Pyodide WebAssembly with shared state across all code cells.</p>
+      </div>
+
+      <div class="notebook-wrapper" id="notebook-container">
+        <!-- Notebook cells rendered dynamically -->
+      </div>
+    </div>
+
+    <!-- Default Sample Notebook Data -->
+    <script>
+      const SAMPLE_NOTEBOOK = {
+        cells: [
+          {
+            cell_type: "markdown",
+            source: [
+              "# 📊 Exploratory Data Analysis in WebAssembly\n",
+              "Welcome to the **DataCamp Light Jupyter Notebook Runner**! Every code cell on this page executes inside a **shared in-browser WebAssembly Python kernel** (`data-shared-environment=\"jupyter-kernel\"`).\n",
+              "\n",
+              "- State and variables defined in Step 1 persist into subsequent cells.\n",
+              "- Zero backend servers required; runs completely client-side."
+            ]
+          },
+          {
+            cell_type: "code",
+            source: [
+              "# Step 1: Import core data science libraries and generate sample metrics\n",
+              "import pandas as pd\n",
+              "import numpy as np\n",
+              "\n",
+              "np.random.seed(42)\n",
+              "dates = pd.date_range('2026-01-01', periods=8, freq='D')\n",
+              "sales = np.random.randint(150, 450, size=len(dates))\n",
+              "visitors = sales * np.random.uniform(2.5, 4.0, size=len(dates))\n",
+              "\n",
+              "df = pd.DataFrame({\n",
+              "    'Date': dates,\n",
+              "    'Daily_Sales': sales,\n",
+              "    'Visitors': visitors.round().astype(int),\n",
+              "})\n",
+              "\n",
+              "print('✅ Step 1 completed! Created dataset with shape:', df.shape)\n",
+              "df.head()"
+            ]
+          },
+          {
+            cell_type: "markdown",
+            source: [
+              "## 📈 Summary Statistics & Feature Engineering\n",
+              "In the cell below, we directly reference `df` created in Step 1 to calculate conversion rates and statistical summaries."
+            ]
+          },
+          {
+            cell_type: "code",
+            source: [
+              "# Step 2: Access 'df' directly from Step 1's shared environment memory\n",
+              "df['Conversion_Rate_%'] = (df['Daily_Sales'] / df['Visitors'] * 100).round(2)\n",
+              "\n",
+              "total_revenue = df['Daily_Sales'].sum() * 29.99\n",
+              "avg_conversion = df['Conversion_Rate_%'].mean()\n",
+              "\n",
+              "print(f'Total Estimated Revenue: ${total_revenue:,.2f}')\n",
+              "print(f'Average Daily Conversion Rate: {avg_conversion:.2f}%')\n",
+              "\n",
+              "df[['Date', 'Daily_Sales', 'Visitors', 'Conversion_Rate_%']]"
+            ]
+          },
+          {
+            cell_type: "markdown",
+            source: [
+              "## 🎨 Visualizing Trends with Matplotlib\n",
+              "Now we render interactive data visualizations using `matplotlib.pyplot`."
+            ]
+          },
+          {
+            cell_type: "code",
+            source: [
+              "# Step 3: Render Matplotlib graphics using the shared DataFrame\n",
+              "import matplotlib.pyplot as plt\n",
+              "\n",
+              "plt.figure(figsize=(9, 4))\n",
+              "plt.plot(df['Date'], df['Daily_Sales'], marker='o', color='#0578ff', linewidth=2.5, label='Daily Sales')\n",
+              "plt.title('Daily Sales Trend (January 2026)', fontsize=14, fontweight='bold')\n",
+              "plt.xlabel('Date')\n",
+              "plt.ylabel('Units Sold')\n",
+              "plt.grid(True, linestyle='--', alpha=0.5)\n",
+              "plt.legend()\n",
+              "plt.tight_layout()\n",
+              "plt.show()\n",
+              "\n",
+              "print('Visualized sales trends directly in the browser!')"
+            ]
+          }
+        ]
+      };
+
+      const notebookContainer = document.getElementById('notebook-container');
+      const dropZone = document.getElementById('drop-zone');
+      const fileInput = document.getElementById('ipynb-upload');
+      const themeButton = document.getElementById('btn-theme-toggle');
+
+      let currentTheme = 'dark';
+
+      themeButton.addEventListener('click', () => {
+        currentTheme = currentTheme === 'dark' ? 'light' : 'dark';
+        if (currentTheme === 'light') {
+          document.documentElement.setAttribute('data-theme', 'light');
+        } else {
+          document.documentElement.removeAttribute('data-theme');
+        }
+      });
+
+      function renderNotebook(notebook) {
+        notebookContainer.innerHTML = '';
+        const cells = notebook.cells || [];
+        let codeCellIndex = 0;
+
+        cells.forEach((cell) => {
+          const rawSource = Array.isArray(cell.source) ? cell.source.join('') : (cell.source || '');
+
+          if (cell.cell_type === 'markdown') {
+            const mdDiv = document.createElement('div');
+            mdDiv.className = 'cell-markdown';
+            mdDiv.innerHTML = marked.parse(rawSource);
+            notebookContainer.appendChild(mdDiv);
+          } else if (cell.cell_type === 'code') {
+            codeCellIndex++;
+            const codeContainer = document.createElement('div');
+            codeContainer.className = 'cell-code-container';
+
+            const promptLabel = document.createElement('div');
+            promptLabel.className = 'cell-prompt';
+            promptLabel.textContent = `In [${codeCellIndex}]:`;
+            codeContainer.appendChild(promptLabel);
+
+            const exerciseDiv = document.createElement('div');
+            exerciseDiv.setAttribute('data-datacamp-exercise', '');
+            exerciseDiv.setAttribute('data-lang', 'python');
+            exerciseDiv.setAttribute('data-shared-environment', 'jupyter-kernel');
+
+            const sampleCode = document.createElement('code');
+            sampleCode.setAttribute('data-type', 'sample-code');
+            sampleCode.textContent = rawSource;
+
+            exerciseDiv.appendChild(sampleCode);
+            codeContainer.appendChild(exerciseDiv);
+            notebookContainer.appendChild(codeContainer);
+          }
+        });
+
+        // Initialize DataCamp Light on newly rendered exercise blocks
+        if (window.DataCampLight && typeof window.DataCampLight.replace === 'function') {
+          window.DataCampLight.replace();
+        }
+      }
+
+      function loadNotebookFile(file) {
+        const reader = new FileReader();
+        reader.onload = (event) => {
+          try {
+            const parsed = JSON.parse(event.target.result);
+            renderNotebook(parsed);
+          } catch (error) {
+            alert('Failed to parse .ipynb file: ' + error.message);
+          }
+        };
+        reader.readAsText(file);
+      }
+
+      fileInput.addEventListener('change', (e) => {
+        if (e.target.files && e.target.files[0]) {
+          loadNotebookFile(e.target.files[0]);
+        }
+      });
+
+      dropZone.addEventListener('dragover', (e) => {
+        e.preventDefault();
+        dropZone.classList.add('dragover');
+      });
+
+      dropZone.addEventListener('dragleave', () => {
+        dropZone.classList.remove('dragover');
+      });
+
+      dropZone.addEventListener('drop', (e) => {
+        e.preventDefault();
+        dropZone.classList.remove('dragover');
+        if (e.dataTransfer.files && e.dataTransfer.files[0]) {
+          loadNotebookFile(e.dataTransfer.files[0]);
+        }
+      });
+
+      // Initial render with sample EDA notebook
+      renderNotebook(SAMPLE_NOTEBOOK);
+    </script>
+
+    <script type="text/javascript" src="../dist/dcl-react.js"></script>
+  </body>
+</html>

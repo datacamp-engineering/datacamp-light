@@ -1,3 +1,7 @@
+if (typeof globalThis !== 'undefined' && !(globalThis as any).process) {
+  (globalThis as any).process = { env: { NODE_ENV: 'production', NODE_NEV: 'production' } };
+}
+
 import './i18n';
 import {
   bootElement,
@@ -6,7 +10,7 @@ import {
   initDataCampLight,
 } from './boot';
 import { DataCampExercise } from './components/DataCampExercise';
-import { createWasmSession } from './runtime/WasmSession';
+import { createSessionForLanguage as createWasmSession } from './runtime/createSessionForLanguage';
 import './styles/fonts.css';
 
 // Expose on window for browser embeds and global usage

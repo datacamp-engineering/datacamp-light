@@ -115,10 +115,16 @@ describe('sessionPool', () => {
     firstAcquisition.session.onOutput(firstOutputHandler);
     secondAcquisition.session.onOutput(secondOutputHandler);
 
+    // Pre-initialize session so underlying worker is resolved before testing output routing
+    const sharedEntrySession = (firstAcquisition.session as any).getUnderlyingSession();
+    await sharedEntrySession.getUnderlyingSession();
+    const activeWorker = mockWorkerInstance as MockWorker | null;
+
     // Simulate first widget running code
     const runPromise = firstAcquisition.session.runCode({ code: 'x = 42\nprint(x)' });
 
-    const activeWorker = mockWorkerInstance as MockWorker | null;
+    // Yield macro-task queue so runCode request is posted to activeWorker
+    await new Promise((resolve) => setTimeout(resolve, 0));
 
     // Worker emits output during first run
     activeWorker?.onmessage?.({

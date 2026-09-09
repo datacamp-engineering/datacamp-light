@@ -142,6 +142,10 @@
       <p class="subtitle">
         Standalone interactive in-browser WebAssembly data science exercises. Edit the full HTML block below (including pre-exercise code, sample code, solution, and SCT) to see the widget automatically re-render and grade in real time.
       </p>
+      <div style="margin-top: 12px; display: flex; gap: 12px; flex-wrap: wrap;">
+        <a href="./notebook.html" style="color: var(--accent-blue); text-decoration: none; font-weight: 600; font-size: 14px; background: rgba(5,120,255,0.1); border: 1px solid rgba(5,120,255,0.25); padding: 6px 12px; border-radius: 6px;">🪐 Jupyter Notebook Player Demo →</a>
+        <a href="./example.html" style="color: var(--text-muted); text-decoration: none; font-size: 14px; padding: 6px 12px;">Minimal Embedding Example →</a>
+      </div>
     </header>
 
     <main id="playground-container">
@@ -347,8 +351,34 @@
 </div>`
         },
         {
+          id: 'card-isolated-environments',
+          title: '10a. Multiple Python Exercises (Isolated Contexts - Zero State Leakage)',
+          lang: 'python',
+          html: `<!-- Exercise A: Defines local variable in isolated context A -->
+<div data-datacamp-exercise data-lang="python">
+  <code data-type="sample-code">
+    # Exercise A (Isolated): Define variable 'secret_token'
+    secret_token = "ALPHA_SECRET_999"
+    print(f"Exercise A: defined secret_token = {secret_token}")
+  </code>
+</div>
+
+<div style="height: 16px;"></div>
+
+<!-- Exercise B: Runs in isolated context B - cannot access 'secret_token' from Exercise A -->
+<div data-datacamp-exercise data-lang="python">
+  <code data-type="sample-code">
+    # Exercise B (Isolated): 'secret_token' is not defined here!
+    try:
+        print("Exercise B:", secret_token)
+    except NameError:
+        print("Exercise B: secret_token is correctly undefined (isolated session).")
+  </code>
+</div>`
+        },
+        {
           id: 'card-shared-environment',
-          title: '10. Shared Execution Environment (Multi-Step Tutorial)',
+          title: '10b. Multiple Python Exercises (Shared Context - Multi-Step Tutorial)',
           lang: 'python',
           html: `<!-- Step 1: Define dataset and import libraries -->
 <div data-datacamp-exercise data-lang="python" data-shared-environment="stats-tutorial">

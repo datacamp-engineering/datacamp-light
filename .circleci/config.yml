@@ -130,20 +130,36 @@ jobs:
       - attach_workspace:
           at: /tmp/workspace
       - run:
-          name: Sync staging CDN artifacts
+          name: Sync staging CDN artifacts (/dcl/v4/staging/)
           command: |
-            aws s3 cp /tmp/workspace/dist/dcl-react.js.gz s3://cdn.datacamp.com/dcl-react-staging.js.gz --acl public-read --content-encoding "gzip" --content-type "application/javascript" --cache-control "max-age=1296000"
-            aws cloudfront create-invalidation --distribution-id E11JM11LLUSZQE --paths "/dcl-react-staging.js.gz"
+            # 1. Sync all distribution assets, chunks, and CSS as clean uncompressed files
+            # (enables CloudFront automatic Brotli and Gzip compression at edge)
+            aws s3 sync /tmp/workspace/dist/ s3://cdn.datacamp.com/dcl/v4/staging/ \
+              --acl public-read \
+              --exclude "*.gz" \
+              --exclude "*.wasm" \
+              --cache-control "max-age=1296000"
 
-            aws s3 cp /tmp/workspace/dist/dcl-react.js.gz s3://cdn.datacamp.com/dcl-react-staging/dcl-react.js.gz --acl public-read --content-encoding "gzip" --content-type "application/javascript"
-            aws s3 cp /tmp/workspace/dist/dcl-react.es.js s3://cdn.datacamp.com/dcl-react-staging/dcl-react.es.js --acl public-read --content-type "application/javascript"
-            aws s3 cp /tmp/workspace/dist/datacamp-light.css s3://cdn.datacamp.com/dcl-react-staging/datacamp-light.css --acl public-read --content-type "text/css"
+            # 2. Upload WASM binary (raw binary, application/wasm, CORS enabled)
+            aws s3 cp /tmp/workspace/dist/busybox.wasm s3://cdn.datacamp.com/dcl/v4/staging/busybox.wasm \
+              --acl public-read \
+              --content-type "application/wasm" \
+              --cache-control "max-age=1296000"
 
-            # Rewrite relative paths in HTML fixtures to point to staging CDN endpoints
-            sed -e "s|\.\./dist/|https://cdn.datacamp.com/dcl-react-staging/|g" -i /tmp/workspace/docs/index.html /tmp/workspace/docs/example.html
-            aws s3 cp /tmp/workspace/docs/index.html s3://cdn.datacamp.com/dcl-react-staging/index.html --acl public-read --content-type "text/html"
-            aws s3 cp /tmp/workspace/docs/example.html s3://cdn.datacamp.com/dcl-react-staging/example.html --acl public-read --content-type "text/html"
-            aws cloudfront create-invalidation --distribution-id E11JM11LLUSZQE --paths "/dcl-react-staging/*"
+            # 3. Upload pre-compressed .js.gz entrypoint
+            aws s3 cp /tmp/workspace/dist/dcl-react.js.gz s3://cdn.datacamp.com/dcl/v4/staging/dcl-react.js.gz \
+              --acl public-read \
+              --content-encoding "gzip" \
+              --content-type "application/javascript" \
+              --cache-control "max-age=1296000"
+
+            # 4. Upload demo/showcase pages rewritten for staging CDN
+            sed -e "s|\.\./dist/|https://cdn.datacamp.com/dcl/v4/staging/|g" -i /tmp/workspace/docs/index.html /tmp/workspace/docs/example.html
+            aws s3 cp /tmp/workspace/docs/index.html s3://cdn.datacamp.com/dcl/v4/staging/index.html --acl public-read --content-type "text/html"
+            aws s3 cp /tmp/workspace/docs/example.html s3://cdn.datacamp.com/dcl/v4/staging/example.html --acl public-read --content-type "text/html"
+
+            # Invalidate CloudFront staging distribution cache
+            aws cloudfront create-invalidation --distribution-id E11JM11LLUSZQE --paths "/dcl/v4/staging/*"
 
   deploy-prod:
     executor: aws-deploy
@@ -151,26 +167,49 @@ jobs:
       - attach_workspace:
           at: /tmp/workspace
       - run:
-          name: Sync production CDN artifacts (v4 paths only)
+          name: Sync production CDN artifacts (/dcl/v4/prod/ and aliases)
           command: |
-            # Fixed asset base baked into src/config.ts: https://cdn.datacamp.com/dcl/v4
-            # Versioned copy (immutable), latest-v4 copy, and entrypoint alias.
-            aws s3 cp /tmp/workspace/dist/dcl-react.js.gz s3://cdn.datacamp.com/dcl/v4/$CIRCLE_TAG/dcl-react.js.gz --acl public-read --content-encoding "gzip" --content-type "application/javascript" --cache-control "max-age=31536000"
-            aws s3 cp /tmp/workspace/dist/dcl-react.js.gz s3://cdn.datacamp.com/dcl/v4/dcl-react.js.gz --acl public-read --content-encoding "gzip" --content-type "application/javascript" --cache-control "max-age=1296000"
-            aws s3 cp /tmp/workspace/dist/dcl-react.js.gz s3://cdn.datacamp.com/dcl-react-v4.js.gz --acl public-read --content-encoding "gzip" --content-type "application/javascript" --cache-control "max-age=1296000"
-            aws cloudfront create-invalidation --distribution-id E11JM11LLUSZQE --paths "/dcl/v4/*" "/dcl-react-v4.js.gz"
+            # 1. Sync secondary assets, chunks, and CSS to canonical base /dcl/v4/prod/
+            # (Clean uncompressed files enable CloudFront automatic Brotli and Gzip)
+            aws s3 sync /tmp/workspace/dist/ s3://cdn.datacamp.com/dcl/v4/prod/ \
+              --acl public-read \
+              --exclude "*.gz" \
+              --exclude "*.wasm" \
+              --cache-control "max-age=31536000"
 
-            # Secondary assets under the canonical base. busybox.wasm is raw:
-            # no content-encoding, application/wasm, CDN CORS required.
-            aws s3 cp /tmp/workspace/dist/busybox.wasm s3://cdn.datacamp.com/dcl/v4/busybox.wasm --acl public-read --content-type "application/wasm" --cache-control "max-age=31536000"
-            aws s3 cp /tmp/workspace/dist/busybox.js s3://cdn.datacamp.com/dcl/v4/busybox.js --acl public-read --content-type "application/javascript" --cache-control "max-age=31536000"
-            aws s3 cp /tmp/workspace/dist/dcl-react.es.js s3://cdn.datacamp.com/dcl/v4/dcl-react.es.js --acl public-read --content-type "application/javascript" --cache-control "max-age=31536000"
-            aws s3 cp /tmp/workspace/dist/datacamp-light.css s3://cdn.datacamp.com/dcl/v4/datacamp-light.css --acl public-read --content-type "text/css" --cache-control "max-age=31536000"
+            # 2. Upload WASM binary (raw binary, application/wasm, CORS enabled)
+            aws s3 cp /tmp/workspace/dist/busybox.wasm s3://cdn.datacamp.com/dcl/v4/prod/busybox.wasm \
+              --acl public-read \
+              --content-type "application/wasm" \
+              --cache-control "max-age=31536000"
 
-            # Demo pages rewritten to load bundles from the canonical base.
-            sed -e "s|\.\./dist/|https://cdn.datacamp.com/dcl/v4/|g" -i /tmp/workspace/docs/index.html /tmp/workspace/docs/example.html
-            aws s3 cp /tmp/workspace/docs/index.html s3://cdn.datacamp.com/dcl/v4/index.html --acl public-read --content-type "text/html"
-            aws s3 cp /tmp/workspace/docs/example.html s3://cdn.datacamp.com/dcl/v4/example.html --acl public-read --content-type "text/html"
+            # 3. Upload clean entrypoints for versioned release tag and latest prod
+            aws s3 cp /tmp/workspace/dist/dcl-react.js s3://cdn.datacamp.com/dcl/v4/prod/dcl-react.js --acl public-read --content-type "application/javascript" --cache-control "max-age=1296000"
+            aws s3 cp /tmp/workspace/dist/dcl-react.es.js s3://cdn.datacamp.com/dcl/v4/prod/dcl-react.es.js --acl public-read --content-type "application/javascript" --cache-control "max-age=1296000"
+            aws s3 cp /tmp/workspace/dist/dcl-react.js s3://cdn.datacamp.com/dcl/v4/$CIRCLE_TAG/dcl-react.js --acl public-read --content-type "application/javascript" --cache-control "max-age=31536000"
+            aws s3 cp /tmp/workspace/dist/dcl-react.es.js s3://cdn.datacamp.com/dcl/v4/$CIRCLE_TAG/dcl-react.es.js --acl public-read --content-type "application/javascript" --cache-control "max-age=31536000"
+
+            # 4. Upload pre-compressed Gzip entrypoint aliases for all production entrypoints
+            for key in "dcl-react.js.gz" "dcl-react-v4.js.gz" "dcl-react-prod/dcl-react.js.gz" "dcl/v4/dcl-react.js.gz" "dcl/v4/prod/dcl-react.js.gz" "dcl/v4/$CIRCLE_TAG/dcl-react.js.gz"; do
+              aws s3 cp /tmp/workspace/dist/dcl-react.js.gz "s3://cdn.datacamp.com/$key" \
+                --acl public-read \
+                --content-encoding "gzip" \
+                --content-type "application/javascript" \
+                --cache-control "max-age=1296000"
+            done
+
+            # 5. Upload demo pages rewritten for production canonical base
+            sed -e "s|\.\./dist/|https://cdn.datacamp.com/dcl/v4/prod/|g" -i /tmp/workspace/docs/index.html /tmp/workspace/docs/example.html
+            aws s3 cp /tmp/workspace/docs/index.html s3://cdn.datacamp.com/dcl/v4/prod/index.html --acl public-read --content-type "text/html"
+            aws s3 cp /tmp/workspace/docs/example.html s3://cdn.datacamp.com/dcl/v4/prod/example.html --acl public-read --content-type "text/html"
+
+            # 6. Invalidate CloudFront caches across production paths
+            aws cloudfront create-invalidation --distribution-id E11JM11LLUSZQE --paths \
+              "/dcl/v4/prod/*" \
+              "/dcl/v4/*" \
+              "/dcl-react.js.gz" \
+              "/dcl-react-v4.js.gz" \
+              "/dcl-react-prod/*"
 
 workflows:
   version: 2

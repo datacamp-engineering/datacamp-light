@@ -80,16 +80,18 @@ async function runIntegrationTest() {
   };
 
   // 5. Load native Python modules
-  console.log('[Modules] Loading dcl_shellwhat_parser, dcl_shell_bridge, dcl_ipython, dcl_introspection...');
+  console.log('[Modules] Loading dcl_shellwhat_parser, dcl_shell_bridge, dcl_ipython, dcl_introspection, dcl_plain_runner...');
   const shellwhatParserSource = fs.readFileSync(path.join(pythonDirectory, 'dcl_shellwhat_parser.py'), 'utf8');
   const shellBridgeSource = fs.readFileSync(path.join(pythonDirectory, 'dcl_shell_bridge.py'), 'utf8');
   const ipythonSource = fs.readFileSync(path.join(pythonDirectory, 'dcl_ipython.py'), 'utf8');
   const introspectionSource = fs.readFileSync(path.join(pythonDirectory, 'dcl_introspection.py'), 'utf8');
+  const plainRunnerSource = fs.readFileSync(path.join(pythonDirectory, 'dcl_plain_runner.py'), 'utf8');
 
   await pyodide.runPythonAsync(shellwhatParserSource);
   await pyodide.runPythonAsync(shellBridgeSource);
   await pyodide.runPythonAsync(ipythonSource);
   await pyodide.runPythonAsync(introspectionSource);
+  await pyodide.runPythonAsync(plainRunnerSource);
 
   // 6. Load data science libraries
   console.log('[Packages] Preloading numpy and matplotlib...');
@@ -280,8 +282,61 @@ with open('python_to_shell.txt', 'w') as file:
   }
   console.log('  ✅ PASS: writeFile/readFile contract round-trip and cwd resolution succeeded.');
 
+  // Test Case 12: Plain Python execution via _dcl_run_plain_code (non-SCT path)
+  console.log('\n[Test 12] Verifying plain Python execution via _dcl_run_plain_code (zero-dependency path)...');
+  const plainRunnerFunction = pyodide.globals.get('_dcl_run_plain_code');
+  const plainResultJson = plainRunnerFunction('val_a = 21\nval_b = 2\nval_a * val_b');
+  const plainEntries = JSON.parse(plainResultJson);
+  const plainOutput = plainEntries.find((entry) => entry.type === 'output');
+  if (!plainOutput || !plainOutput.payload.includes('42')) {
+    throw new Error(`Plain Python execution failed: ${JSON.stringify(plainEntries)}`);
+  }
+  console.log('  ✅ PASS: Plain Python execution captured stdout expression result correctly.');
+
+  // Test Case 13: shellwhat SCT evaluation via evaluate_shellwhat
+  console.log('\n[Test 13] Verifying shellwhat AST evaluation via evaluate_shellwhat...');
+  const evaluateShellwhatFunction = pyodide.globals.get('evaluate_shellwhat');
+  const shellwhatRaw = evaluateShellwhatFunction(
+    "Ex().has_output('testing_shellwhat')",
+    'echo testing_shellwhat',
+    'testing_shellwhat\n',
+    '',
+    'echo testing_shellwhat',
+  );
+  const shellwhatParsed = JSON.parse(shellwhatRaw);
+  if (!shellwhatParsed.correct) {
+    throw new Error(`shellwhat evaluation failed: ${shellwhatRaw}`);
+  }
+  console.log('  ✅ PASS: shellwhat evaluation parsed AST and returned correct = true.');
+
+  // Test Case 14: Matplotlib plotting in plain execution mode (_dcl_run_plain_code)
+  console.log('\n[Test 14] Verifying Matplotlib plotting in plain execution mode (notebook runner)...');
+  const plainPlotCode = `
+import matplotlib.pyplot as plt
+import numpy as np
+
+x = np.linspace(0, 5, 20)
+y = x ** 2
+plt.figure(figsize=(5, 3))
+plt.plot(x, y, color='#0578ff')
+plt.title('Plain Mode Curve')
+plt.show()
+print('Plotted in plain mode!')
+`;
+  const plainPlotResultJson = plainRunnerFunction(plainPlotCode);
+  const plainPlotEntries = JSON.parse(plainPlotResultJson);
+  const plainPlotGraph = plainPlotEntries.find((entry) => entry.type === 'graph');
+  const plainPlotError = plainPlotEntries.find((entry) => entry.type === 'error');
+  if (plainPlotError) {
+    throw new Error(`Plain Matplotlib execution error: ${plainPlotError.payload}`);
+  }
+  if (!plainPlotGraph || !plainPlotGraph.payload || plainPlotGraph.payload.length < 50) {
+    throw new Error(`Plain Matplotlib did not produce graph: ${plainPlotResultJson}`);
+  }
+  console.log(`  ✅ PASS: Plain mode Matplotlib generated graph SVG (${plainPlotGraph.payload.length} bytes) without error.`);
+
   console.log(`\n======================================================================`);
-  console.log(` All WASM & Python Integration Tests PASSED (11/11)`);
+  console.log(` All WASM & Python Integration Tests PASSED (14/14)`);
   console.log(`======================================================================\n`);
 }
 

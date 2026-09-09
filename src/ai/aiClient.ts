@@ -37,6 +37,7 @@ export async function checkIsUserSignedIn(
     cachedSignedInStatus = isSignedIn;
     return isSignedIn;
   } catch {
+    cachedSignedInStatus = false;
     return false;
   }
 }

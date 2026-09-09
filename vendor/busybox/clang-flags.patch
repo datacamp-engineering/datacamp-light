@@ -1,0 +1,31 @@
+diff --git a/Makefile.flags b/Makefile.flags
+index 97cb4dca2..ad48f5bb6 100644
+--- a/Makefile.flags
++++ b/Makefile.flags
+@@ -48,8 +48,11 @@ endif
+ # gcc 3.x emits bogus "old style proto" warning on find.c:alloc_action()
+ CFLAGS += $(call cc-ifversion, -ge, 0400, -Wold-style-definition)
+ 
+-ifneq ($(lastword $(subst -, ,$(CC))),clang)
++ifeq ($(lastword $(subst -, ,$(CC))),clang)
+ # "clang-9: warning: optimization flag '-finline-limit=0' is not supported
++else ifeq ($(lastword $(subst -, ,$(CC))),emcc)
++# "clang: warning: optimization flag '-inline-limit=0' is not supported
++else
+ CFLAGS += $(call cc-option,-finline-limit=0,)
+ endif
+ 
+@@ -66,8 +69,12 @@ CFLAGS += $(call cc-option,-static-libgcc,)
+ endif
+ 
+ CFLAGS += $(call cc-option,-falign-functions=1,)
+-ifneq ($(lastword $(subst -, ,$(CC))),clang)
++ifeq ($(lastword $(subst -, ,$(CC))),clang)
+ # "clang-9: warning: optimization flag '-falign-jumps=1' is not supported" (and same for other two)
++else ifeq ($(lastword $(subst -, ,$(CC))),emcc)
++# "clang: warning: optimization flag '-falign-jumps=1' is not supported" (and same for '-falign-labels=1')
++CFLAGS += $(call cc-option,-falign-loops=1,)
++else
+ CFLAGS += $(call cc-option,-falign-jumps=1 -falign-labels=1 -falign-loops=1,)
+ endif
+ 

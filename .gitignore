@@ -17,3 +17,4 @@ src/**/*.js.map
 *.tsbuildinfo
 .cache/
 .temp/
+vendor/busybox/busybox_src/

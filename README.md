@@ -235,16 +235,22 @@ Unlike legacy versions that required remote server sessions, DataCamp Light v4 e
 ### Prerequisites
 
 - Node.js (see `.nvmrc`).
-- `@datacamp/waffles` and `@datacamp/waffles-fonts` are published to the DataCamp npm registry. Export your token if needed: `export NPM_TOKEN=$(grep -o 'npm_[^"]*' ~/.npmrc)`.
-- Install dependencies with `--legacy-peer-deps`: `npm install --legacy-peer-deps`.
+- `just` task runner (recommended): `brew install just` or https://just.systems.
 
-### Run the dev server
+### Just Commands
 
 ```bash
-npm run dev -- --port 5183
+just setup          # Install dependencies (npm install)
+just check          # Run typecheck and full production build
+just fix            # Run typecheck auto-checks
+just test           # Run unit tests, WASM integration tests, and external tutorial audits
+just test-unit      # Run Vitest unit tests only (npm test)
+just test-wasm      # Run WebAssembly & Python runtime integration tests
+just test-external  # Run external tutorial audit (learnpython.org & learnshell.org)
+just test-network   # Run live HTTP network footprint audit (Brotli/Gzip)
+just dev            # Start local Vite development server
+just serve          # Start local compressed static server (port 4173)
 ```
-
-Open `http://localhost:5183/` to view the live development playground with real-time hot module reloading.
 
 ### Verification commands
 
@@ -252,8 +258,6 @@ Open `http://localhost:5183/` to view the live development playground with real-
 npm run typecheck   # tsc --noEmit
 npm test            # vitest run (unit + component + integration tests)
 npm run build       # tsc -b && vite build -> dist/dcl-react.js, dist/dcl-react.es.js, dist/datacamp-light.css
-npm run update:shellwhat  # sync shellwhat Python sources
-npm run update:testwhat   # sync testwhat R sources
 ```
 
 ## Architecture
