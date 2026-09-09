@@ -26,7 +26,7 @@ cmd_busybox__ = $(srctree)/scripts/trylink \
 
 busybox.js: busybox_unstripped
 	@cp busybox_unstripped.js busybox.js
-	@sed -i.bak "s/busybox_unstripped\.wasm/busybox.wasm/g" busybox.js 2>/dev/null || sed -i "" "s/busybox_unstripped\.wasm/busybox.wasm/g" busybox.js
+	@sed -i "s/busybox_unstripped\.wasm/busybox.wasm/g" busybox.js
 
 busybox.wasm: busybox_unstripped
 	@cp busybox_unstripped.wasm busybox.wasm

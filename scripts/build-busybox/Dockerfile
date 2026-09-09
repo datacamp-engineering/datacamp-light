@@ -1,4 +1,4 @@
-FROM emscripten/emsdk:3.1.53
+FROM emscripten/emsdk:latest AS builder
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential \
@@ -17,4 +17,10 @@ COPY clang-flags.patch /build/clang-flags.patch
 COPY build.sh /build/build.sh
 RUN chmod +x /build/build.sh
 
-ENTRYPOINT ["/build/build.sh"]
+RUN /build/build.sh
+
+FROM alpine:latest
+COPY --from=builder /build/dist/busybox.js /dist/busybox.js
+COPY --from=builder /build/dist/busybox.wasm /dist/busybox.wasm
+VOLUME /out
+CMD ["sh", "-c", "cp /dist/* /out/"]

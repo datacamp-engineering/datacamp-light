@@ -1,0 +1,44 @@
+{
+  "runtimeAssets": [
+    {
+      "artifact": "busybox.js",
+      "source": "BusyBox",
+      "upstream": "https://github.com/vda-linux/busybox_mirror",
+      "sourceRef": "commit c8eb8614068a662271a5187d4876df1d8439a0ae",
+      "license": "GPL-2.0",
+      "copyright": "BusyBox contributors"
+    },
+    {
+      "artifact": "busybox.wasm",
+      "source": "BusyBox",
+      "upstream": "https://github.com/vda-linux/busybox_mirror",
+      "sourceRef": "commit c8eb8614068a662271a5187d4876df1d8439a0ae",
+      "license": "GPL-2.0",
+      "copyright": "BusyBox contributors"
+    },
+    {
+      "artifact": "wasm_exec.js",
+      "source": "Go toolchain",
+      "upstream": "https://github.com/golang/go",
+      "sourceRef": "go1.22 (misc/wasm/wasm_exec.js)",
+      "license": "BSD-3-Clause",
+      "copyright": "The Go Authors"
+    },
+    {
+      "artifact": "sh-runner.wasm",
+      "source": "mvdan/sh runner",
+      "upstream": "https://github.com/mvdan/sh",
+      "sourceRef": "mvdan.cc/sh/v3 (see scripts/build-sh-runner/go.mod)",
+      "license": "BSD-3-Clause",
+      "copyright": "mvdan-sh authors; The Go Authors"
+    }
+  ],
+  "buildRecipes": [
+    {
+      "path": "vendor/busybox",
+      "upstream": "https://github.com/cryptool-org/busybox-wasm",
+      "license": "Apache-2.0",
+      "pinnedRef": "277e7cb2ff5e94f6df681ff06f665710f3983148"
+    }
+  ]
+}

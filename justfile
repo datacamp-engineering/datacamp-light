@@ -10,6 +10,18 @@ setup:
 update-deps:
 	npm update
 
+# Rebuild public/busybox.js and public/busybox.wasm from the vendored upstream recipe (requires Docker)
+build-busybox:
+	bash scripts/build-busybox.sh
+
+# Rebuild public/sh-runner.wasm and public/wasm_exec.js with the Go shell runner (requires Docker)
+build-sh-runner:
+	bash scripts/build-sh-runner.sh
+
+# Sync vendor/busybox from the pinned upstream commit and regenerate vendor/PROVENANCE.md
+update-vendor:
+	node scripts/update-vendor.mjs
+
 # Run typecheck and full production build
 check:
 	npm run typecheck && npm run build
