@@ -17,6 +17,7 @@ import { OutputConsole } from './OutputConsole';
 import type { ConsoleEntry } from './OutputConsole';
 import { PlotCanvas } from './PlotCanvas';
 import { ResizeHandle } from './ResizeHandle';
+import { SanitizedHtml } from './SanitizedHtml';
 import { TerminalConsole } from './TerminalConsole';
 import { useAiAssistance } from './hooks/useAiAssistance';
 import { useSessionFileDrop } from './hooks/useSessionFileDrop';
@@ -56,8 +57,9 @@ const HintPanel: React.FC<{ hint: string }> = ({ hint }) => (
       fontSize: tokens.fontSizes.medium,
       display: 'block',
     }}
-    dangerouslySetInnerHTML={{ __html: hint }}
-  />
+  >
+    <SanitizedHtml as="div" html={hint} />
+  </div>
 );
 
 /**

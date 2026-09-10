@@ -2,11 +2,12 @@ import { Button } from '@datacamp/waffles/button';
 import { Checkmark, Cross, CrossCircle, Sparkles } from '@datacamp/waffles/icon';
 import { theme } from '@datacamp/waffles/theme';
 import { tokens } from '@datacamp/waffles/tokens';
-import { marked } from 'marked';
 import React from 'react';
 import type { LineChange } from '../ai/lineDiff';
+import { renderMarkdown } from '../utils/richText';
 import { baseBannerStyle } from '../styles/bannerStyles';
 import { AiCodeDiff } from './AiCodeDiff';
+import { SanitizedHtml } from './SanitizedHtml';
 
 export interface AiExplanationPanelProps {
   title?: string;
@@ -29,9 +30,7 @@ export const AiExplanationPanel: React.FC<AiExplanationPanelProps> = ({
   onRejectFix,
   onClose,
 }) => {
-  const formattedExplanation = explanation
-    ? (marked.parse(explanation, { async: false, gfm: true, breaks: true }) as string)
-    : '';
+  const formattedExplanation = explanation ? renderMarkdown(explanation) : '';
 
   return (
     <div
@@ -120,8 +119,9 @@ export const AiExplanationPanel: React.FC<AiExplanationPanelProps> = ({
                   },
                 },
               }}
-              dangerouslySetInnerHTML={{ __html: formattedExplanation }}
-            />
+            >
+              <SanitizedHtml html={formattedExplanation} />
+            </div>
           )}
 
           {diff && diff.length > 0 && (

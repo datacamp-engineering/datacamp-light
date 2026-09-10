@@ -1,11 +1,13 @@
 import { CheckmarkCircle, CrossCircle } from '@datacamp/waffles/icon';
 import { tokens } from '@datacamp/waffles/tokens';
 import React from 'react';
+import { renderMarkdown } from '../utils/richText';
 import {
   BannerCloseButton,
   getFeedbackBannerStyle,
   getFeedbackTheme,
 } from '../styles/bannerStyles';
+import { SanitizedHtml } from './SanitizedHtml';
 
 export interface FeedbackBannerProps {
   correct?: boolean;
@@ -23,7 +25,6 @@ export const FeedbackBanner: React.FC<FeedbackBannerProps> = ({
   }
 
   const isSuccess = correct === true;
-  const formattedMessage = message.replace(/`([^`]+)`/g, '<code>$1</code>').trim();
   const feedbackTheme = getFeedbackTheme(isSuccess);
 
   return (
@@ -38,7 +39,7 @@ export const FeedbackBanner: React.FC<FeedbackBannerProps> = ({
         ) : (
           <CrossCircle size="small" />
         )}
-        <span dangerouslySetInnerHTML={{ __html: formattedMessage }} />
+        <SanitizedHtml html={renderMarkdown(message)} />
       </div>
       {onClose && (
         <BannerCloseButton
