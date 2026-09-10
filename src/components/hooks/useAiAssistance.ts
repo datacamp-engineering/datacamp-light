@@ -5,7 +5,7 @@ import {
   fixAndExplainCode,
   parseFixAndExplainResponse,
 } from '../../ai/aiClient';
-import { isFirstPartyDomain } from '../../ai/aiConfig';
+import { FIX_AND_EXPLAIN_DELIMITER, isFirstPartyDomain } from '../../ai/aiConfig';
 import { computeLineDiff, type LineChange } from '../../ai/lineDiff';
 
 export interface AiAssistanceState {
@@ -154,6 +154,15 @@ export function useAiAssistance(options: {
         error: errorMessage || 'Error occurred',
         mockAi,
         onChunk: (chunk) => {
+          // The response streams as `<updated code><delimiter><explanation>`.
+          // Before the delimiter arrives, the accumulated text is the raw
+          // fixed code — never render it as the explanation, or markdown
+          // parsing would turn `#` comment lines inside the code into h1
+          // headings (the panel then flips to the diff once streaming
+          // completes).
+          if (!chunk.includes(FIX_AND_EXPLAIN_DELIMITER)) {
+            return;
+          }
           const parsed = parseFixAndExplainResponse(chunk);
           if (parsed.explanation) {
             setAiState((previous) => ({
