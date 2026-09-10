@@ -36,8 +36,8 @@ import { cachedAssetFetch } from './assetCache';
  * injected directly into the webR virtual environment alongside pre-compiled
  * CRAN WASM dependencies (`evaluate`, `stringdist`, `R6`, `magrittr`, `praise`).
  */
-const WEBR_LATEST_URL = dclConfig.webrUrl;
-const WEBR_BIN_WASM_URL = dclConfig.webrBinWasmUrl;
+const WEBR_MODULE_URL = dclConfig.webrUrl;
+const WEBR_RWASM_URL = dclConfig.webrRWasmUrl;
 const WEBR_WORKER_URL = dclConfig.webrWorkerUrl;
 
 let prewarmWebRPromise: Promise<void> | null = null;
@@ -49,7 +49,7 @@ function prewarmWebRAssetCache(): Promise<void> {
     try {
       // Pre-warm the WebR binary assets into browser Cache Storage
       await Promise.all([
-        cachedAssetFetch(WEBR_BIN_WASM_URL).catch(() => {}),
+        cachedAssetFetch(WEBR_RWASM_URL).catch(() => {}),
         cachedAssetFetch(WEBR_WORKER_URL).catch(() => {}),
       ]);
     } catch {}
@@ -93,7 +93,7 @@ export class RWebRSession {
     if (this.webRPromise == null) {
       this.webRPromise = (async () => {
         await prewarmWebRAssetCache();
-        const { WebR } = await import(/* @vite-ignore */ WEBR_LATEST_URL);
+        const { WebR } = await import(/* @vite-ignore */ WEBR_MODULE_URL);
         const webR = new WebR();
         await webR.init();
         return webR;
