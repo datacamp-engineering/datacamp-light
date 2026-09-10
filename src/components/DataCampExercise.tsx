@@ -20,7 +20,7 @@ import { PlotCanvas } from './PlotCanvas';
 import { ResizeHandle } from './ResizeHandle';
 import { SanitizedHtml } from './SanitizedHtml';
 import { TerminalConsole } from './TerminalConsole';
-import { renderMarkdown } from '../utils/richText';
+import { dedent, renderMarkdown } from '../utils/richText';
 import { useAiAssistance } from './hooks/useAiAssistance';
 import { useSessionFileDrop } from './hooks/useSessionFileDrop';
 import { baseBannerStyle } from '../styles/bannerStyles';
@@ -68,7 +68,7 @@ export const HintPanel: React.FC<{ hint: string }> = ({ hint }) => (
       },
     }}
   >
-    <SanitizedHtml as="div" html={renderMarkdown(hint)} />
+    <SanitizedHtml as="div" html={renderMarkdown(dedent(hint))} />
   </div>
 );
 

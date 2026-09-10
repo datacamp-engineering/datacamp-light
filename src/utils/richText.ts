@@ -59,6 +59,24 @@ export function closeUnterminatedCodeFences(markdown: string): string {
 }
 
 /**
+ * Removes uniform leading indentation and surrounding whitespace from
+ * author-authored HTML/Markdown fragments. Host pages author hint blocks
+ * indented inside their markup; left intact, that indentation turns the first
+ * content lines into indented code blocks when parsed as markdown. Relative
+ * indentation inside the fragment is preserved.
+ */
+export function dedent(block: string): string {
+  const matches = block.match(/^[ \t]*(?=\S)/gm);
+  if (!matches) {
+    return block.trim();
+  }
+  const baseIndent = Math.min(...matches.map((element) => element.length));
+  const dedented =
+    baseIndent > 0 ? block.replace(new RegExp(`^[ \\t]{${baseIndent}}`, 'gm'), '') : block;
+  return dedented.trim();
+}
+
+/**
  * Renders markdown (or embedded raw HTML) to sanitized HTML. Used for AI
  * explanations, SCT feedback messages, and exercise hints, so a single
  * pipeline accepts both markdown syntax and author-authored HTML.
