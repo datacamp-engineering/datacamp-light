@@ -12,6 +12,7 @@ import './runtime/assetResolver';
 import { createRoot } from 'react-dom/client';
 import { DataCampExercise } from './components/DataCampExercise';
 import type { DataCampExerciseProps } from './components/DataCampExercise';
+import { ErrorBoundary } from './components/ErrorBoundary';
 
 const stripIndent = (sourceString: string): string => {
   const match = sourceString.match(/^[ \t]*(?=\S)/gm);
@@ -178,7 +179,11 @@ export function bootElement(element: HTMLElement): void {
     element.removeAttribute('data-datacamp-exercise');
 
     const root = createRoot(element);
-    root.render(<DataCampExercise {...settingsForLazyLoad} />);
+    root.render(
+      <ErrorBoundary label="widget" variant="widget">
+        <DataCampExercise {...settingsForLazyLoad} />
+      </ErrorBoundary>,
+    );
   };
 
   if (noLazyLoad || typeof IntersectionObserver === 'undefined') {

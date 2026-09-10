@@ -13,6 +13,7 @@ import { DCLWidgetShell } from './DCLWidgetShell';
 import { DropZoneOverlay } from './DropZoneOverlay';
 import { FeedbackBanner } from './FeedbackBanner';
 import { Footer } from './Footer';
+import { ErrorBoundary } from './ErrorBoundary';
 import { OutputConsole } from './OutputConsole';
 import type { ConsoleEntry } from './OutputConsole';
 import { PlotCanvas } from './PlotCanvas';
@@ -250,15 +251,17 @@ const ShellExercise: React.FC<{
           />
         )}
 
-        <TerminalConsole
-          onExecuteCommand={handleExecuteShellCommand}
-          onIntrospect={handleIntrospect}
-          prompt="$ "
-          initialCwd="/home/repl"
-          height={terminalHeight}
-          resetKey={resetCounter}
-          theme={activeTheme}
-        />
+        <ErrorBoundary label="terminal-console" variant="inline">
+          <TerminalConsole
+            onExecuteCommand={handleExecuteShellCommand}
+            onIntrospect={handleIntrospect}
+            prompt="$ "
+            initialCwd="/home/repl"
+            height={terminalHeight}
+            resetKey={resetCounter}
+            theme={activeTheme}
+          />
+        </ErrorBoundary>
 
         <ResizeHandle
           ariaLabel="Resize terminal"
@@ -493,14 +496,16 @@ const CodeExercise: React.FC<DataCampExerciseProps> = ({
         onFileDrop={handleFileDrop}
         preview={previewDropZone}
       >
-        <CodeEditor
-          code={code}
-          onChange={setCode}
-          height={editorHeight}
-          language={language}
-          session={session}
-          autocomplete={autocomplete}
-        />
+        <ErrorBoundary label="code-editor" variant="inline">
+          <CodeEditor
+            code={code}
+            onChange={setCode}
+            height={editorHeight}
+            language={language}
+            session={session}
+            autocomplete={autocomplete}
+          />
+        </ErrorBoundary>
 
       <ResizeHandle
         ariaLabel="Resize code editor"
@@ -544,16 +549,18 @@ const CodeExercise: React.FC<DataCampExerciseProps> = ({
       )}
 
       {aiState.visible && aiState.type !== 'upsell' && (
-        <AiExplanationPanel
-          diff={aiState.diff}
-          error={aiState.error}
-          explanation={aiState.explanation}
-          isLoading={aiState.isLoading}
-          onAcceptFix={handleAcceptFix}
-          onClose={handleCloseAi}
-          onRejectFix={handleRejectFix}
-          title={aiState.title}
-        />
+        <ErrorBoundary label="ai-explanation" variant="inline">
+          <AiExplanationPanel
+            diff={aiState.diff}
+            error={aiState.error}
+            explanation={aiState.explanation}
+            isLoading={aiState.isLoading}
+            onAcceptFix={handleAcceptFix}
+            onClose={handleCloseAi}
+            onRejectFix={handleRejectFix}
+            title={aiState.title}
+          />
+        </ErrorBoundary>
       )}
 
       {feedback && (
@@ -584,7 +591,9 @@ const CodeExercise: React.FC<DataCampExerciseProps> = ({
 
       {plots.length > 0 && (
         <>
-          <PlotCanvas height={plotHeight} plots={plots} />
+          <ErrorBoundary label="plot-canvas" variant="inline">
+            <PlotCanvas height={plotHeight} plots={plots} />
+          </ErrorBoundary>
           <ResizeHandle
             ariaLabel="Resize plot section"
             onResize={(deltaY) =>
