@@ -22,10 +22,7 @@ import {
   unpackRListResult,
 } from './r/testwhatHarness';
 
-import { cachedAssetFetch, installGlobalFetchCache } from './assetCache';
-
-// Install persistent cache interceptor for main thread and webR network fetches
-installGlobalFetchCache();
+import { cachedAssetFetch } from './assetCache';
 
 /**
  * webR-backed session for R exercises.

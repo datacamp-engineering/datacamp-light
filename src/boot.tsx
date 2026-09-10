@@ -1,14 +1,14 @@
+// Some bundled dependencies (notably bash-parser's tokenizer, used by the
+// shell interpreter) read `process.env.NODE_NEV` — an upstream typo of
+// NODE_ENV — unconditionally at module scope, which throws when `process`
+// is undefined in the browser. The misspelled key mirrors that reference
+// on purpose; do not "fix" it.
 if (typeof globalThis !== 'undefined' && !(globalThis as any).process) {
   (globalThis as any).process = { env: { NODE_ENV: 'production', NODE_NEV: 'production' } };
 }
 
 import './i18n';
 import './runtime/assetResolver';
-import { installGlobalFetchCache } from './runtime/assetCache';
-
-// Automatically install persistent fetch cache when DataCamp Light boots
-installGlobalFetchCache();
-
 import { createRoot } from 'react-dom/client';
 import { DataCampExercise } from './components/DataCampExercise';
 import type { DataCampExerciseProps } from './components/DataCampExercise';

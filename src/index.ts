@@ -1,3 +1,6 @@
+// See the comment on the identical shim in boot.tsx: bash-parser reads
+// `process.env.NODE_NEV` (upstream typo of NODE_ENV) at module scope, so the
+// misspelled key must stay as-is.
 if (typeof globalThis !== 'undefined' && !(globalThis as any).process) {
   (globalThis as any).process = { env: { NODE_ENV: 'production', NODE_NEV: 'production' } };
 }
