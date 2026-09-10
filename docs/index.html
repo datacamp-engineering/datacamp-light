@@ -447,7 +447,35 @@
     print("Files in working directory:", sorted(os.listdir(".")))
   </code>
 </div>`
-        }
+        },
+        {
+          id: 'card-hint-feedback-rendering',
+          title: '13. Hint & Feedback Rendering (Markdown + HTML)',
+          lang: 'python',
+          html: `<div data-datacamp-exercise data-lang="python">
+  <code data-type="pre-exercise-code">
+    pi = 3.14159
+  </code>
+  <code data-type="sample-code">
+    # Compute the area of a circle with radius 5
+    radius = 5
+    area = pi * (radius ** 2)
+  </code>
+  <code data-type="solution">
+    pi = 3.14159
+    radius = 5
+    area = pi * (radius ** 2)
+  </code>
+  <code data-type="sct">
+    Ex().check_object('area', incorrect_msg='**Not quite** — compute <code>area = pi * (radius ** 2)</code> using the <code>pi</code> from the pre-exercise code.').has_equal_value().success_msg('**Correct!** The variable \`area\` now holds <code>area = pi * (radius ** 2)</code>. *Markdown* and HTML both render in feedback — including <b>bold HTML</b> and \`inline code\`.')
+  </code>
+  <div data-type="hint">
+    **Markdown hint**: the formula is \`area = pi * (radius ** 2)\` — and <code>pi</code> is preloaded for you.
+    - **Bold**, *italic*, and \`inline code\` render through the markdown pipeline.
+    - HTML renders too: <code>pi * (radius ** 2)</code> and <b>bold HTML</b>.
+  </div>
+</div>`
+        },
       ];
 
       const debounceTimers = {};
