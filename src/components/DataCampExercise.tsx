@@ -20,6 +20,7 @@ import { PlotCanvas } from './PlotCanvas';
 import { ResizeHandle } from './ResizeHandle';
 import { SanitizedHtml } from './SanitizedHtml';
 import { TerminalConsole } from './TerminalConsole';
+import { renderMarkdown } from '../utils/richText';
 import { useAiAssistance } from './hooks/useAiAssistance';
 import { useSessionFileDrop } from './hooks/useSessionFileDrop';
 import { baseBannerStyle } from '../styles/bannerStyles';
@@ -50,16 +51,24 @@ export interface DataCampExerciseProps {
   onFeedback?: (correct: boolean, message: string) => void;
 }
 
-const HintPanel: React.FC<{ hint: string }> = ({ hint }) => (
+export const HintPanel: React.FC<{ hint: string }> = ({ hint }) => (
   <div
     css={{
       ...baseBannerStyle,
       color: theme.text.secondary,
       fontSize: tokens.fontSizes.medium,
       display: 'block',
+      // renderMarkdown wraps plain-text hints in paragraphs; keep the banner
+      // layout tight while preserving spacing between paragraphs.
+      '& p': {
+        margin: '0 0 8px 0',
+        '&:last-child': {
+          marginBottom: 0,
+        },
+      },
     }}
   >
-    <SanitizedHtml as="div" html={hint} />
+    <SanitizedHtml as="div" html={renderMarkdown(hint)} />
   </div>
 );
 
