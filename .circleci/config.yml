@@ -54,6 +54,9 @@ commands:
           name: Unit tests
           command: npm test
       - run:
+          name: WASM runtime integration tests
+          command: node scripts/test-wasm-runtime.mjs
+      - run:
           name: Build
           command: npm run build
 
