@@ -4,7 +4,9 @@ import {
   type CompletionResult,
   type CompletionSource,
 } from '@codemirror/autocomplete';
+import { syntaxTree } from '@codemirror/language';
 import type { Extension } from '@codemirror/state';
+import type { SyntaxNode } from '@lezer/common';
 import type { IJsonRpcSession } from '../../jsonrpc/session';
 import { getDynamicCompletions } from './dynamicIntrospection';
 import { createLazyAutocompleteExtension } from './lazyAutocomplete';
@@ -22,6 +24,34 @@ export function createAutocompleteExtension(
   session?: IJsonRpcSession | null,
 ): Extension {
   return createLazyAutocompleteExtension(language, session);
+}
+
+/**
+ * Languages whose completion is suppressed inside string literals: identifier
+ * completions (keywords, builtins, variables) are never valid inside a string,
+ * and accepting one inserts code syntax into the quoted text. Python uses the
+ * Lezer grammar (node type `String`); R uses a StreamLanguage whose tokens are
+ * named `string`.
+ */
+const STRING_AWARE_LANGUAGES = new Set(['python', 'r']);
+
+/**
+ * True when the completion cursor sits inside a string literal (per the
+ * language's syntax tree). Used to suppress identifier completions inside
+ * strings; file-path completion would be the future replacement here.
+ */
+export function isInsideStringLiteral(context: CompletionContext, language: string): boolean {
+  if (!STRING_AWARE_LANGUAGES.has(language)) {
+    return false;
+  }
+  let node: SyntaxNode | null = syntaxTree(context.state).resolveInner(context.pos, -1);
+  while (node) {
+    if (node.name === 'String' || node.name === 'string') {
+      return true;
+    }
+    node = node.parent;
+  }
+  return false;
 }
 
 const languagePrefixPatterns: Record<string, RegExp> = {
@@ -137,6 +167,9 @@ export function createLanguageCompletionSource(
   const debounceKey = `language-introspection-${normalizedLanguage}-${++sourceCounter}`;
 
   return (context: CompletionContext): CompletionResult | null | Promise<CompletionResult | null> => {
+    if (isInsideStringLiteral(context, normalizedLanguage)) {
+      return null;
+    }
     const prefixPattern = languagePrefixPatterns[normalizedLanguage] || defaultPrefixPattern;
     const tokenMatch = context.matchBefore(prefixPattern);
     const matchRange = computeMatchRange(normalizedLanguage, context, tokenMatch);

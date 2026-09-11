@@ -3,8 +3,11 @@ import {
   type CompletionResult,
   type CompletionSource,
 } from '@codemirror/autocomplete';
+import { python } from '@codemirror/lang-python';
+import { StreamLanguage } from '@codemirror/language';
 import { EditorState } from '@codemirror/state';
 import { EditorView } from '@codemirror/view';
+import { r } from '@codemirror/legacy-modes/mode/r';
 import { describe, expect, it, vi } from 'vitest';
 import type { IJsonRpcSession } from '../../jsonrpc/session';
 import { createLanguageCompletionSource } from './autocompleteExtension';
@@ -124,6 +127,39 @@ describe('autocomplete extension', () => {
     const docText = 'import pandas as ';
     const state = createState(docText);
     const result = await resolveSource(source, state, docText.length, true);
+    expect(result).not.toBeNull();
+    expect((result?.options.length ?? 0)).toBeGreaterThan(0);
+  });
+
+  it('suppresses completions inside python string literals', async () => {
+    const source = createLanguageCompletionSource('python');
+    const state = EditorState.create({ doc: "open('pri", extensions: [python()] });
+    const result = await resolveSource(source, state, 9);
+    expect(result).toBeNull();
+  });
+
+  it('suppresses explicit completions inside python string literals', async () => {
+    const source = createLanguageCompletionSource('python');
+    const state = EditorState.create({ doc: "message = 'hello w", extensions: [python()] });
+    const result = await resolveSource(source, state, 18, true);
+    expect(result).toBeNull();
+  });
+
+  it('suppresses completions inside r string literals', async () => {
+    const source = createLanguageCompletionSource('r');
+    const state = EditorState.create({
+      doc: 'x <- "hel',
+      extensions: [StreamLanguage.define(r)],
+    });
+    const result = await resolveSource(source, state, 9);
+    expect(result).toBeNull();
+  });
+
+  it('keeps completions working outside string literals', async () => {
+    const source = createLanguageCompletionSource('python');
+    const docText = "x = 'abc'\ncust";
+    const state = EditorState.create({ doc: docText, extensions: [python()] });
+    const result = await resolveSource(source, state, docText.length);
     expect(result).not.toBeNull();
     expect((result?.options.length ?? 0)).toBeGreaterThan(0);
   });
