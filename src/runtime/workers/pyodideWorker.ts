@@ -56,6 +56,7 @@ const PYTHONWHAT_BUILTIN_DEPENDENCIES = [
 const PYTHONWHAT_MICROPIP_DEPENDENCIES = ['pyodide_backend'];
 
 let pythonwhatReadyPromise: Promise<void> | null = null;
+let blackReadyPromise: Promise<void> | null = null;
 let shellwhatReadyPromise: Promise<void> | null = null;
 let busyboxReadyPromise: Promise<void> | null = null;
 
@@ -75,6 +76,24 @@ async function ensurePythonwhatLoaded(): Promise<void> {
   })();
 
   return pythonwhatReadyPromise;
+}
+
+async function ensureBlackLoaded(): Promise<void> {
+  if (blackReadyPromise) return blackReadyPromise;
+
+  blackReadyPromise = (async () => {
+    try {
+      await ensurePythonwhatLoaded();
+      const micropip = pyodide.pyimport('micropip');
+      await micropip.install(['black']);
+    } catch (error) {
+      console.warn('Failed to load black for AST formatting:', error);
+      blackReadyPromise = null;
+      throw error;
+    }
+  })();
+
+  return blackReadyPromise;
 }
 
 async function ensureShellwhatLoaded(): Promise<void> {
@@ -493,6 +512,41 @@ async function handleRunCode(params: any): Promise<any> {
   return emitOutputEntries(entries);
 }
 
+function handleSctException(submitError: any): { correct: boolean; message: string; output: string } {
+  console.error('[DataCamp Light SCT Exception]', submitError);
+  const rawErrorString = String(
+    submitError && submitError.message ? submitError.message : submitError,
+  );
+  let sanitizedErrorMessage = rawErrorString;
+
+  if (rawErrorString.indexOf('InstructorError:') !== -1) {
+    const parts = rawErrorString.split('InstructorError:')[1];
+    const description = parts.split('Debug on error:')[0].split('\n')[0].trim();
+    sanitizedErrorMessage = 'SCT Error: ' + description;
+  } else if (rawErrorString.indexOf('SyntaxError:') !== -1) {
+    const parts = rawErrorString.split('SyntaxError:')[1];
+    sanitizedErrorMessage = 'SCT SyntaxError: ' + parts.split('\n')[0].trim();
+  } else if (rawErrorString.indexOf('NameError:') !== -1) {
+    const parts = rawErrorString.split('NameError:')[1];
+    sanitizedErrorMessage = 'SCT NameError: ' + parts.split('\n')[0].trim();
+  } else {
+    const lines = rawErrorString.split('\n').map((line) => line.trim()).filter(Boolean);
+    sanitizedErrorMessage = lines[lines.length - 1] || 'Error during SCT evaluation.';
+  }
+
+  self.postMessage({
+    jsonrpc: '2.0',
+    method: 'session_output',
+    params: { type: 'sct', payload: { correct: false, message: sanitizedErrorMessage } },
+  });
+
+  return {
+    correct: false,
+    message: sanitizedErrorMessage,
+    output: '',
+  };
+}
+
 async function handleSubmitCode(params: any): Promise<any> {
   const { code, height, width, stdin, sct, pec, solution, language, studentResult } = params || {};
 
@@ -566,6 +620,10 @@ async function handleSubmitCode(params: any): Promise<any> {
   }
 
   await ensurePythonwhatLoaded();
+  if (sct && (sct.includes('has_equal_ast') || sct.includes('black'))) {
+    await ensureBlackLoaded();
+  }
+
   if (!exercise) {
     const PyodideExercise = pyodide.pyimport('pyodide_backend').PyodideExercise;
     exercise = PyodideExercise(pec || '', solution || '', sct || '');
@@ -589,38 +647,26 @@ async function handleSubmitCode(params: any): Promise<any> {
       } catch {}
     }
   } catch (submitError: any) {
-    console.error('[DataCamp Light SCT Exception]', submitError);
     const rawErrorString = String(
       submitError && submitError.message ? submitError.message : submitError,
     );
-    let sanitizedErrorMessage = rawErrorString;
 
-    if (rawErrorString.indexOf('InstructorError:') !== -1) {
-      const parts = rawErrorString.split('InstructorError:')[1];
-      const description = parts.split('Debug on error:')[0].split('\n')[0].trim();
-      sanitizedErrorMessage = 'SCT Error: ' + description;
-    } else if (rawErrorString.indexOf('SyntaxError:') !== -1) {
-      const parts = rawErrorString.split('SyntaxError:')[1];
-      sanitizedErrorMessage = 'SCT SyntaxError: ' + parts.split('\n')[0].trim();
-    } else if (rawErrorString.indexOf('NameError:') !== -1) {
-      const parts = rawErrorString.split('NameError:')[1];
-      sanitizedErrorMessage = 'SCT NameError: ' + parts.split('\n')[0].trim();
+    // If SCT failed due to missing black AST formatter, install on demand and retry
+    if (rawErrorString.includes("No module named 'black'")) {
+      try {
+        await ensureBlackLoaded();
+        resultJson = exercise.run_submit(transformedCode || '', height || 320, width || 320);
+        if (exercise?.user_process?.shell) {
+          try {
+            pyodide.globals.set('_dcl_active_locals', exercise.user_process.shell.locals);
+          } catch {}
+        }
+      } catch (retryError: any) {
+        return handleSctException(retryError);
+      }
     } else {
-      const lines = rawErrorString.split('\n').map((line) => line.trim()).filter(Boolean);
-      sanitizedErrorMessage = lines[lines.length - 1] || 'Error during SCT evaluation.';
+      return handleSctException(submitError);
     }
-
-    self.postMessage({
-      jsonrpc: '2.0',
-      method: 'session_output',
-      params: { type: 'sct', payload: { correct: false, message: sanitizedErrorMessage } },
-    });
-
-    return {
-      correct: false,
-      message: sanitizedErrorMessage,
-      output: '',
-    };
   }
 
   const entries = JSON.parse(resultJson);
