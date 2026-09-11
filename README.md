@@ -54,14 +54,14 @@
 * **100% Backward Compatible**: Drop-in replacement for existing `<div data-datacamp-exercise>` embeds.
 * **DataLab Deep-Linking**: "Powered by DataLab" footer link opens a new DataLab cloud notebook populated with the learner's current editor code.
 * Styled with [`@datacamp/waffles`](https://www.npmjs.com/package/@datacamp/waffles)
-  with self-hosted Studio-Feixen-Sans and JetBrains Mono fonts inlined into the stylesheet.
+  with self-hosted Studio-Feixen-Sans and JetBrains Mono fonts inlined into the bundle.
 
 ## How to run the app
 
-Include the generated stylesheet and script bundle on your page:
+Include the script bundle on your page — the stylesheet (fonts, terminal styles)
+is injected by the bundle itself, so no separate `<link>` is required:
 
 ```html
-<link rel="stylesheet" href="https://cdn.datacamp.com/dcl/v4/datacamp-light.css" />
 <script type="text/javascript" src="https://cdn.datacamp.com/dcl/v4/dcl-react.js"></script>
 ```
 
@@ -257,7 +257,7 @@ just serve          # Start local compressed static server (port 4173)
 ```bash
 npm run typecheck   # tsc --noEmit
 npm test            # vitest run (unit + component + integration tests)
-npm run build       # tsc -b && vite build -> dist/dcl-react.js, dist/dcl-react.es.js, dist/datacamp-light.css
+npm run build       # tsc -b && vite build -> dist/dcl-react.js, dist/dcl-react.es.js
 ```
 
 ## Architecture

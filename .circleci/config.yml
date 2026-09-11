@@ -68,7 +68,7 @@ jobs:
       - run:
           name: Gzip deployable artifacts
           command: |
-            gzip -9 -k -f dist/dcl-react.js dist/dcl-react.es.js dist/datacamp-light.css
+            gzip -9 -k -f dist/dcl-react.js dist/dcl-react.es.js
       - persist_to_workspace:
           root: .
           paths:
@@ -120,8 +120,7 @@ jobs:
 
             aws s3 cp /tmp/workspace/dist/dcl-react.js.gz s3://cdn.datacamp.com/dcl-react-dev/dcl-react.js.gz --acl public-read --content-encoding "gzip" --content-type "application/javascript"
             aws s3 cp /tmp/workspace/dist/dcl-react.es.js s3://cdn.datacamp.com/dcl-react-dev/dcl-react.es.js --acl public-read --content-type "application/javascript"
-            aws s3 cp /tmp/workspace/dist/datacamp-light.css s3://cdn.datacamp.com/dcl-react-dev/datacamp-light.css --acl public-read --content-type "text/css"
-
+            
             # Rewrite relative paths in HTML fixtures to point to dev CDN endpoints
             sed -e "s|\.\./dist/|https://cdn.datacamp.com/dcl-react-dev/|g" -i /tmp/workspace/docs/index.html /tmp/workspace/docs/example.html /tmp/workspace/docs/notebook.html
             aws s3 cp /tmp/workspace/docs/index.html s3://cdn.datacamp.com/dcl-react-dev/index.html --acl public-read --content-type "text/html"

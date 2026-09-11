@@ -1,4 +1,14 @@
-import '@xterm/xterm/css/xterm.css';
+// Inline the xterm terminal stylesheet so the bundle is self-contained
+// (consumers only load the JS, no separate datacamp-light.css). Injected
+// once when the terminal module is first loaded.
+import xtermCss from '@xterm/xterm/css/xterm.css?inline';
+
+if (typeof document !== 'undefined' && !document.head.querySelector('[data-datacamp-light-xterm]')) {
+  const xtermStyle = document.createElement('style');
+  xtermStyle.setAttribute('data-datacamp-light-xterm', '');
+  xtermStyle.textContent = xtermCss;
+  document.head.appendChild(xtermStyle);
+}
 
 import { FitAddon } from '@xterm/addon-fit';
 import { Terminal as Xterm } from '@xterm/xterm';

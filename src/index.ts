@@ -14,7 +14,21 @@ import {
 } from './boot';
 import { DataCampExercise } from './components/DataCampExercise';
 import { createSessionForLanguage as createWasmSession } from './runtime/createSessionForLanguage';
-import './styles/fonts.css';
+// Inline the fonts stylesheet so the bundle is self-contained: consumers only
+// need the script tag, no separate datacamp-light.css link. The woff2 fonts are
+// data-URI inlined in the CSS, so injecting it at boot carries no extra
+// requests. Vite's `?inline` import keeps the CSS out of the extracted
+// stylesheet and into the JS bundle.
+import fontsCss from './styles/fonts.css?inline';
+
+// Inject the fonts stylesheet before any widget renders so the self-hosted
+// fonts are available immediately. Idempotent: a single style element.
+if (typeof document !== 'undefined') {
+  const styleElement = document.createElement('style');
+  styleElement.setAttribute('data-datacamp-light-fonts', '');
+  styleElement.textContent = fontsCss;
+  document.head.appendChild(styleElement);
+}
 
 // Expose on window for browser embeds and global usage
 if (typeof window !== 'undefined') {
