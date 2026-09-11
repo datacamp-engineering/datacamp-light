@@ -57,7 +57,6 @@ export function isInsideStringLiteral(context: CompletionContext, language: stri
 const languagePrefixPatterns: Record<string, RegExp> = {
   python: /[\w.]*$/,
   r: /[\w.$]*$/,
-  shell: /[\w./~-]*$/,
   sql: /[\w.]*$/,
 };
 const defaultPrefixPattern = /[\w]*$/;
@@ -65,7 +64,6 @@ const defaultPrefixPattern = /[\w]*$/;
 const languageWordPatterns: Record<string, RegExp> = {
   python: /^\w*$/,
   r: /^\w*$/,
-  shell: /^[\w-]*$/,
   sql: /^\w*$/,
 };
 const defaultWordPattern = /^\w*$/;
@@ -85,7 +83,6 @@ interface MatchRange {
 
 export function normalizeLanguage(language?: string): string {
   const normalized = (language || 'python').toLowerCase();
-  if (normalized === 'bash' || normalized === 'sh' || normalized === 'zsh') return 'shell';
   if (normalized === 'r' || normalized === 'sql' || normalized === 'python') return normalized;
   return 'python';
 }
@@ -107,18 +104,6 @@ function computeMatchRange(
 ): MatchRange {
   if (!tokenMatch) return { from: context.pos, text: '', triggerCharacter: '', targetObject: '' };
   let from = tokenMatch.from;
-  if (language === 'shell') {
-    const lastSlashIndex = tokenMatch.text.lastIndexOf('/');
-    if (lastSlashIndex !== -1) {
-      return {
-        from: from + lastSlashIndex + 1,
-        text: tokenMatch.text.slice(lastSlashIndex + 1),
-        triggerCharacter: '/',
-        targetObject: tokenMatch.text.slice(0, lastSlashIndex),
-      };
-    }
-    return { from, text: tokenMatch.text, triggerCharacter: '', targetObject: '' };
-  }
   const triggers = memberTriggerCharactersByLanguage[language] || [];
   let lastTriggerIndex = -1;
   let triggerCharacter = '';

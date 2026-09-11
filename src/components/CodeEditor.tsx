@@ -3,7 +3,6 @@ import { indentWithTab } from '@codemirror/commands';
 import { python } from '@codemirror/lang-python';
 import { HighlightStyle, StreamLanguage, syntaxHighlighting } from '@codemirror/language';
 import { r } from '@codemirror/legacy-modes/mode/r';
-import { shell } from '@codemirror/legacy-modes/mode/shell';
 import { EditorState, Prec } from '@codemirror/state';
 import { EditorView, ViewUpdate, keymap } from '@codemirror/view';
 import { theme } from '@datacamp/waffles/theme';
@@ -231,9 +230,6 @@ const getLanguageExtension = (language?: string) => {
   const normalized = (language || 'python').toLowerCase();
   if (normalized === 'r') {
     return StreamLanguage.define(r);
-  }
-  if (normalized === 'shell' || normalized === 'bash' || normalized === 'sh') {
-    return StreamLanguage.define(shell);
   }
   return python();
 };

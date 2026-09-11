@@ -59,7 +59,7 @@ DataCamp Light v4 provides layered autocompletion inside CodeMirror 6 (`@codemir
 | :--- | :--- | :--- | :--- |
 | **Python** | Full keywords, builtins, and library snippets (`pandas`, `numpy`, `matplotlib`, `seaborn`) | Live `dir()` and `inspect` on `__main__` namespace via Pyodide Worker | `.` (e.g. `df.`, `np.`) |
 | **R** | Core keywords, base functions, tidyverse pipes (`%>%`, `\|>`), and plotting | Live `.GlobalEnv` search and `.DollarNames` evaluation via webR | `$` and `.` (e.g. `df$`, `model.`) |
-| **Shell** | POSIX coreutils commands (`ls`, `grep`, `awk`, `sed`, `sort`, `wc`, etc.) and control flow | Live in-memory VFS path resolution (`getShellVfsCompletions`) and interactive terminal tab completion | `/` in editor, `Tab` in xterm console |
+| **Shell** | POSIX coreutils commands (`ls`, `grep`, `awk`, `sed`, `sort`, `wc`, etc.) and control flow | Live in-memory VFS path resolution (`getShellVfsCompletions`) | `Tab` in the xterm console |
 | **SQL** | ANSI SQL & PostgreSQL keywords (`SELECT`, `FROM`, `WHERE`, `GROUP BY`, `JOIN`, etc.) | Static document CTE/table extraction (runtime execution is planned for a future release) | `.` |
 
 ---

@@ -182,36 +182,6 @@ export const rMemberCatalog: Record<string, CompletionSnippetTemplate[]> = {
   ],
 };
 
-export const shellCatalog: StaticCompletionCatalog = {
-  language: 'shell',
-  templates: [
-    template('echo', 'Write arguments to standard output', 'function', 'echo "${1:message}"', 95),
-    template('ls', 'List directory contents', 'function', 'ls -la ${1:path}', 90),
-    template('cd', 'Change working directory', 'function', 'cd ${1:path}', 90),
-    template('pwd', 'Print name of current directory', 'function', 'pwd', 85),
-    template('mkdir', 'Create directories', 'function', 'mkdir -p ${1:dir}', 85),
-    template('rm', 'Remove files or directories', 'function', 'rm -rf ${1:path}', 80),
-    template('cp', 'Copy files and directories', 'function', 'cp -r ${1:source} ${2:dest}', 80),
-    template('mv', 'Move or rename files', 'function', 'mv ${1:source} ${2:dest}', 80),
-    template('cat', 'Concatenate and print files', 'function', 'cat ${1:file}', 80),
-    template('grep', 'Search text matching a pattern', 'function', 'grep -E "${1:pattern}" ${2:file}', 80),
-    template('head', 'Output the first part of files', 'function', 'head -n ${1:10} ${2:file}', 75),
-    template('tail', 'Output the last part of files', 'function', 'tail -n ${1:10} ${2:file}', 75),
-    template('wc', 'Print newline, word, and byte counts', 'function', 'wc -l ${1:file}', 75),
-    template('sort', 'Sort lines of text files', 'function', 'sort -u ${1:file}', 70),
-    template('uniq', 'Report or omit repeated lines', 'function', 'uniq ${1:file}', 70),
-    template('cut', 'Remove sections from each line', 'function', 'cut -d "${1:,}" -f ${2:1} ${3:file}', 70),
-    template('awk', 'Pattern scanning and processing language', 'function', "awk '{print $${1:1}}' ${2:file}", 70),
-    template('sed', 'Stream editor for filtering and transforming text', 'function', "sed 's/${1:old}/${2:new}/g' ${3:file}", 70),
-    template('find', 'Search for files in a directory hierarchy', 'function', 'find ${1:.} -name "${2:pattern}"', 65),
-    template('tar', 'Manipulate tape archives', 'function', 'tar -czvf ${1:archive.tar.gz} ${2:dir}', 65),
-    template('export', 'Set environment variable', 'keyword', 'export ${1:VAR}="${2:value}"', 85),
-    template('if', 'Conditional execution', 'keyword', 'if [ ${1:condition} ]; then\n\t${2}\nfi', 80),
-    template('for', 'For loop', 'keyword', 'for ${1:item} in ${2:list}; do\n\t${3}\ndone', 80),
-    template('while', 'While loop', 'keyword', 'while ${1:condition}; do\n\t${2}\ndone', 75),
-  ],
-};
-
 export const sqlCatalog: StaticCompletionCatalog = {
   language: 'sql',
   templates: [
@@ -244,7 +214,6 @@ export const sqlCatalog: StaticCompletionCatalog = {
 export function getStaticCompletionCatalog(language: string): StaticCompletionCatalog {
   const normalized = (language || 'python').toLowerCase();
   if (normalized === 'r') return rCatalog;
-  if (normalized === 'shell' || normalized === 'bash' || normalized === 'sh' || normalized === 'zsh') return shellCatalog;
   if (normalized === 'sql') return sqlCatalog;
   return pythonCatalog;
 }
@@ -408,16 +377,6 @@ export function extractDocumentSymbols(code: string, language: string): Completi
       const assignMatch = trimmed.match(/^([a-zA-Z._][\w._]*)\s*(?:<-|=)\s*/);
       if (assignMatch) {
         add(assignMatch[1], 'variable', 'variable', 60);
-      }
-    } else if (normalizedLanguage === 'shell') {
-      const funcMatch = trimmed.match(/^([a-zA-Z_]\w*)\s*\(\s*\)\s*\{/);
-      if (funcMatch) {
-        add(funcMatch[1], 'function', 'shell function', 70);
-        continue;
-      }
-      const varMatch = trimmed.match(/^([a-zA-Z_]\w*)=/);
-      if (varMatch) {
-        add(varMatch[1], 'variable', 'env var', 60);
       }
     } else if (normalizedLanguage === 'sql') {
       const tableMatch = trimmed.match(/(?:FROM|JOIN|TABLE)\s+([a-zA-Z_]\w*)/i);

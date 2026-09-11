@@ -5,7 +5,6 @@ import {
   getStaticCompletionCatalog,
   pythonCatalog,
   rCatalog,
-  shellCatalog,
   sqlCatalog,
   staticCatalogToCompletions,
 } from './staticCatalogs';
@@ -18,15 +17,12 @@ const templateByLabel = (
   catalog.templates.find((template) => template.label === label);
 
 describe('static completion catalogs', () => {
-  it('exposes catalogs for all four supported languages', () => {
+  it('exposes catalogs for the supported editor languages', () => {
     expect(pythonCatalog.language).toBe('python');
     expect(rCatalog.language).toBe('r');
-    expect(shellCatalog.language).toBe('shell');
     expect(sqlCatalog.language).toBe('sql');
     expect(getStaticCompletionCatalog('python').templates.length).toBeGreaterThan(0);
     expect(getStaticCompletionCatalog('r').templates.length).toBeGreaterThan(0);
-    expect(getStaticCompletionCatalog('bash').language).toBe('shell');
-    expect(getStaticCompletionCatalog('sh').language).toBe('shell');
     expect(getStaticCompletionCatalog('sql').templates.length).toBeGreaterThan(0);
   });
 
@@ -46,9 +42,8 @@ describe('static completion catalogs', () => {
     expect(defTemplate?.documentation?.synopsis).toBeTruthy();
   });
 
-  it('includes pipes, shell commands, and sql keywords', () => {
+  it('includes pipes and sql keywords', () => {
     expect(templateByLabel(rCatalog, '%>%')).toBeDefined();
-    expect(templateByLabel(shellCatalog, 'grep')).toBeDefined();
     const selectTemplate = templateByLabel(sqlCatalog, 'SELECT');
     expect(selectTemplate).toBeDefined();
     expect(selectTemplate?.snippet).toContain('${1:');
@@ -96,7 +91,7 @@ from datetime import date, time as t
     expect(taxSymbol?.detail).toBe('(subtotal, rate=0.2)');
   });
 
-  it('statically extracts R, Shell, and SQL symbols from document code', () => {
+  it('statically extracts R and SQL symbols from document code', () => {
     const rCode = `
 my_data <- data.frame(a = 1:5)
 calculate_mean <- function(x) { mean(x) }
@@ -104,14 +99,6 @@ calculate_mean <- function(x) { mean(x) }
     const rSymbols = extractDocumentSymbols(rCode, 'r');
     expect(rSymbols.map((s) => s.label)).toContain('my_data');
     expect(rSymbols.map((s) => s.label)).toContain('calculate_mean');
-
-    const shellCode = `
-APP_ENV=production
-deploy_app() { echo "deploying"; }
-`;
-    const shellSymbols = extractDocumentSymbols(shellCode, 'shell');
-    expect(shellSymbols.map((s) => s.label)).toContain('APP_ENV');
-    expect(shellSymbols.map((s) => s.label)).toContain('deploy_app');
 
     const sqlCode = `
 CREATE TABLE customers (id INT);
