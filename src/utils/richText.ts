@@ -1,6 +1,7 @@
 import DOMPurify from 'dompurify';
 import type { Config } from 'dompurify';
 import { marked } from 'marked';
+import { theme } from '@datacamp/waffles/theme';
 
 // Anchors may only keep their href; target is re-added by the hook below so
 // links can never navigate the host page's top frame or tab-nab it.
@@ -53,6 +54,15 @@ export const richTextContentStyle = {
   },
   '& > :last-child': {
     marginBottom: 0,
+  },
+  // Links match the Waffles Link component: blue text (covers visited links
+  // too, avoiding the browser's default purple), no underline until hover.
+  '& a': {
+    color: theme.blue.text,
+    textDecoration: 'none',
+  },
+  '& a:hover': {
+    textDecoration: 'underline',
   },
 } as const;
 

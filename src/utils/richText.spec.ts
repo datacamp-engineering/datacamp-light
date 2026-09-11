@@ -1,5 +1,6 @@
 // @vitest-environment jsdom
 import { describe, expect, it } from 'vitest';
+import { theme } from '@datacamp/waffles/theme';
 import {
   closeUnterminatedCodeFences,
   renderMarkdown,
@@ -21,6 +22,14 @@ describe('richTextContentStyle', () => {
     expect(selectors).toContain('& > :last-child');
     expect(richTextContentStyle['& > :first-child']).toEqual({ marginTop: 0 });
     expect(richTextContentStyle['& > :last-child']).toEqual({ marginBottom: 0 });
+  });
+
+  it('styles links with the waffles link treatment', () => {
+    const anchorRule = richTextContentStyle['& a'] as Record<string, string>;
+    expect(anchorRule.color).toBe(theme.blue.text);
+    expect(anchorRule.textDecoration).toBe('none');
+    const hoverRule = richTextContentStyle['& a:hover'] as Record<string, string>;
+    expect(hoverRule.textDecoration).toBe('underline');
   });
 
   it('covers the block element types markdown produces', () => {
