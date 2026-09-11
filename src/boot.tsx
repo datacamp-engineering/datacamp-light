@@ -14,6 +14,7 @@ import { DataCampExercise } from './components/DataCampExercise';
 import type { DataCampExerciseProps } from './components/DataCampExercise';
 import { DCLWidgetShell } from './components/DCLWidgetShell';
 import { ErrorBoundary } from './components/ErrorBoundary';
+import { useResolvedTheme } from './theme/themeManager';
 
 const stripIndent = (sourceString: string): string => {
   const match = sourceString.match(/^[ \t]*(?=\S)/gm);
@@ -184,7 +185,10 @@ const mount = () => {
     root.render(
       <ErrorBoundary label="widget" variant="widget">
         {crashDemo ? (
-          <CrashDemo mode={crashDemo === 'component' ? 'component' : 'widget'} />
+          <CrashDemo
+            mode={crashDemo === 'component' ? 'component' : 'widget'}
+            theme={settingsForLazyLoad.theme}
+          />
         ) : (
           <DataCampExercise {...settingsForLazyLoad} />
         )}
@@ -226,17 +230,30 @@ export const initDataCampLight = initAddedDCLightExercises;
  * - `data-crash-demo="component"` crashes a single subcomponent inside a real
  *   widget shell (inline boundary), showing the compact section fallback.
  */
-function CrashDemo({ mode }: { mode: 'widget' | 'component' }): never | React.ReactElement {
+function CrashDemo({
+  mode,
+  theme,
+}: {
+  mode: 'widget' | 'component';
+  theme?: 'light' | 'dark';
+}): never | React.ReactElement {
   if (mode === 'component') {
     return (
-      <DCLWidgetShell>
-        <ErrorBoundary label="code-editor" variant="inline">
-          <CrashingSubcomponent />
-        </ErrorBoundary>
-      </DCLWidgetShell>
+      <ComponentCrashDemo theme={theme} />
     );
   }
   throw new Error('This widget was asked to crash for the error-boundary demo (data-crash-demo="true").');
+}
+
+function ComponentCrashDemo({ theme }: { theme?: 'light' | 'dark' }): React.ReactElement {
+  const { theme: resolvedTheme } = useResolvedTheme(theme);
+  return (
+    <DCLWidgetShell theme={resolvedTheme}>
+      <ErrorBoundary label="code-editor" variant="inline">
+        <CrashingSubcomponent />
+      </ErrorBoundary>
+    </DCLWidgetShell>
+  );
 }
 
 function CrashingSubcomponent(): never {
