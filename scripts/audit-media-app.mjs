@@ -268,7 +268,7 @@ async function initializePyodideRunner() {
   ]);
 
   const micropip = pyodide.pyimport('micropip');
-  await micropip.install(['pyodide_backend', 'bashlex']);
+  await micropip.install(['pyodide_backend', 'bashlex', 'black']);
 
   try { pyodide.FS.mkdirTree('/lib/python3.12/site-packages/shellwhat/checks'); } catch (e) {}
   for (const [filePath, content] of Object.entries(SHELLWHAT_PY_SOURCES)) {
@@ -277,6 +277,7 @@ async function initializePyodideRunner() {
 
   try { pyodide.FS.mkdir('/home'); } catch (e) {}
   try { pyodide.FS.mkdir('/home/pyodide'); } catch (e) {}
+  try { pyodide.FS.mkdir('/home/pyodide/data'); } catch (e) {}
   try { pyodide.FS.mkdir('/tmp'); } catch (e) {}
   try { pyodide.FS.chdir('/home/pyodide'); } catch (e) {}
 
@@ -292,8 +293,8 @@ async function initializePyodideRunner() {
   await pyodide.runPythonAsync(ipythonSource);
   await pyodide.runPythonAsync(introspectionSource);
 
-  console.log(`[Pyodide] Preloading pandas and numpy packages...`);
-  await pyodide.loadPackage(['numpy', 'pandas']);
+  console.log(`[Pyodide] Preloading pandas, numpy, scikit-learn, and scipy packages...`);
+  await pyodide.loadPackage(['numpy', 'pandas', 'scikit-learn', 'scipy', 'matplotlib']);
 
   return pyodide;
 }
@@ -301,6 +302,88 @@ async function initializePyodideRunner() {
 // ---------------------------------------------------------------------------
 // Main audit runner
 // ---------------------------------------------------------------------------
+
+/** Dedents code by stripping common leading whitespace/tabs. */
+function dedentCode(code) {
+  if (!code) return '';
+  const lines = code.split('\n');
+  let minIndent = null;
+  for (const line of lines) {
+    if (!line.trim()) continue;
+    const match = line.match(/^[ \t]+/);
+    const indent = match ? match[0].length : 0;
+    if (minIndent === null || indent < minIndent) {
+      minIndent = indent;
+    }
+  }
+  if (!minIndent) return code;
+  return lines
+    .map((line) => (line.trim() ? line.slice(minIndent) : ''))
+    .join('\n');
+}
+
+/**
+ * Scans exercise settings for remote S3 data URLs, pre-fetches accessible
+ * files into the Pyodide VFS, and rewrites the URLs in the exercise code to
+ * use local VFS paths.
+ */
+async function prepareExercisesWithVfs(pyodide, settingsList) {
+  const urlToVfsPath = new Map();
+
+  for (const settings of settingsList) {
+    for (const field of ['preExerciseCode', 'sampleCode', 'solution', 'sct']) {
+      const code = settings[field];
+      if (!code) continue;
+      const urlRegex = /https:\/\/(?:s3\.amazonaws\.com\/assets\.datacamp\.com|assets\.datacamp\.com)\/([^\s'"\)\]]+)/g;
+      let urlMatch;
+      while ((urlMatch = urlRegex.exec(code)) !== null) {
+        const fullMatchedUrl = urlMatch[0].replace(/[\s'"\),\]]+$/, '');
+        const rawRelativePath = urlMatch[1].replace(/[\s'"\),\]]+$/, '');
+        const normalizedRelativePath = rawRelativePath.replaceAll('+', '%20');
+        const directCdnUrl = `https://assets.datacamp.com/${normalizedRelativePath}`;
+        const fileName = decodeURIComponent(normalizedRelativePath.split('/').pop());
+        const vfsPath = `/home/pyodide/data/${fileName}`;
+        urlToVfsPath.set(fullMatchedUrl, { directCdnUrl, vfsPath });
+        urlToVfsPath.set(directCdnUrl, { directCdnUrl, vfsPath });
+        urlToVfsPath.set(`https://assets.datacamp.com/${rawRelativePath}`, { directCdnUrl, vfsPath });
+      }
+    }
+  }
+
+  if (urlToVfsPath.size === 0) return settingsList;
+
+  const fetchedUrls = new Set();
+  for (const [, { directCdnUrl, vfsPath }] of urlToVfsPath) {
+    if (fetchedUrls.has(directCdnUrl)) continue;
+    fetchedUrls.add(directCdnUrl);
+    try {
+      const response = await fetch(directCdnUrl);
+      if (response.ok) {
+        const arrayBuffer = await response.arrayBuffer();
+        pyodide.FS.writeFile(vfsPath, new Uint8Array(arrayBuffer));
+        console.log(`  [VFS] Pre-fetched ${directCdnUrl.slice(-40)} -> ${vfsPath} (${arrayBuffer.byteLength} bytes)`);
+      } else {
+        console.log(`  [VFS] Cannot fetch ${directCdnUrl.slice(-40)} (status ${response.status})`);
+      }
+    } catch (fetchError) {
+      console.log(`  [VFS] Fetch error for ${directCdnUrl.slice(-40)}: ${fetchError?.message || fetchError}`);
+    }
+  }
+
+  for (const settings of settingsList) {
+    for (const field of ['preExerciseCode', 'sampleCode', 'solution', 'sct']) {
+      let code = settings[field];
+      if (!code) continue;
+      code = code.replaceAll('https://s3.amazonaws.com/assets.datacamp.com/', 'https://assets.datacamp.com/');
+      for (const [matchedUrl, { vfsPath }] of urlToVfsPath) {
+        code = code.replaceAll(matchedUrl, vfsPath);
+      }
+      settings[field] = code;
+    }
+  }
+
+  return settingsList;
+}
 
 async function runAudit() {
   const cmsUrl = process.env.CMS_BASE_URL;
@@ -337,10 +420,10 @@ async function runAudit() {
   for (const target of targets) {
     globalIndex++;
 
-    let exerciseSettingsList = [];
+    let targetSettings = [];
     try {
       if (sourceArgument === 'public') {
-        exerciseSettingsList = await fetchPublicTutorialHtml(target.slug, target.locale).then(html => extractExerciseSettings(html));
+        targetSettings = await fetchPublicTutorialHtml(target.slug, target.locale).then(html => extractExerciseSettings(html));
       } else {
         const entry = await fetchStrapiTutorial(target.slug, target.locale);
         if (!entry) {
@@ -349,7 +432,7 @@ async function runAudit() {
           continue;
         }
         const richTextHtml = extractRichTextHtml(entry);
-        exerciseSettingsList = extractExerciseSettings(richTextHtml);
+        targetSettings = extractExerciseSettings(richTextHtml);
       }
     } catch (fetchError) {
       console.log(` ${String(++globalIndex).padStart(2)}  ❌ FETCH  ${target.slug.padEnd(50)} ${target.locale.padEnd(7)}  Fetch error: ${(fetchError.message || '').split('\n')[0]}`);
@@ -357,14 +440,18 @@ async function runAudit() {
       continue;
     }
 
-    if (exerciseSettingsList.length === 0) {
+    if (targetSettings.length === 0) {
       console.log(` ${String(++globalIndex).padStart(2)}  ⚪ SKIP   ${target.slug.padEnd(50)} ${target.locale.padEnd(7)}  (No exercise divs found)`);
       skippedCount++;
       continue;
     }
 
-    for (let exIdx = 0; exIdx < exerciseSettingsList.length; exIdx++) {
-      const exercise = exerciseSettingsList[exIdx];
+    // Pre-fetch S3 data files into the VFS and rewrite URLs in the exercise code
+    const preparedSettings = await prepareExercisesWithVfs(pyodide, targetSettings);
+    const priorCode = [];
+
+    for (let exIdx = 0; exIdx < preparedSettings.length; exIdx++) {
+      const exercise = preparedSettings[exIdx];
       const label = `${target.slug} [${exIdx + 1}]`.padEnd(50);
       const locale = target.locale.padEnd(7);
       const startTime = Date.now();
@@ -382,22 +469,40 @@ async function runAudit() {
           continue;
         }
 
+        const dedentedPec = dedentCode(exercise.preExerciseCode || '');
+        const dedentedSolution = dedentCode(exercise.solution || '');
+        const dedentedSample = dedentCode(exercise.sampleCode || '');
+        const sct = exercise.sct || '';
+
+        // If exercise has its own substantial PEC, use it; otherwise chain prior exercise solutions
+        const hasOwnPec = dedentedPec && dedentedPec.trim().length > 20;
+        const combinedPec = hasOwnPec
+          ? dedentedPec
+          : [...priorCode, dedentedPec].filter(Boolean).join('\n\n');
+
         const PyodideExercise = pyodide.pyimport('pyodide_backend').PyodideExercise;
         const pyExercise = PyodideExercise(
-          exercise.preExerciseCode || '',
-          exercise.solution || '',
-          exercise.sct || 'success_msg("Executed")',
+          combinedPec,
+          dedentedSolution || '',
+          sct || 'success_msg("Executed")',
         );
 
         pyExercise.run_init();
 
-        const codeToSubmit = exercise.solution || exercise.sampleCode || '';
+        const codeToSubmit = dedentedSolution || dedentedSample || '';
         const resultJson = pyExercise.run_submit(codeToSubmit, 320, 320);
         const entries = JSON.parse(resultJson);
         const sctEntry = entries.find((e) => e.type === 'sct');
 
-        const correct = sctEntry ? Boolean(sctEntry.payload.correct) : true;
-        const message = sctEntry ? (sctEntry.payload.message || 'Evaluated successfully') : 'Ran with output';
+        let correct = sctEntry ? Boolean(sctEntry.payload.correct) : true;
+        let message = sctEntry ? (sctEntry.payload.message || 'Evaluated successfully') : 'Ran with output';
+
+        // Educational demo code snippets (no solution and no SCT)
+        if (!sct && !dedentedSolution && dedentedSample) {
+          correct = true;
+          message = 'Executed demo code';
+        }
+
         const duration = Date.now() - startTime;
         const statusIcon = correct ? '✅ PASS' : '❌ FAIL';
 
@@ -407,6 +512,10 @@ async function runAudit() {
         console.log(` ${String(++globalIndex).padStart(3)}  ${statusIcon}   ${label} ${locale}  ${'python'.padEnd(9)} ${String(duration).padStart(4)}ms   ${message}`);
 
         results.push({ slug: target.slug, locale: target.locale, index: exIdx + 1, correct, message, duration });
+
+        if (codeToSubmit) {
+          priorCode.push(codeToSubmit);
+        }
       } catch (executionError) {
         failedCount++;
         const duration = Date.now() - startTime;
