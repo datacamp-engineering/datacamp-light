@@ -181,7 +181,11 @@ export function bootElement(element: HTMLElement): void {
     const root = createRoot(element);
     root.render(
       <ErrorBoundary label="widget" variant="widget">
-        <DataCampExercise {...settingsForLazyLoad} />
+        {element.getAttribute('data-crash-demo') === 'true' ? (
+          <CrashDemo />
+        ) : (
+          <DataCampExercise {...settingsForLazyLoad} />
+        )}
       </ErrorBoundary>,
     );
   };
@@ -212,3 +216,12 @@ export function initAddedDCLightExercises(): void {
 }
 
 export const initDataCampLight = initAddedDCLightExercises;
+
+/**
+ * Playground-only: `data-crash-demo="true"` makes the widget throw during
+ * render so the top-level ErrorBoundary and its reload flow can be exercised
+ * from the demo pages.
+ */
+function CrashDemo(): never {
+  throw new Error('This widget was asked to crash for the error-boundary demo (data-crash-demo="true").');
+}

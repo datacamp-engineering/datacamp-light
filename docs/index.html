@@ -477,6 +477,20 @@
   </div>
 </div>`
         },
+        {
+          id: 'card-error-boundary',
+          title: '14. Error Boundary Reload (data-crash-demo)',
+          lang: 'python',
+          html: `<!-- data-crash-demo makes the widget throw during render on purpose:
+    the top-level ErrorBoundary catches it and shows a reload card instead of
+    unmounting the widget. Clicking "Reload widget" remounts it in place
+    (it crashes again by design, showing the catch -> fallback -> reload cycle). -->
+<div data-datacamp-exercise data-lang="python" data-crash-demo="true" data-no-lazy-load="true">
+  <code data-type="sample-code">
+    # This widget never renders: it is asked to crash for the demo.
+  </code>
+</div>`
+        }
       ];
 
       const debounceTimers = {};
