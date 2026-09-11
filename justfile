@@ -46,6 +46,10 @@ test-wasm:
 test-external:
 	node scripts/audit-external-tutorials.mjs
 
+# Run media-app Strapi tutorial compatibility audit (public pages, English locale)
+test-media-app locale="en" slug="":
+	node scripts/audit-media-app.mjs --source=public --locale='{{locale}}' {{ if slug == "" { "" } else { "--slug=" + slug } }}
+
 # Measure live HTTP network footprint and compression ratios (Brotli / Gzip)
 test-network:
 	node scripts/measure-network-footprint.mjs
