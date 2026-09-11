@@ -12,6 +12,7 @@ import './runtime/assetResolver';
 import { createRoot } from 'react-dom/client';
 import { DataCampExercise } from './components/DataCampExercise';
 import type { DataCampExerciseProps } from './components/DataCampExercise';
+import { DCLWidgetShell } from './components/DCLWidgetShell';
 import { ErrorBoundary } from './components/ErrorBoundary';
 
 const stripIndent = (sourceString: string): string => {
@@ -170,7 +171,7 @@ export function bootElement(element: HTMLElement): void {
     (element.hasAttribute('data-no-lazy-load') &&
       element.getAttribute('data-no-lazy-load')?.toLowerCase() !== 'false');
 
-  const mount = () => {
+const mount = () => {
     if (element.classList.contains('datacamp-exercise-initialized')) {
       return;
     }
@@ -178,11 +179,12 @@ export function bootElement(element: HTMLElement): void {
     element.classList.add('datacamp-exercise-initialized');
     element.removeAttribute('data-datacamp-exercise');
 
+    const crashDemo = element.getAttribute('data-crash-demo');
     const root = createRoot(element);
     root.render(
       <ErrorBoundary label="widget" variant="widget">
-        {element.getAttribute('data-crash-demo') === 'true' ? (
-          <CrashDemo />
+        {crashDemo ? (
+          <CrashDemo mode={crashDemo === 'component' ? 'component' : 'widget'} />
         ) : (
           <DataCampExercise {...settingsForLazyLoad} />
         )}
@@ -218,10 +220,25 @@ export function initAddedDCLightExercises(): void {
 export const initDataCampLight = initAddedDCLightExercises;
 
 /**
- * Playground-only: `data-crash-demo="true"` makes the widget throw during
- * render so the top-level ErrorBoundary and its reload flow can be exercised
- * from the demo pages.
+ * Playground-only: `data-crash-demo` makes a widget throw during render so the
+ * error boundaries and their reload flows can be exercised from the demo pages.
+ * - `data-crash-demo="true"` crashes the whole widget (top-level boundary).
+ * - `data-crash-demo="component"` crashes a single subcomponent inside a real
+ *   widget shell (inline boundary), showing the compact section fallback.
  */
-function CrashDemo(): never {
+function CrashDemo({ mode }: { mode: 'widget' | 'component' }): never | React.ReactElement {
+  if (mode === 'component') {
+    return (
+      <DCLWidgetShell>
+        <ErrorBoundary label="code-editor" variant="inline">
+          <CrashingSubcomponent />
+        </ErrorBoundary>
+      </DCLWidgetShell>
+    );
+  }
   throw new Error('This widget was asked to crash for the error-boundary demo (data-crash-demo="true").');
+}
+
+function CrashingSubcomponent(): never {
+  throw new Error('This section was asked to crash for the component error-boundary demo (data-crash-demo="component").');
 }

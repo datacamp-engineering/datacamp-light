@@ -2,6 +2,7 @@ import { Button } from '@datacamp/waffles/button';
 import { CrossCircle } from '@datacamp/waffles/icon';
 import { theme } from '@datacamp/waffles/theme';
 import { tokens } from '@datacamp/waffles/tokens';
+import type { CSSObject } from '@emotion/react';
 import React from 'react';
 import { baseBannerStyle } from '../styles/bannerStyles';
 
@@ -69,17 +70,11 @@ export class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoun
     return <React.Fragment key={generation}>{this.props.children}</React.Fragment>;
   }
 
-  private renderDefaultFallback(error: Error): React.ReactNode {
+private renderDefaultFallback(error: Error): React.ReactNode {
     const isWidgetVariant = (this.props.variant ?? 'widget') === 'widget';
 
     return (
-      <div
-        css={{
-          ...baseBannerStyle,
-          flexDirection: 'column',
-          gap: tokens.spacingNew.xsmall,
-        }}
-      >
+      <div css={isWidgetVariant ? widgetFallbackStyle : inlineFallbackStyle}>
         <div css={{ alignItems: 'center', display: 'flex', gap: tokens.spacingNew.xsmall }}>
           <CrossCircle css={{ color: theme.error.text }} size="small" />
           <span css={{ color: theme.text.main, fontWeight: tokens.fontWeights.bold }}>
@@ -103,6 +98,37 @@ export class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoun
     );
   }
 }
+
+/**
+ * The widget-level fallback replaces the whole exercise, which renders outside
+ * DCLWidgetShell, so it must carry the shell's card treatment itself: full
+ * border, rounded corners, and the waffles sans-serif font.
+ */
+const widgetFallbackStyle: CSSObject = {
+  backgroundColor: theme.background.contrast,
+  border: `${tokens.borderWidth.thin} solid ${theme.border.main}`,
+  borderRadius: tokens.borderRadius.medium,
+  color: theme.text.main,
+  display: 'flex',
+  flexDirection: 'column',
+  fontFamily: tokens.fontFamilies.sansSerif,
+  fontSize: tokens.fontSizes.medium,
+  gap: tokens.spacingNew.xsmall,
+  lineHeight: tokens.lineHeights.relaxed,
+  maxWidth: '100%',
+  padding: tokens.spacingNew.medium,
+};
+
+/**
+ * The inline fallback lives inside DCLWidgetShell, so it only needs the
+ * banner treatment (top border, no radius) to sit flush under the section it
+ * replaces.
+ */
+const inlineFallbackStyle: CSSObject = {
+  ...baseBannerStyle,
+  flexDirection: 'column',
+  gap: tokens.spacingNew.xsmall,
+};
 
 function truncate(message: string, maxLength = 240): string {
   if (message.length <= maxLength) {

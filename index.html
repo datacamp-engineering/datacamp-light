@@ -468,6 +468,20 @@
     # This widget never renders: it is asked to crash for the demo.
   </code>
 </div>`
+        },
+        {
+          id: 'card-error-boundary-component',
+          title: '15. Component Error Boundary Reload (data-crash-demo="component")',
+          lang: 'python',
+          html: `<!-- data-crash-demo="component" crashes a single subcomponent inside a
+    real widget shell: the inline ErrorBoundary catches it and shows the compact
+    section fallback (top border only, no radius) while the rest of the shell
+    stays intact. Clicking "Reload section" remounts the section in place. -->
+<div data-datacamp-exercise data-lang="python" data-crash-demo="component" data-no-lazy-load="true">
+  <code data-type="sample-code">
+    # This widget renders a shell whose code-editor section crashes on purpose.
+  </code>
+</div>`
         }
       ];
 
