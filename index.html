@@ -1,0 +1,597 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>DataCamp Light WASM Playground</title>
+    <style>
+      :root {
+        --bg-main: #05192d;
+        --bg-card: #0e2439;
+        --bg-input: #081726;
+        --border-color: #1e3d59;
+        --text-main: #ffffff;
+        --text-muted: #8fa6b2;
+        --accent-blue: #0578ff;
+        --accent-green: #00d06c;
+        --accent-yellow: #f89406;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+        background-color: var(--bg-main);
+        color: var(--text-main);
+        padding: 32px 20px;
+        max-width: 1040px;
+        margin: 0 auto;
+        line-height: 1.5;
+      }
+      header {
+        margin-bottom: 28px;
+      }
+      h1 {
+        margin: 0 0 8px 0;
+        font-size: 28px;
+        font-weight: 700;
+        letter-spacing: -0.5px;
+      }
+      p.subtitle {
+        color: var(--text-muted);
+        margin: 0;
+        font-size: 15px;
+      }
+      .playground-card {
+        background: var(--bg-card);
+        border: 1px solid var(--border-color);
+        border-radius: 8px;
+        padding: 20px;
+        margin-bottom: 32px;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25);
+      }
+      .card-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        flex-wrap: wrap;
+        gap: 12px;
+        margin-bottom: 16px;
+      }
+      .card-title-group {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+      }
+      .card-title {
+        font-size: 18px;
+        font-weight: 600;
+        margin: 0;
+      }
+      .lang-badge {
+        font-size: 11px;
+        font-weight: 700;
+        text-transform: uppercase;
+        padding: 3px 8px;
+        border-radius: 4px;
+        letter-spacing: 0.5px;
+      }
+      .badge-python {
+        background: rgba(5, 120, 255, 0.2);
+        color: #4da3ff;
+        border: 1px solid rgba(5, 120, 255, 0.4);
+      }
+      .badge-r {
+        background: rgba(0, 208, 108, 0.2);
+        color: #00e676;
+        border: 1px solid rgba(0, 208, 108, 0.4);
+      }
+      .badge-shell {
+        background: rgba(248, 148, 6, 0.2);
+        color: #ffb03a;
+        border: 1px solid rgba(248, 148, 6, 0.4);
+      }
+      .card-actions {
+        display: flex;
+        gap: 8px;
+      }
+      button.btn {
+        background: var(--bg-input);
+        border: 1px solid var(--border-color);
+        color: var(--text-main);
+        padding: 6px 12px;
+        border-radius: 4px;
+        font-size: 13px;
+        font-weight: 600;
+        cursor: pointer;
+        transition: background 0.15s, border-color 0.15s;
+      }
+      button.btn:hover {
+        background: #14314d;
+        border-color: #2b567d;
+      }
+      button.btn-primary {
+        background: var(--accent-blue);
+        border-color: var(--accent-blue);
+        color: white;
+      }
+      button.btn-primary:hover {
+        background: #0060d4;
+        border-color: #0060d4;
+      }
+      .source-container {
+        margin-bottom: 20px;
+      }
+      textarea.html-editor {
+        background: #030d17;
+        border: 1px solid var(--border-color);
+        color: #e2e8f0;
+        font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace;
+        font-size: 13px;
+        padding: 12px;
+        border-radius: 6px;
+        line-height: 1.45;
+        resize: vertical;
+        width: 100%;
+        tab-size: 2;
+      }
+      textarea.html-editor:focus {
+        outline: none;
+        border-color: var(--accent-blue);
+      }
+      .widget-mount {
+        min-height: 120px;
+      }
+    </style>
+  </head>
+  <body>
+    <header>
+      <h1>DataCamp Light WASM Playground</h1>
+      <p class="subtitle">
+        Interactive in-browser WebAssembly data science exercises. Edit the full HTML block below (including pre-exercise code, sample code, solution, and SCT) to see the widget automatically re-render and grade in real time.
+      </p>
+    </header>
+
+    <main id="playground-container">
+      <!-- Cards will be rendered dynamically -->
+    </main>
+
+    <script type="module">
+      import { bootElement } from '/src/index.ts';
+
+      const EXAMPLES = [
+        {
+          id: 'card-python-sct',
+          title: '1. Basic Python Exercise with SCT Validation',
+          lang: 'python',
+          html: `<div data-datacamp-exercise data-lang="python">
+  <code data-type="pre-exercise-code">
+    # Initial environment setup
+    pi = 3.14159
+  </code>
+  <code data-type="sample-code">
+    # Calculate the area of a circle with radius 5
+    radius = 5
+    area = pi * (radius ** 2)
+    print(f"Area: {area}")
+  </code>
+  <code data-type="solution">
+    radius = 5
+    area = pi * (radius ** 2)
+    print(f"Area: {area}")
+  </code>
+  <code data-type="sct">
+    Ex().check_object('area').has_equal_value()
+  </code>
+  <div data-type="hint">
+    Remember the formula: <code>area = pi * (radius ** 2)</code>.
+  </div>
+</div>`
+        },
+        {
+          id: 'card-python-plot',
+          title: '2. Data Science & Matplotlib Plotting',
+          lang: 'python',
+          html: `<div data-datacamp-exercise data-lang="python" data-packages="numpy,matplotlib">
+  <code data-type="pre-exercise-code"></code>
+  <code data-type="sample-code">
+    import numpy as np
+    import matplotlib.pyplot as plt
+
+    x = np.linspace(0, 10, 100)
+    y = np.sin(x)
+
+    plt.figure(figsize=(8, 4))
+    plt.plot(x, y, label='Sine Wave', color='#0578ff')
+    plt.title('Sine Wave in Pyodide WASM')
+    plt.xlabel('x')
+    plt.ylabel('sin(x)')
+    plt.grid(True)
+    plt.legend()
+    plt.show()
+
+    print("Generated plot successfully in WebAssembly!")
+  </code>
+  <code data-type="solution"></code>
+  <code data-type="sct"></code>
+  <div data-type="hint">Click "Run Code" to execute Python in the browser.</div>
+</div>`
+        },
+        {
+          id: 'card-shell-wasm',
+          title: '3. Shell Exercise (WASM Terminal & shellwhat)',
+          lang: 'shell',
+          html: `<div data-datacamp-exercise data-lang="shell" data-height="300">
+  <div data-type="hint">Type <code>cd ..</code> or <code>cd ~</code> to go up a level.</div>
+  <code data-type="sct">
+    Ex().has_code(r'cd\\s+(\\.\\.|~)', incorrect_msg='Use \`cd ..\` to go up a level or \`cd ~\` to return home.')
+  </code>
+</div>`
+        },
+        {
+          id: 'card-r-testwhat',
+          title: '4. R Exercise (webR & testwhat)',
+          lang: 'r',
+          html: `<div data-datacamp-exercise data-lang="r">
+  <code data-type="pre-exercise-code">
+    # Initial environment setup
+    pi <- 3.14159
+  </code>
+  <code data-type="sample-code">
+    # Calculate the area of a circle with radius 5
+    radius <- 5
+    area <- pi * (radius ** 2)
+    print(area)
+  </code>
+  <code data-type="solution">
+    radius <- 5
+    area <- pi * (radius ** 2)
+    print(area)
+  </code>
+  <code data-type="sct">
+    ex() %>% check_object('area') %>% check_equal()
+  </code>
+  <div data-type="hint">
+    Remember the formula: <code>area = pi * (radius ** 2)</code>.
+  </div>
+</div>`
+        },
+        {
+          id: 'card-r-plot',
+          title: '5. R Data Visualization (webR Base Plotting)',
+          lang: 'r',
+          html: `<div data-datacamp-exercise data-lang="r">
+  <code data-type="pre-exercise-code"></code>
+  <code data-type="sample-code">
+    # Generate data in R
+    x <- seq(0, 2 * pi, length.out = 100)
+    y <- sin(x)
+
+    # Render base R graphics in the browser via webR
+    plot(x, y, type = "l", col = "#0578ff", lwd = 2,
+         main = "Sine Wave in webR WASM",
+         xlab = "x", ylab = "sin(x)")
+    grid()
+
+    print("Rendered R plot successfully in WebAssembly!")
+  </code>
+  <code data-type="solution"></code>
+  <code data-type="sct"></code>
+  <div data-type="hint">Click "Run Code" to render the plot with webR.</div>
+</div>`
+        },
+        {
+          id: 'card-light-theme',
+          title: '6. Light Mode Theme with AI Disabled (data-theme="light" data-show-ai="false")',
+          lang: 'python',
+          html: `<div data-datacamp-exercise data-lang="python" data-theme="light" data-show-ai="false">
+  <code data-type="sample-code">
+    # Explicit Light Mode Theme with AI disabled
+    items = ["Python", "R", "Shell"]
+    for index, item in enumerate(items, start=1):
+        print(f"{index}. {item} in WebAssembly")
+  </code>
+  <code data-type="solution">
+    items = ["Python", "R", "Shell"]
+    for index, item in enumerate(items, start=1):
+        print(f"{index}. {item} in WebAssembly")
+  </code>
+  <code data-type="sct">
+    Ex().has_output(r'1\\. Python in WebAssembly')
+  </code>
+</div>`
+        },
+        {
+          id: 'card-ai-stream',
+          title: '7. AI Code Assistance (Live Streamed Explanation & Automated Fix)',
+          lang: 'python',
+          html: `<div data-datacamp-exercise data-lang="python" data-mock-ai="stream">
+  <code data-type="sample-code">
+    # Click 'Explain Code' (✨) in the action bar to stream an explanation!
+    # Or click 'Run Code' to see an error, then click 'Fix & Explain' in the output console.
+    radius = 5
+    area = 3.14159 * (rad ** 2)
+    print(f"Area: {area}")
+  </code>
+  <code data-type="solution">
+    radius = 5
+    area = 3.14159 * (radius ** 2)
+    print(f"Area: {area}")
+  </code>
+  <code data-type="sct">
+    Ex().check_object('area').has_equal_value()
+  </code>
+  <div data-type="hint">
+    Notice the typo in <code>rad</code> - it should be <code>radius</code>.
+  </div>
+</div>`
+        },
+        {
+          id: 'card-ai-signed-out',
+          title: '8. AI First-Party Auth Gate (Free Sign-Up Prompt)',
+          lang: 'python',
+          html: `<div data-datacamp-exercise data-lang="python" data-mock-ai="signed-out">
+  <code data-type="sample-code">
+    # Simulated first-party signed-out mode on *.datacamp.com.
+    # Click 'Explain Code' to see the inline free sign-up unlock prompt!
+    numbers = [10, 20, 30, 40]
+    total = sum(numbers)
+    print(f"Total: {total}")
+  </code>
+</div>`
+        },
+        {
+          id: 'card-ai-third-party',
+          title: '9. AI Third-Party Embed Gate (Open in DataLab Prompt)',
+          lang: 'python',
+          html: `<div data-datacamp-exercise data-lang="python" data-mock-ai="third-party">
+  <code data-type="sample-code">
+    # Simulated third-party embed mode (e.g. Medium, blog, or docs).
+    # Click 'Explain Code' to see the 'Open in DataLab' assistant prompt!
+    dataset = {"Python": 1991, "R": 1993, "WebAssembly": 2017}
+    for name, year in dataset.items():
+        print(f"{name} was released in {year}")
+  </code>
+</div>`
+        },
+        {
+          id: 'card-shared-environment',
+          title: '10. Shared Execution Environment (Multi-Step Tutorial)',
+          lang: 'python',
+          html: `<!-- Step 1: Define dataset and import libraries -->
+<div data-datacamp-exercise data-lang="python" data-shared-environment="stats-tutorial">
+  <code data-type="sample-code">
+    # Step 1: Run this block first to load data into shared environment 'stats-tutorial'
+    import statistics
+    temperatures = [68, 72, 75, 71, 69, 74, 70]
+    print(f"Step 1: Successfully loaded {len(temperatures)} temperature readings.")
+  </code>
+</div>
+
+<div style="height: 16px;"></div>
+
+<!-- Step 2: Directly access 'statistics' and 'temperatures' from Step 1 without redefining -->
+<div data-datacamp-exercise data-lang="python" data-shared-environment="stats-tutorial">
+  <code data-type="sample-code">
+    # Step 2: Directly calculates statistics using the memory from Step 1!
+    mean_temp = statistics.mean(temperatures)
+    stdev_temp = statistics.stdev(temperatures)
+    print(f"Step 2 (Shared Memory): Mean = {mean_temp:.1f}°F, StdDev = {stdev_temp:.2f}")
+  </code>
+</div>`
+        },
+        {
+          id: 'card-python-shell-shared',
+          title: '11. Python + Shell Unified Environment (Co-Located VFS)',
+          lang: 'python',
+          html: `<!-- Step 1: Python generates data into shared virtual filesystem -->
+<div data-datacamp-exercise data-lang="python" data-shared-environment="pipeline-demo">
+  <code data-type="sample-code">
+    # Step 1: Write a dataset to disk in the shared virtual filesystem
+    import pandas as pd
+    
+    df = pd.DataFrame({
+        "id": [101, 102, 103, 104, 105],
+        "name": ["Alice", "Bob", "Charlie", "David", "Eve"],
+        "role": ["Engineer", "Data Scientist", "Product Manager", "Designer", "Data Scientist"],
+        "salary_k": [140, 155, 135, 120, 160]
+    })
+    
+    df.to_csv("employees.csv", index=False)
+    print(f"Python: Saved {len(df)} records to employees.csv in shared VFS.")
+  </code>
+</div>
+
+<div style="height: 16px;"></div>
+
+<!-- Step 2: Shell terminal inspects, filters, or runs pip on the same filesystem -->
+<div data-datacamp-exercise data-lang="shell" data-shared-environment="pipeline-demo">
+</div>`
+        },
+        {
+          id: 'card-drop-zone-preview',
+          title: '12. Drag & Drop Hover State (Virtual Filesystem)',
+          lang: 'python',
+          html: `<!-- Drag and drop any local file onto this card to add it to the in-memory virtual filesystem -->
+<div data-datacamp-exercise data-lang="python" data-preview-drop-zone="true">
+  <code data-type="sample-code">
+    # Drag a local file (e.g. sales.csv) onto this card to add it
+    # to the exercise's in-memory working directory.
+    #
+    # The overlay below is the hover state you see while dragging,
+    # so you can preview it before trying with a real file.
+    
+    import os
+    print("Files in working directory:", sorted(os.listdir(".")))
+  </code>
+</div>`
+        },
+        {
+          id: 'card-hint-feedback-rendering',
+          title: '13. Hint & Feedback Rendering (Markdown + HTML)',
+          lang: 'python',
+          html: `<div data-datacamp-exercise data-lang="python">
+  <code data-type="pre-exercise-code">
+    pi = 3.14159
+  </code>
+  <code data-type="sample-code">
+    # Compute the area of a circle with radius 5
+    radius = 5
+    area = pi * (radius ** 2)
+  </code>
+  <code data-type="solution">
+    pi = 3.14159
+    radius = 5
+    area = pi * (radius ** 2)
+  </code>
+  <code data-type="sct">
+    Ex().check_object('area', incorrect_msg='**Not quite** — compute <code>area = pi * (radius ** 2)</code> using the <code>pi</code> from the pre-exercise code.').has_equal_value().success_msg('**Correct!** The variable \`area\` now holds <code>area = pi * (radius ** 2)</code>. *Markdown* and HTML both render in feedback — including <b>bold HTML</b> and \`inline code\`.')
+  </code>
+  <div data-type="hint">
+    **Markdown hint**: the formula is \`area = pi * (radius ** 2)\` — and <code>pi</code> is preloaded for you.
+    - **Bold**, *italic*, and \`inline code\` render through the markdown pipeline.
+    - [Links](https://docs.datacamp.com) use the Waffles link style and open in a new tab.
+    - HTML renders too: <code>pi * (radius ** 2)</code> and <b>bold HTML</b>.
+  </div>
+</div>`
+        },
+        {
+          id: 'card-error-boundary',
+          title: '14. Error Boundary Reload (data-crash-demo)',
+          lang: 'python',
+          html: `<!-- data-crash-demo makes the widget throw during render on purpose:
+    the top-level ErrorBoundary catches it and shows a reload card instead of
+    unmounting the widget. Clicking "Reload widget" remounts it in place
+    (it crashes again by design, showing the catch -> fallback -> reload cycle). -->
+<div data-datacamp-exercise data-lang="python" data-crash-demo="true" data-no-lazy-load="true">
+  <code data-type="sample-code">
+    # This widget never renders: it is asked to crash for the demo.
+  </code>
+</div>`
+        },
+        {
+          id: 'card-error-boundary-component',
+          title: '15. Component Error Boundary Reload (data-crash-demo="component")',
+          lang: 'python',
+          html: `<!-- data-crash-demo="component" crashes a single subcomponent inside a
+    real widget shell: the inline ErrorBoundary catches it and shows the compact
+    section fallback (top border only, no radius) while the rest of the shell
+    stays intact. Clicking "Reload section" remounts the section in place. -->
+<div data-datacamp-exercise data-lang="python" data-crash-demo="component" data-no-lazy-load="true">
+  <code data-type="sample-code">
+    # This widget renders a shell whose code-editor section crashes on purpose.
+  </code>
+</div>`
+        }
+      ];
+
+      function escapeHtml(str) {
+        if (!str) return '';
+        return str
+          .replace(/&/g, '&amp;')
+          .replace(/</g, '&lt;')
+          .replace(/>/g, '&gt;')
+          .replace(/"/g, '&quot;');
+      }
+
+      const debounceTimers = {};
+
+      function handleEditorInput(exampleId) {
+        if (debounceTimers[exampleId]) {
+          clearTimeout(debounceTimers[exampleId]);
+        }
+        debounceTimers[exampleId] = setTimeout(() => {
+          renderWidget(exampleId);
+        }, 450);
+      }
+
+      function buildCardHtml(example) {
+        const langClass = 'badge-' + example.lang;
+        return `
+          <div class="playground-card card" id="${example.id}">
+            <div class="card-header">
+              <div class="card-title-group">
+                <h2 class="card-title">${escapeHtml(example.title)}</h2>
+                <span class="lang-badge ${langClass}">${example.lang}</span>
+              </div>
+              <div class="card-actions">
+                <button class="btn" onclick="toggleSource('${example.id}')" id="btn-toggle-${example.id}">
+                  Hide HTML Source
+                </button>
+                <button class="btn" onclick="resetSource('${example.id}')">
+                  Reset Source
+                </button>
+              </div>
+            </div>
+
+            <div class="source-container" id="source-${example.id}">
+              <textarea class="html-editor" rows="12" id="editor-${example.id}" oninput="handleEditorInput('${example.id}')" spellcheck="false">${escapeHtml(example.html)}</textarea>
+            </div>
+
+            <div class="widget-mount" id="mount-${example.id}"></div>
+          </div>
+        `;
+      }
+
+      function renderWidget(exampleId) {
+        const editor = document.getElementById('editor-' + exampleId);
+        const mount = document.getElementById('mount-' + exampleId);
+        if (!editor || !mount) return;
+
+        const html = editor.value;
+        mount.innerHTML = html;
+
+        const exerciseElements = mount.querySelectorAll('[data-datacamp-exercise]');
+        if (exerciseElements.length > 0) {
+          exerciseElements.forEach((element) => {
+            element.setAttribute('data-no-lazy-load', 'true');
+            bootElement(element);
+          });
+        } else if (mount.firstElementChild) {
+          mount.firstElementChild.setAttribute('data-no-lazy-load', 'true');
+          bootElement(mount.firstElementChild);
+        }
+      }
+
+      window.handleEditorInput = handleEditorInput;
+
+      window.applySource = function (exampleId) {
+        renderWidget(exampleId);
+      };
+
+      window.resetSource = function (exampleId) {
+        const example = EXAMPLES.find((e) => e.id === exampleId);
+        if (!example) return;
+
+        const editor = document.getElementById('editor-' + exampleId);
+        if (editor) {
+          editor.value = example.html;
+        }
+
+        renderWidget(exampleId);
+      };
+
+      window.toggleSource = function (exampleId) {
+        const sourceDiv = document.getElementById('source-' + exampleId);
+        const btn = document.getElementById('btn-toggle-' + exampleId);
+        if (!sourceDiv || !btn) return;
+
+        if (sourceDiv.style.display === 'none') {
+          sourceDiv.style.display = 'block';
+          btn.textContent = 'Hide HTML Source';
+        } else {
+          sourceDiv.style.display = 'none';
+          btn.textContent = 'Show HTML Source';
+        }
+      };
+
+      // Initial Mount
+      const container = document.getElementById('playground-container');
+      container.innerHTML = EXAMPLES.map(buildCardHtml).join('');
+
+      EXAMPLES.forEach((example) => {
+        renderWidget(example.id);
+      });
+    </script>
+  </body>
+</html>

@@ -5,12 +5,16 @@ build/
 npm-debug.log
 ecs_task.json
 dist/
-public/
 .idea
 .awcache
+.Rhistory
 
 *.css.d.ts
 *.scss.d.ts
 src/**/*.js
 src/**/*.js.map
 .vscode
+*.tsbuildinfo
+.cache/
+.temp/
+vendor/busybox/busybox_src/

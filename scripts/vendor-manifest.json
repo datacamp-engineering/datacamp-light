@@ -1,0 +1,86 @@
+{
+  "runtimeAssets": [
+    {
+      "artifact": "busybox.js",
+      "source": "BusyBox",
+      "upstream": "https://github.com/vda-linux/busybox_mirror",
+      "sourceRef": "commit c8eb8614068a662271a5187d4876df1d8439a0ae",
+      "license": "GPL-2.0",
+      "copyright": "BusyBox contributors"
+    },
+    {
+      "artifact": "busybox.wasm",
+      "source": "BusyBox",
+      "upstream": "https://github.com/vda-linux/busybox_mirror",
+      "sourceRef": "commit c8eb8614068a662271a5187d4876df1d8439a0ae",
+      "license": "GPL-2.0",
+      "copyright": "BusyBox contributors"
+    },
+    {
+      "artifact": "wasm_exec.js",
+      "source": "Go toolchain",
+      "upstream": "https://github.com/golang/go",
+      "sourceRef": "go1.22 (misc/wasm/wasm_exec.js)",
+      "license": "BSD-3-Clause",
+      "copyright": "The Go Authors"
+    },
+    {
+      "artifact": "sh-runner.wasm",
+      "source": "mvdan/sh runner",
+      "upstream": "https://github.com/mvdan/sh",
+      "sourceRef": "mvdan.cc/sh/v3 (see scripts/build-sh-runner/go.mod)",
+      "license": "BSD-3-Clause",
+      "copyright": "mvdan-sh authors; The Go Authors"
+    }
+  ],
+  "vendoredLicenseFiles": [
+    {
+      "path": "vendor/busybox/LICENSE.GPL-2.0",
+      "upstream": "https://github.com/cryptool-org/busybox-wasm",
+      "sourceRef": "same pinned ref as the vendor/busybox build recipe ({pinnedRef})",
+      "url": "https://raw.githubusercontent.com/cryptool-org/busybox-wasm/{pinnedRef}/LICENSE.GPL-2.0",
+      "license": "GPL-2.0",
+      "notes": "Upstream BusyBox GPL-2.0 license, distributed with the busybox.js/busybox.wasm binaries"
+    },
+    {
+      "path": "vendor/busybox/LICENSE.APACHE-2.0",
+      "upstream": "https://github.com/cryptool-org/busybox-wasm",
+      "sourceRef": "same pinned ref as the vendor/busybox build recipe ({pinnedRef})",
+      "url": "https://raw.githubusercontent.com/cryptool-org/busybox-wasm/{pinnedRef}/LICENSE.APACHE-2.0",
+      "license": "Apache-2.0",
+      "notes": "License of the BusyBox build recipe (scripts/build-busybox/)"
+    },
+    {
+      "path": "vendor/golang-go/LICENSE",
+      "upstream": "https://github.com/golang/go",
+      "sourceRef": "go1.22.0 (commit a10e42f219abb9c5bc4e7d86d9464700a42c7d57)",
+      "url": "https://raw.githubusercontent.com/golang/go/go1.22.0/LICENSE",
+      "license": "BSD-3-Clause",
+      "notes": "License of the Go toolchain (public/wasm_exec.js runtime shim for sh-runner.wasm)"
+    },
+    {
+      "path": "vendor/mvdan-sh/LICENSE",
+      "upstream": "https://github.com/mvdan/sh",
+      "sourceRef": "v3.8.0 (tag, per scripts/build-sh-runner/go.mod)",
+      "url": "https://raw.githubusercontent.com/mvdan/sh/v3.8.0/LICENSE",
+      "license": "BSD-3-Clause",
+      "notes": "License of mvdan.cc/sh/v3 (public/sh-runner.wasm shell parser)"
+    }
+  ],
+  "buildRecipes": [
+    {
+      "path": "vendor/busybox",
+      "upstream": "https://github.com/cryptool-org/busybox-wasm",
+      "license": "Apache-2.0",
+      "pinnedRef": "277e7cb2ff5e94f6df681ff06f665710f3983148",
+      "url": "https://raw.githubusercontent.com/cryptool-org/busybox-wasm/{pinnedRef}/{file}",
+      "files": [
+        "README.md",
+        "build.sh",
+        "Makefile.wasm32",
+        "emscripten_defconfig",
+        "clang-flags.patch"
+      ]
+    }
+  ]
+}

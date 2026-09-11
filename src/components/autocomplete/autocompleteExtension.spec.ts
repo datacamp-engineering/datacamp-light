@@ -1,0 +1,166 @@
+import {
+  CompletionContext,
+  type CompletionResult,
+  type CompletionSource,
+} from '@codemirror/autocomplete';
+import { python } from '@codemirror/lang-python';
+import { StreamLanguage } from '@codemirror/language';
+import { EditorState } from '@codemirror/state';
+import { EditorView } from '@codemirror/view';
+import { r } from '@codemirror/legacy-modes/mode/r';
+import { describe, expect, it, vi } from 'vitest';
+import type { IJsonRpcSession } from '../../jsonrpc/session';
+import { createLanguageCompletionSource } from './autocompleteExtension';
+import { createLazyAutocompleteExtension } from './lazyAutocomplete';
+
+const createState = (documentText: string): EditorState => EditorState.create({ doc: documentText });
+
+const resolveSource = async (
+  source: CompletionSource,
+  state: EditorState,
+  position: number,
+  explicit = false,
+): Promise<CompletionResult | null> => {
+  const context = new CompletionContext(state, position, explicit);
+  const result = await source(context);
+  return result;
+};
+
+describe('autocomplete extension', () => {
+  it('returns static python completions without a session', async () => {
+    const source = createLanguageCompletionSource('python');
+    const state = createState('pri');
+    const result = await resolveSource(source, state, 3);
+    expect(result).not.toBeNull();
+    const labels = result?.options.map((option) => option.label) ?? [];
+    expect(labels).toContain('print');
+  });
+
+  it('starts member completions after the dot trigger and excludes top-level keywords/templates', async () => {
+    const source = createLanguageCompletionSource('python');
+    const state = createState('plt.');
+    const result = await resolveSource(source, state, 4);
+    expect(result?.from).toBe(4);
+    const labels = result?.options.map((option) => option.label) ?? [];
+    expect(labels).toContain('plot');
+    expect(labels).toContain('show');
+    expect(labels).toContain('title');
+    expect(labels).not.toContain('def');
+    expect(labels).not.toContain('class');
+    expect(labels).not.toContain('import');
+    expect(labels).not.toContain('while');
+  });
+
+  it('returns static variables defined in document before or without execution', async () => {
+    const source = createLanguageCompletionSource('python');
+    const docText = 'custom_order_id = 9999\ncust';
+    const state = createState(docText);
+    const result = await resolveSource(source, state, docText.length);
+    expect(result).not.toBeNull();
+    const labels = result?.options.map((option) => option.label) ?? [];
+    expect(labels).toContain('custom_order_id');
+  });
+
+  it('merges deduplicated dynamic completions into static options', async () => {
+    const session = {
+      request: vi.fn().mockResolvedValue({
+        completions: [{ label: 'print', type: 'function', detail: 'dynamic print', boost: 90 }],
+      }),
+    } as unknown as IJsonRpcSession;
+    const source = createLanguageCompletionSource('python', session);
+    const state = createState('print');
+    const result = await resolveSource(source, state, 5);
+    const printOption = result?.options.find((option) => option.label === 'print');
+    expect(printOption?.boost).toBe(90);
+    expect(session.request).toHaveBeenCalledWith(
+      'introspect',
+      expect.objectContaining({ language: 'python' }),
+    );
+  });
+
+  it('keeps static completions when dynamic introspection fails', async () => {
+    const session = {
+      request: vi.fn().mockRejectedValue(new Error('worker error')),
+    } as unknown as IJsonRpcSession;
+    const source = createLanguageCompletionSource('python', session);
+    const state = createState('pri');
+    const result = await resolveSource(source, state, 3);
+    const labels = result?.options.map((option) => option.label) ?? [];
+    expect(labels).toContain('print');
+  });
+
+  it('applies snippet completions through the editor view', () => {
+    const container = document.createElement('div');
+    document.body.appendChild(container);
+    const state = createState('bre');
+    const view = new EditorView({ state, parent: container });
+    try {
+      const source = createLanguageCompletionSource('python');
+      const result = source(new CompletionContext(state, 3, false)) as unknown as CompletionResult | null;
+      const breakCompletion = result?.options.find((option) => option.label === 'break');
+      expect(breakCompletion).toBeDefined();
+      if (typeof breakCompletion?.apply === 'function') {
+        breakCompletion.apply(view, breakCompletion, 0, 3);
+      }
+      expect(view.state.doc.toString()).toBe('break');
+    } finally {
+      view.destroy();
+      container.remove();
+    }
+  });
+
+  it('creates a valid extension with theme and configuration', () => {
+    const extension = createLazyAutocompleteExtension('python');
+    expect(Array.isArray(extension)).toBe(true);
+  });
+
+  it('suppresses autocomplete popup when typing trailing whitespace like import pandas as ', async () => {
+    const source = createLanguageCompletionSource('python');
+    const docText = 'import pandas as ';
+    const state = createState(docText);
+    const result = await resolveSource(source, state, docText.length, false);
+    expect(result).toBeNull();
+  });
+
+  it('returns completions on empty token when explicitly requested with Ctrl+Space', async () => {
+    const source = createLanguageCompletionSource('python');
+    const docText = 'import pandas as ';
+    const state = createState(docText);
+    const result = await resolveSource(source, state, docText.length, true);
+    expect(result).not.toBeNull();
+    expect((result?.options.length ?? 0)).toBeGreaterThan(0);
+  });
+
+  it('suppresses completions inside python string literals', async () => {
+    const source = createLanguageCompletionSource('python');
+    const state = EditorState.create({ doc: "open('pri", extensions: [python()] });
+    const result = await resolveSource(source, state, 9);
+    expect(result).toBeNull();
+  });
+
+  it('suppresses explicit completions inside python string literals', async () => {
+    const source = createLanguageCompletionSource('python');
+    const state = EditorState.create({ doc: "message = 'hello w", extensions: [python()] });
+    const result = await resolveSource(source, state, 18, true);
+    expect(result).toBeNull();
+  });
+
+  it('suppresses completions inside r string literals', async () => {
+    const source = createLanguageCompletionSource('r');
+    const state = EditorState.create({
+      doc: 'x <- "hel',
+      extensions: [StreamLanguage.define(r)],
+    });
+    const result = await resolveSource(source, state, 9);
+    expect(result).toBeNull();
+  });
+
+  it('keeps completions working outside string literals', async () => {
+    const source = createLanguageCompletionSource('python');
+    const docText = "x = 'abc'\ncust";
+    const state = EditorState.create({ doc: docText, extensions: [python()] });
+    const result = await resolveSource(source, state, docText.length);
+    expect(result).not.toBeNull();
+    expect((result?.options.length ?? 0)).toBeGreaterThan(0);
+  });
+});

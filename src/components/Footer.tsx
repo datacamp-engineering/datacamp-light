@@ -1,147 +1,101 @@
-import * as React from "react";
+import '../i18n';
+import { DataLabLogo } from '@datacamp/waffles/brand';
+import { Button } from '@datacamp/waffles/button';
+import { Chapeau } from '@datacamp/waffles/chapeau';
+import { Moon, Sun } from '@datacamp/waffles/icon';
+import { theme } from '@datacamp/waffles/theme';
+import { tokens } from '@datacamp/waffles/tokens';
+import React from 'react';
+import type { ThemeMode } from '../theme/themeManager';
+import { buildDataLabUrl } from '../utils/urlUtils';
 
-import BackendStatus from "../containers/BackendStatus";
-import noop from "../helpers/noop";
-import { ISubmitCodePayload } from "../redux/backend-session";
-import Button from "./Button";
-import RestartSessionButton from "../containers/RestartSessionButton";
-
-import * as DatacampLogo from "../images/datacamp-logo.svg";
-
-import * as styles from "./Footer.module.scss";
-
-export interface IFooterProps extends React.Props<Footer> {
-  onSubmit?: (payload: Partial<ISubmitCodePayload>) => void;
-  onShowHint?: (event: React.SyntheticEvent<HTMLButtonElement>) => void;
-  onShowSolution?: (event: React.SyntheticEvent<HTMLButtonElement>) => void;
-  isSessionBroken?: boolean;
-  isSessionBusy?: boolean;
-  hint?: string;
-  solution?: string;
-  showSolutionButton?: boolean;
-  showRunButton?: boolean;
-  sct?: string;
+export interface FooterProps {
+  code?: string;
   language?: string;
   utmSource?: string;
   utmCampaign?: string;
   impactTrackingLink?: string;
+  theme?: ThemeMode;
+  onToggleTheme?: () => void;
 }
 
-interface IFooterState {
-  isHintPressed: boolean;
-}
+export const Footer: React.FC<FooterProps> = ({
+  code,
+  language = 'python',
+  utmSource = 'datacamp_light',
+  utmCampaign = 'powered_by_datalab',
+  impactTrackingLink,
+  theme: activeTheme = 'dark',
+  onToggleTheme,
+}) => {
+  const datalabUrl = buildDataLabUrl({
+    code,
+    language,
+    utmSource,
+    utmCampaign,
+    impactTrackingLink,
+  });
 
-export class Footer extends React.PureComponent<IFooterProps, IFooterState> {
-  public static defaultProps: Partial<IFooterProps> = {
-    onShowHint: noop,
-    onShowSolution: noop,
-    onSubmit: noop,
-    isSessionBroken: false,
-    isSessionBusy: false,
-    showSolutionButton: false,
-    showRunButton: false,
-    utmSource: "datacamp_light",
-    utmCampaign: "powered_by_datacamp",
-  };
+  const isDarkMode = activeTheme === 'dark';
+  const toggleLabel = isDarkMode ? 'Switch to light theme' : 'Switch to dark theme';
 
-  public displayName: string = "Footer";
-
-  constructor() {
-    super();
-    this.state = {
-      isHintPressed: false,
-    };
-
-    this.onShowHint = this.onShowHint.bind(this);
-    this.onRun = this.onRun.bind(this);
-    this.onSubmit = this.onSubmit.bind(this);
-  }
-
-  onShowHint(event: React.SyntheticEvent<HTMLButtonElement>) {
-    this.setState({
-      isHintPressed: true,
-    });
-    this.props.onShowHint(event);
-  }
-
-  onRun() {
-    this.props.onSubmit({
-      command: "console",
-    });
-  }
-
-  onSubmit() {
-    this.props.onSubmit({
-      command: "submit",
-    });
-  }
-
-  public render() {
-    const { utmSource, utmCampaign, impactTrackingLink } = this.props;
-    const baseUrl = impactTrackingLink
-      ? "https://datacamp.pxf.io"
-      : "https://www.datacamp.com/";
-    const queryParams = `utm_source=${utmSource}&utm_campaign=${utmCampaign}`;
-    const datacampUrl = impactTrackingLink
-      ? `${baseUrl}${impactTrackingLink}`
-      : `${baseUrl}?${queryParams}`;
-
-    return (
-      <div className={styles.footer}>
-        {this.props.hint ? (
-          <Button size="small" onClick={this.onShowHint}>
-            Hint
-          </Button>
-        ) : null}
-        {this.props.solution &&
-        this.props.showSolutionButton &&
-        (!this.props.hint || this.state.isHintPressed) && (
-          <Button
-            appearance="inverted"
-            size="small"
-            onClick={this.props.onShowSolution}
-          >
-            Solution
-          </Button>
-        )}
-        {this.props.language !== "shell" && this.props.sct ? (
-          <Button
-            size="small"
-            appearance="primary"
-            onClick={this.onSubmit}
-            disabled={this.props.isSessionBroken || this.props.isSessionBusy}
-          >
-            Submit
-          </Button>
-        ) : null}
-        {this.props.language !== "shell" &&
-        (!this.props.solution || this.props.showRunButton) ? (
-          <Button
-            size="small"
-            appearance="primary"
-            onClick={this.onRun}
-            disabled={this.props.isSessionBroken || this.props.isSessionBusy}
-          >
-            Run
-          </Button>
-        ) : null}
-        <BackendStatus className={styles.status} />
-        <div className={`${styles.spacer}`} />
-        <RestartSessionButton
-          visible={this.props.isSessionBroken}
-          className={styles.restart}
+  return (
+    <div
+      css={{
+        alignItems: 'center',
+        backgroundColor: theme.background.secondary,
+        borderBottomLeftRadius: tokens.borderRadius.medium,
+        borderBottomRightRadius: tokens.borderRadius.medium,
+        borderTop: `${tokens.borderWidth.thin} solid ${theme.border.main}`,
+        display: 'flex',
+        gap: tokens.spacingNew.medium,
+        justifyContent: 'flex-end',
+        padding: `${tokens.spacingNew.xsmall} ${tokens.spacingNew.medium}`,
+      }}
+    >
+      {onToggleTheme && (
+        <Button
+          aria-label={toggleLabel}
+          icon={isDarkMode ? <Sun size="small" /> : <Moon size="small" />}
+          onClick={onToggleTheme}
+          size="small"
+          title={toggleLabel}
+          variant="plain"
         />
-        <a
-          href={datacampUrl}
-          className={styles.logo}
-          title="Powered by DataCamp"
-          target="_blank"
-        >
-          <DatacampLogo />
-        </a>
-      </div>
-    );
-  }
-}
+      )}
 
-export default Footer;
+      <a
+        aria-label="Powered by DataCamp DataLab - Open this code in a cloud workbook"
+        css={{
+          alignItems: 'center',
+          cursor: 'pointer',
+          display: 'inline-flex',
+          gap: tokens.spacingNew.tiny,
+          textDecoration: 'none !important',
+        }}
+        href={datalabUrl}
+        rel="noopener noreferrer"
+        target="_blank"
+        title="Open this code in DataLab (DataCamp's cloud notebook)"
+      >
+        <Chapeau
+          aria-hidden="true"
+          css={{
+            color: theme.text.inverseSubtle,
+            marginBottom: '0 !important',
+            marginTop: '2px',
+          }}
+          size="small"
+        >
+          Powered by
+        </Chapeau>
+        <DataLabLogo
+          css={{ color: theme.text.inverseSubtle }}
+          height={17}
+          monochrome
+          width={71}
+        />
+      </a>
+    </div>
+  );
+};
