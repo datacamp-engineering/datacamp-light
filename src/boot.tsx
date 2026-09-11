@@ -180,7 +180,7 @@ const mount = () => {
     element.classList.add('datacamp-exercise-initialized');
     element.removeAttribute('data-datacamp-exercise');
 
-    const crashDemo = element.getAttribute('data-crash-demo');
+    const crashDemo = import.meta.env.DEV ? element.getAttribute('data-crash-demo') : null;
     const root = createRoot(element);
     root.render(
       <ErrorBoundary label="widget" variant="widget">
@@ -224,11 +224,15 @@ export function initAddedDCLightExercises(): void {
 export const initDataCampLight = initAddedDCLightExercises;
 
 /**
- * Playground-only: `data-crash-demo` makes a widget throw during render so the
- * error boundaries and their reload flows can be exercised from the demo pages.
+ * Playground-only (stripped from production builds): `data-crash-demo` makes a
+ * widget throw during render so the error boundaries and their reload flows
+ * can be exercised from the demo pages.
  * - `data-crash-demo="true"` crashes the whole widget (top-level boundary).
  * - `data-crash-demo="component"` crashes a single subcomponent inside a real
  *   widget shell (inline boundary), showing the compact section fallback.
+ *
+ * The `import.meta.env.DEV` gate in bootElement makes the attribute a no-op
+ * and lets Vite dead-code-eliminate the components from production bundles.
  */
 function CrashDemo({
   mode,
@@ -238,11 +242,11 @@ function CrashDemo({
   theme?: 'light' | 'dark';
 }): never | React.ReactElement {
   if (mode === 'component') {
-    return (
-      <ComponentCrashDemo theme={theme} />
-    );
+    return <ComponentCrashDemo theme={theme} />;
   }
-  throw new Error('This widget was asked to crash for the error-boundary demo (data-crash-demo="true").');
+  throw new Error(
+    'This widget was asked to crash for the error-boundary demo (data-crash-demo="true").',
+  );
 }
 
 function ComponentCrashDemo({ theme }: { theme?: 'light' | 'dark' }): React.ReactElement {
@@ -257,5 +261,7 @@ function ComponentCrashDemo({ theme }: { theme?: 'light' | 'dark' }): React.Reac
 }
 
 function CrashingSubcomponent(): never {
-  throw new Error('This section was asked to crash for the component error-boundary demo (data-crash-demo="component").');
+  throw new Error(
+    'This section was asked to crash for the component error-boundary demo (data-crash-demo="component").',
+  );
 }
