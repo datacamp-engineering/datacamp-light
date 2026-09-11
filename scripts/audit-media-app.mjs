@@ -11,10 +11,15 @@
  * Focuses on Python exercises (the majority); R exercises are reported but
  * skipped (webR cannot run in Node with the current audit infrastructure).
  *
+ * The Strapi token is optional: published content is usually readable via the
+ * public role, so the audit works without CMS_API_TOKEN_READ_ONLY. As an
+ * alternative source, --source=public fetches the rendered tutorial page from
+ * the public site (no Strapi API at all) and parses the exercise divs from the
+ * SSR HTML.
+ *
  * Usage:
- *   CMS_BASE_URL=http://cms.datacamp.test \
- *   CMS_API_TOKEN_READ_ONLY=... \
- *   node scripts/audit-media-app.mjs [--locale=en] [--slug=python-list-comprehension] [--refresh]
+ *   node scripts/audit-media-app.mjs [--locale=en] [--slug=python-list-comprehension]
+ *   node scripts/audit-media-app.mjs --source=public [--base-url=https://www.datacamp.com/tutorials]
  */
 
 import fs from 'node:fs';
@@ -34,10 +39,12 @@ const cmsToken = process.env.CMS_API_TOKEN_READ_ONLY || '';
 const commandArguments = process.argv.slice(2);
 const localeArgument = commandArguments.find((arg) => arg.startsWith('--locale='))?.split('=')[1] || 'en';
 const slugArgument = commandArguments.find((arg) => arg.startsWith('--slug='))?.split('=')[1] || null;
+const sourceArgument = commandArguments.find((arg) => arg.startsWith('--source='))?.split('=')[1] || 'strapi';
+const baseUrlArgument = commandArguments.find((arg) => arg.startsWith('--base-url='))?.split('=')[1] || null;
 
 console.log(`\n======================================================================`);
-console.log(` DataCamp Light v4 — Media-App Strapi Tutorial Compatibility Audit`);
-console.log(` Locale: ${localeArgument}${slugArgument ? ` | Slug: ${slugArgument}` : ' | All slugs'}`);
+console.log(` DataCamp Light v4 — Media-App Tutorial Compatibility Audit`);
+console.log(` Source: ${sourceArgument} | Locale: ${localeArgument}${slugArgument ? ` | Slug: ${slugArgument}` : ' | All slugs'}`);
 console.log(`======================================================================\n`);
 
 // ---------------------------------------------------------------------------
@@ -135,12 +142,11 @@ async function fetchStrapiTutorial(slug, locale) {
   const cmsToken = process.env.CMS_API_TOKEN_READ_ONLY || '';
 
   const url = `${cmsBaseUrl}/api/tutorials?filters[slug][$eq]=${slug}&locale=${locale}&publicationState=live&fields[0]=content&fields[1]=type&fields[2]=isCodeExecutable&fields[3]=title`;
-  const response = await fetch(url, {
-    headers: {
-      Authorization: `Bearer ${cmsToken}`,
-      Accept: 'application/json',
-    },
-  });
+  const headers = { Accept: 'application/json' };
+  if (cmsToken) {
+    headers.Authorization = `Bearer ${cmsToken}`;
+  }
+  const response = await fetch(url, { headers });
 
   if (!response.ok) {
     throw new Error(`Strapi API error ${response.status} for slug "${slug}" (${locale})`);
@@ -148,6 +154,26 @@ async function fetchStrapiTutorial(slug, locale) {
 
   const data = await response.json();
   return data.data?.[0] ?? null;
+}
+
+/**
+ * Fetches the rendered tutorial page from the public site and returns the
+ * exercise divs parsed from the SSR HTML. No Strapi API or token needed.
+ */
+async function fetchPublicTutorial(slug, locale) {
+  const baseUrl = baseUrlArgument || process.env.MEDIA_APP_BASE_URL || 'https://www.datacamp.com/tutorial';
+  const localeSuffix = locale === 'en' ? '' : `?locale=${locale}`;
+  const url = `${baseUrl}/${slug}${localeSuffix}`;
+  const response = await fetch(url, {
+    headers: { Accept: 'text/html' },
+  });
+
+  if (!response.ok) {
+    throw new Error(`Public page error ${response.status} for "${url}"`);
+  }
+
+  const html = await response.text();
+  return extractExerciseDivs(html);
 }
 
 // ---------------------------------------------------------------------------
@@ -167,56 +193,97 @@ function extractExerciseDivs(html) {
     const startTag = match[0];
 
     // Extract lang from the div attributes
-    const langMatch = start.match(/data-lang="([^"]*)"/);
+    const langMatch = startTag.match(/data-lang="([^"]*)"/);
     const lang = langMatch ? langMatch[1] : 'python';
 
     // Count nested <div> opens/closes to find the matching close tag
     let depth = 1;
-    let pos = start + start.length;
+    let pos = start + startTag.length;
     const divRegex = /<\/?div[\s>]/gi;
     divRegex.lastIndex = pos;
     let innerMatch;
+    let end = html.length;
     while ((innerMatch = divRegex.exec(html)) !== null) {
       if (innerMatch[0].startsWith('</')) depth--;
       else depth++;
-      if (depth === 0) break;
-      pos = divRegex.lastIndex;
+      if (depth === 0) {
+        end = divRegex.lastIndex;
+        break;
+      }
     }
-    const end = content_safe_index(html, pos);
     const block = html.slice(start, end);
 
-    exercises.push({ lang: langMatch?.[1] || 'python', block });
+    exercises.push({ lang, block });
   }
   return exercises;
 }
 
-function content_safe_index(html, from) {
-  // Find the closing </div> that matches depth 0 — scan forward
-  const closeIdx = html.indexOf('</div>', from);
-  return closeIdx === -1 ? html.length : closeIdx + 6;
+/**
+ * Removes uniform leading indentation from code extracted from rich-text HTML
+ * (the CMS editor indents code blocks inside <code> elements).
+ */
+function stripIndent(sourceString) {
+  if (!sourceString) return '';
+  const normalized = sourceString.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+  const match = normalized.match(/^[ \t]*(?=\S)/gm);
+  if (!match) return normalized;
+  const indent = Math.min(...match.map((element) => element.length));
+  const regex = new RegExp(`^[ \t]{${indent}}`, 'gm');
+  return indent > 0 ? normalized.replace(regex, '') : normalized;
 }
 
 /**
  * Parses exercise definitions from an exercise div block.
+ * Handles both formats:
+ *  - `data-encoded="true"`: base64 + URI-encoded JSON payload in the element
+ *    text (the format media-app tutorials use)
+ *  - `<code data-type="...">` children (the classic embed format)
  * Returns { preExerciseCode, sampleCode, solution, sct, packages }.
  */
 function parseExerciseBlock(block) {
+  const encodedMatch = block.match(/data-encoded="true"/i);
+  if (encodedMatch) {
+    const textMatch = block.match(/>([^<]*)<\/div>/);
+    if (textMatch && textMatch[1]) {
+      try {
+        const decoded = Buffer.from(decodeURIComponent(textMatch[1]), 'base64').toString('utf8');
+        const exercise = JSON.parse(decoded);
+        return {
+          language: exercise.language || 'python',
+          preExerciseCode: exercise.pre_exercise_code || '',
+          sampleCode: exercise.sample || exercise.sample_code || '',
+          solution: exercise.solution || '',
+          sct: exercise.sct || '',
+          packages: Array.isArray(exercise.packages) ? exercise.packages.join(',') : (exercise.packages || ''),
+        };
+      } catch (decodeError) {
+        // Fall through to the code-children parser if the payload is malformed
+      }
+    }
+  }
+
   const extractCode = (type) => {
     const regex = new RegExp(`<code[^>]*data-type="${type}"[^>]*>([\\s\\S]*?)</code>`, 'i');
     const match = block.match(regex);
     if (!match) return '';
     // Strip HTML tags from the code content (rich text may wrap in spans, etc.)
-    return match[1]
-      .replace(/<[^>]*>/g, '')
-      .replace(/&amp;/g, '&')
-      .replace(/&lt;/g, '<')
-      .replace(/&gt;/g, '>')
-      .replace(/&quot;/g, '"')
-      .replace(/&nbsp;/g, ' ')
-      .trim();
+    // Dedent the raw content BEFORE trimming: the CMS editor indents every
+    // line, and trimming first would flush the first line and break the
+    // uniform-indent computation.
+    return stripIndent(
+      match[1]
+        .replace(/<[^>]*>/g, '')
+        .replace(/&amp;/g, '&')
+        .replace(/&lt;/g, '<')
+        .replace(/&gt;/g, '>')
+        .replace(/&quot;/g, '"')
+        .replace(/&nbsp;/g, ' '),
+    ).trim();
   };
 
+  const langMatch = block.match(/data-lang="([^"]*)"/i);
   return {
+    language: langMatch ? langMatch[1].toLowerCase() : 'python',
     preExerciseCode: extractCode('pre-exercise-code'),
     sampleCode: extractCode('sample-code'),
     solution: extractCode('solution'),
@@ -307,11 +374,9 @@ async function initializePyodideRunner() {
 
 async function runAudit() {
   const cmsUrl = process.env.CMS_BASE_URL;
-  const cmsAuth = process.env.CMS_API_TOKEN_READ_ONLY;
 
-  if (!cmsUrl || !cmsAuth) {
-    console.error('Missing CMS_BASE_URL or CMS_API_TOKEN_READ_ONLY env vars.');
-    console.error('Set them to point at the Strapi instance serving the media-app tutorials.');
+  if (sourceArgument === 'strapi' && !cmsUrl) {
+    console.error('Missing CMS_BASE_URL env var (or use --source=public to fetch rendered pages).');
     process.exit(1);
   }
 
@@ -325,7 +390,7 @@ async function runAudit() {
     return;
   }
 
-  console.log(`[Strapi] Fetching ${targets.length} tutorials from ${cmsUrl}...\n`);
+  console.log(`[${sourceArgument === 'public' ? 'Public' : 'Strapi'}] Fetching ${targets.length} tutorials...\n`);
 
   const pyodide = await initializePyodideRunner();
 
@@ -342,31 +407,31 @@ async function runAudit() {
   for (const target of targets) {
     globalIndex++;
 
-    let entry = null;
+    let exerciseDivs = [];
     try {
-      entry = await fetchStrapiTutorial(target.slug, target.locale);
+      if (sourceArgument === 'public') {
+        exerciseDivs = await fetchPublicTutorial(target.slug, target.locale);
+      } else {
+        const entry = await fetchStrapiTutorial(target.slug, target.locale);
+        if (!entry) {
+          console.log(` ${String(++globalIndex).padStart(2)}  ⚪ SKIP   ${target.slug.padEnd(50)} ${target.locale.padEnd(7)}  (Not found or draft)`);
+          skippedCount++;
+          continue;
+        }
+        const richTextHtml = extractRichTextHtml(entry);
+        exerciseDivs = extractExerciseDivs(richTextHtml);
+      }
     } catch (fetchError) {
-      console.log(` ${String(++globalIndex).padStart(2)}  ❌ FETCH  ${target.slug.padEnd(50)} ${target.locale.padEnd(7)}  Strapi fetch error: ${(fetchError.message || '').split('\n')[0]}`);
+      console.log(` ${String(++globalIndex).padStart(2)}  ❌ FETCH  ${target.slug.padEnd(50)} ${target.locale.padEnd(7)}  Fetch error: ${(fetchError.message || '').split('\n')[0]}`);
       failedCount++;
       continue;
     }
-
-    if (!entry) {
-      console.log(` ${String(++globalIndex).padStart(2)}  ⚪ SKIP   ${target.slug.padEnd(50)} ${target.locale.padEnd(7)}  (Not found or draft)`);
-      skippedCount++;
-      continue;
-    }
-
-    const richTextHtml = extractRichTextHtml(entry);
-    const exerciseDivs = extractExerciseDivs(richTextHtml);
 
     if (exerciseDivs.length === 0) {
       console.log(` ${String(++globalIndex).padStart(2)}  ⚪ SKIP   ${target.slug.padEnd(50)} ${target.locale.padEnd(7)}  (No exercise divs found)`);
       skippedCount++;
       continue;
     }
-
-    const title = entry.attributes?.title || target.slug;
 
     for (let exIdx = 0; exIdx < exerciseDivs.length; exIdx++) {
       const exercise = parseExerciseBlock(exerciseDivs[exIdx].block);
@@ -375,8 +440,8 @@ async function runAudit() {
       const startTime = Date.now();
 
       try {
-        if (exerciseDivs[exIdx].lang !== 'python') {
-          console.log(` ${String(++globalIndex).padStart(3)}  ⚪ SKIP   ${label} ${locale}  ${exerciseDivs[exIdx].lang.padEnd(9)} (R exercises not auditable in Node)`);
+        if (exercise.language !== 'python') {
+          console.log(` ${String(++globalIndex).padStart(3)}  ⚪ SKIP   ${label} ${locale}  ${exercise.language.padEnd(9)} (R exercises not auditable in Node)`);
           skippedCount++;
           continue;
         }
