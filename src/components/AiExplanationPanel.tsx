@@ -80,12 +80,6 @@ export const AiExplanationPanel: React.FC<AiExplanationPanelProps> = ({
                 lineHeight: tokens.lineHeights.relaxed,
                 maxHeight: '260px',
                 overflowY: 'auto',
-                '& p': {
-                  margin: '0 0 8px 0',
-                  '&:last-child': {
-                    marginBottom: 0,
-                  },
-                },
                 '& strong': {
                   fontWeight: tokens.fontWeights.bold,
                 },
@@ -93,7 +87,6 @@ export const AiExplanationPanel: React.FC<AiExplanationPanelProps> = ({
                   fontStyle: 'italic',
                 },
                 '& ul, & ol': {
-                  margin: '4px 0 8px 0',
                   paddingLeft: '20px',
                 },
                 '& li': {

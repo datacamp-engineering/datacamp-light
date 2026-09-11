@@ -3,8 +3,35 @@ import { describe, expect, it } from 'vitest';
 import {
   closeUnterminatedCodeFences,
   renderMarkdown,
+  richTextContentStyle,
   sanitizeHtml,
 } from './richText';
+
+describe('richTextContentStyle', () => {
+  it('gives markdown block elements a consistent interior gap', () => {
+    const [blockRule] = Object.entries(richTextContentStyle).find(
+      ([selector]) => selector.startsWith('& p,'),
+    )!;
+    expect(blockRule).toBeDefined();
+  });
+
+  it('collapses the outer edges of any rendered block element', () => {
+    const selectors = Object.keys(richTextContentStyle);
+    expect(selectors).toContain('& > :first-child');
+    expect(selectors).toContain('& > :last-child');
+    expect(richTextContentStyle['& > :first-child']).toEqual({ marginTop: 0 });
+    expect(richTextContentStyle['& > :last-child']).toEqual({ marginBottom: 0 });
+  });
+
+  it('covers the block element types markdown produces', () => {
+    const blockSelector = Object.keys(richTextContentStyle).find((selector) =>
+      selector.includes('& p,'),
+    )!;
+    for (const element of ['p', 'ul', 'ol', 'pre', 'blockquote', 'h1', 'h6']) {
+      expect(blockSelector).toContain(element);
+    }
+  });
+});
 
 describe('sanitizeHtml', () => {
   it('removes script tags and event handlers while keeping formatting', () => {

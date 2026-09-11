@@ -33,18 +33,7 @@ export const FeedbackBanner: React.FC<FeedbackBannerProps> = ({
       data-correct={String(isSuccess)}
       data-testid="feedback-banner"
     >
-      <div
-        css={{
-          alignItems: 'center',
-          display: 'flex',
-          gap: tokens.spacingNew.xsmall,
-          // renderMarkdown wraps the message in paragraphs with default browser
-          // margins; zero them so the compact banner layout is not pushed apart.
-          '& p': {
-            margin: 0,
-          },
-        }}
-      >
+      <div css={{ alignItems: 'center', display: 'flex', gap: tokens.spacingNew.xsmall }}>
         {isSuccess ? (
           <CheckmarkCircle size="small" />
         ) : (

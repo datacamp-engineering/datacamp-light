@@ -37,6 +37,26 @@ export function sanitizeHtml(html: string): string {
 }
 
 /**
+ * Layout resets for containers that render markdown output. Markdown produces
+ * many block element types (p, ul, ol, pre, headings, blockquotes), each with
+ * its own browser default margins — resetting only `p` leaves stray margins
+ * when the rendered fragment ends with (or starts with) a list or code block.
+ * Block elements get a consistent interior gap, and the first/last child
+ * collapse against the surrounding container edges.
+ */
+export const richTextContentStyle = {
+  '& p, & ul, & ol, & pre, & blockquote, & h1, & h2, & h3, & h4, & h5, & h6': {
+    margin: '0 0 8px 0',
+  },
+  '& > :first-child': {
+    marginTop: 0,
+  },
+  '& > :last-child': {
+    marginBottom: 0,
+  },
+} as const;
+
+/**
  * Closes an unterminated fenced code block so partially streamed markdown
  * renders the block's content (including `#` comment lines) as code instead
  * of as top-level markdown (which would turn `# comment` into an h1 heading).

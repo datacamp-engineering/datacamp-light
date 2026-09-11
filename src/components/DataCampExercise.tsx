@@ -58,14 +58,6 @@ export const HintPanel: React.FC<{ hint: string }> = ({ hint }) => (
       color: theme.text.secondary,
       fontSize: tokens.fontSizes.medium,
       display: 'block',
-      // renderMarkdown wraps plain-text hints in paragraphs; keep the banner
-      // layout tight while preserving spacing between paragraphs.
-      '& p': {
-        margin: '0 0 8px 0',
-        '&:last-child': {
-          marginBottom: 0,
-        },
-      },
     }}
   >
     <SanitizedHtml as="div" html={renderMarkdown(dedent(hint))} />
