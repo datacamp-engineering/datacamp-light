@@ -14,16 +14,14 @@ import { DataCampExercise } from './components/DataCampExercise';
 import { DCLWidgetShell } from './components/DCLWidgetShell';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { useResolvedTheme } from './theme/themeManager';
-import { parseExerciseSettings as getSettings } from './exerciseSettings';
-
-export { parseExerciseSettings as getSettings } from './exerciseSettings';
+import { parseExerciseSettings } from './exerciseSettings';
 
 export function bootElement(element: HTMLElement): void {
   if (element.classList.contains('datacamp-exercise-initialized')) {
     return;
   }
 
-  const settingsForLazyLoad = getSettings(element);
+  const settingsForLazyLoad = parseExerciseSettings(element);
   const noLazyLoad =
     settingsForLazyLoad.noLazyLoad === true ||
     (element.hasAttribute('data-no-lazy-load') &&

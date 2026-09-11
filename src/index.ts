@@ -6,12 +6,8 @@ if (typeof globalThis !== 'undefined' && !(globalThis as any).process) {
 }
 
 import './i18n';
-import {
-  bootElement,
-  getSettings,
-  initAddedDCLightExercises,
-  initDataCampLight,
-} from './boot';
+import { parseExerciseSettings as getSettings } from './exerciseSettings';
+import { initAddedDCLightExercises, initDataCampLight, bootElement } from './boot';
 import { DataCampExercise } from './components/DataCampExercise';
 import { createSessionForLanguage as createWasmSession } from './runtime/createSessionForLanguage';
 // Inline the fonts stylesheet so the bundle is self-contained: consumers only

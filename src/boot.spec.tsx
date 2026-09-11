@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import { getSettings } from './boot';
+import { parseExerciseSettings as getSettings } from './exerciseSettings';
 
 describe('getSettings', () => {
   let element: HTMLDivElement;
